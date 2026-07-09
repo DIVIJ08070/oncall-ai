@@ -5,7 +5,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
-  "references": [{ "path": "../shared" }],
+  "references": [{ "path": "../shared" }, { "path": "../agent" }],
   "include": ["src/**/*.ts"],
   "exclude": ["dist", "node_modules"]
 }
