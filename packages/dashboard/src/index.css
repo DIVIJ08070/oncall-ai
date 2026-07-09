@@ -1,0 +1,179 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * DESIGN_SPEC §2 tokens as CSS custom properties (§14 strategy).
+ * Dark is the default (`:root`); light overrides on `:root[data-theme="light"]`.
+ * The pre-paint script in index.html stamps `data-theme`; the theme toggle updates it.
+ * Do NOT hardcode hex in components — only these tokens (via Tailwind classes/vars).
+ */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg: #0d0d0d;
+  --surface: #1a1a19;
+  --surface-2: #242422;
+  --surface-3: #2e2e2b;
+
+  /* Ink */
+  --ink: #ffffff;
+  --ink-2: #c3c2b7;
+  --ink-muted: #898781;
+  --ink-muted-text: #898781;
+
+  /* Lines */
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --grid: #2c2c2a;
+  --axis: #383835;
+
+  /* Action */
+  --primary: #256abf;
+  --primary-hover: #2a78d6;
+  --accent: #3987e5;
+  --accent-text: #3987e5;
+  --focus-ring: #3987e5;
+  --scrim: rgba(0, 0, 0, 0.6);
+
+  /* Status (reserved) */
+  --ok: #0ca30c;
+  --ok-text: #0ca30c;
+  --warn: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --silent: #898781;
+  --pr-merged: #9085e9;
+
+  /* Chart series + feed accents */
+  --series-error: #3987e5;
+  --series-lat: #199e70;
+  --series-lat-band: rgba(25, 158, 112, 0.1);
+  --tool-result: #199e70;
+  --conclusion: #9085e9;
+
+  /* Elevation (dark leans on surface+border) */
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --elev-2: 0 8px 24px rgba(0, 0, 0, 0.55);
+  --elev-3: 0 16px 48px rgba(0, 0, 0, 0.65);
+
+  /* Type */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas,
+    'Liberation Mono', monospace;
+
+  /* Motion */
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+  --dur-slow: 240ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #ffffff;
+  --surface-3: #f2f1ec;
+
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --ink-muted: #898781;
+  --ink-muted-text: #6b6a65;
+
+  --border: rgba(11, 11, 11, 0.1);
+  --border-strong: rgba(11, 11, 11, 0.16);
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+
+  --primary: #256abf;
+  --primary-hover: #2f7ce0;
+  --accent: #2a78d6;
+  --accent-text: #2a6cc4;
+  --focus-ring: #2a78d6;
+  --scrim: rgba(11, 11, 11, 0.4);
+
+  --ok: #0ca30c;
+  --ok-text: #006300;
+  --warn: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --silent: #898781;
+  --pr-merged: #6c5ce0;
+
+  --series-error: #2a78d6;
+  --series-lat: #1baf7a;
+  --series-lat-band: rgba(27, 175, 122, 0.1);
+  --tool-result: #1baf7a;
+  --conclusion: #4a3aa7;
+
+  --elev-1: 0 1px 2px rgba(11, 11, 11, 0.06);
+  --elev-2: 0 6px 16px rgba(11, 11, 11, 0.1);
+  --elev-3: 0 16px 40px rgba(11, 11, 11, 0.16);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 20px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Tabular numerals for machine data columns (DESIGN_SPEC §2.5). */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Visible focus ring on every interactive element (DESIGN_SPEC §11). */
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  /* Thin, calm scrollbars for the dense console surfaces. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--surface-3);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* Reduced motion: drop translate/scale/pulse; keep instant opacity (§2.7/§11). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
