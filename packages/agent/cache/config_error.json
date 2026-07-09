@@ -1,0 +1,286 @@
+{
+  "scenario": "config_error",
+  "recorded_at": 1783611514451,
+  "model": "claude-sonnet-5",
+  "fingerprints": [
+    "record-config_error"
+  ],
+  "match": {
+    "detector": "error_rate",
+    "suspect_deploy_sha": "4e677cc62a1d10254573814540ede80ac9be140e",
+    "keywords": [
+      "config",
+      "pricing",
+      "missing config",
+      "pricing_table"
+    ]
+  },
+  "outcome": {
+    "status": "completed",
+    "decision": "propose_fix",
+    "root_cause": "Deploy 4e677cc (\"config: source PRICING_TABLE from env only\") edited src/config.ts, removing the default fallback: `process.env.PRICING_TABLE ?? 'default-pricing-v1'` became `process.env.PRICING_TABLE`. With PRICING_TABLE unset in this environment, config.pricingTable is undefined, and src/routes/pricing.ts:9 explicitly throws `Error: Missing config PRICING_TABLE` whenever pricingTable is falsy, returning HTTP 500 on every GET /api/pricing request. This produced the observed error-rate spike (0.6 vs 0.0 baseline).",
+    "confidence": 0.95,
+    "iterations": 11,
+    "cost_usd": 0
+  },
+  "steps": [
+    {
+      "type": "tool_call",
+      "tool_name": "get_metrics",
+      "tool_input": {
+        "service": "checkout-api"
+      },
+      "tool_output": null,
+      "content": null
+    },
+    {
+      "type": "tool_result",
+      "tool_name": "get_metrics",
+      "tool_input": null,
+      "tool_output": {
+        "service": "checkout-api",
+        "window_sec": 900,
+        "current": {
+          "error_rate": 0.6,
+          "req_count": 25,
+          "p50_ms": 30,
+          "p95_ms": 90,
+          "p99_ms": 180
+        },
+        "baseline": {
+          "error_rate": 0,
+          "p95_ms": 0
+        },
+        "series": [
+          {
+            "ts": 1783611514451,
+            "error_rate": 0.6,
+            "req_count": 25,
+            "p95_ms": 90
+          }
+        ]
+      },
+      "content": null
+    },
+    {
+      "type": "tool_call",
+      "tool_name": "search_logs",
+      "tool_input": {
+        "service": "checkout-api",
+        "level": "error"
+      },
+      "tool_output": null,
+      "content": null
+    },
+    {
+      "type": "tool_result",
+      "tool_name": "search_logs",
+      "tool_input": null,
+      "tool_output": {
+        "total_matched": 1,
+        "returned": 1,
+        "truncated": false,
+        "events": [
+          {
+            "ts": 1783611509451,
+            "level": "error",
+            "message": "Missing config PRICING_TABLE",
+            "endpoint": "/api/pricing",
+            "status": 500,
+            "latency_ms": 90,
+            "stack_excerpt": "Error: Missing config PRICING_TABLE\n  at pricing (src/routes/pricing.ts:9)"
+          }
+        ],
+        "patterns": []
+      },
+      "content": null
+    },
+    {
+      "type": "tool_call",
+      "tool_name": "get_recent_deploys",
+      "tool_input": {
+        "limit": 10
+      },
+      "tool_output": null,
+      "content": null
+    },
+    {
+      "type": "tool_result",
+      "tool_name": "get_recent_deploys",
+      "tool_input": null,
+      "tool_output": {
+        "deploys": [
+          {
+            "sha": "4e677cc62a1d10254573814540ede80ac9be140e",
+            "short_sha": "4e677cc",
+            "message_first_line": "config: source PRICING_TABLE from env only",
+            "author": "Victim Dev Team",
+            "committed_at": 1783601208000,
+            "is_current": true
+          },
+          {
+            "sha": "32a55d50246e401a6a8216a1f14a42930b1590bb",
+            "short_sha": "32a55d5",
+            "message_first_line": "reports: switch to full report scan for accuracy",
+            "author": "Victim Dev Team",
+            "committed_at": 1783600608000,
+            "is_current": false
+          },
+          {
+            "sha": "1faea629b497d3250927292cc69072c8c20008be",
+            "short_sha": "1faea62",
+            "message_first_line": "checkout: drop redundant session-cart null check",
+            "author": "Victim Dev Team",
+            "committed_at": 1783600008000,
+            "is_current": false
+          },
+          {
+            "sha": "2ad98c3a0efb0d20b1f114017d8baf9a95874cec",
+            "short_sha": "2ad98c3",
+            "message_first_line": "chore: bootstrap checkout-api service",
+            "author": "Victim Dev Team",
+            "committed_at": 1783599408000,
+            "is_current": false
+          }
+        ]
+      },
+      "content": null
+    },
+    {
+      "type": "thought",
+      "tool_name": null,
+      "tool_input": null,
+      "tool_output": null,
+      "content": "Confirmed breach: error_rate 0.6 vs baseline 0 (threshold 0.2). Log shows `Missing config PRICING_TABLE` at `src/routes/pricing.ts:9`, 500s on `/api/pricing`. Current deploy is 4e677cc \"config: source PRICING_TABLE from env only\" — let's verify the diff and surrounding code."
+    },
+    {
+      "type": "tool_call",
+      "tool_name": "get_deploy_diff",
+      "tool_input": {
+        "sha": "4e677cc62a1d10254573814540ede80ac9be140e"
+      },
+      "tool_output": null,
+      "content": null
+    },
+    {
+      "type": "tool_call",
+      "tool_name": "read_file",
+      "tool_input": {
+        "path": "src/routes/pricing.ts"
+      },
+      "tool_output": null,
+      "content": null
+    },
+    {
+      "type": "tool_result",
+      "tool_name": "get_deploy_diff",
+      "tool_input": null,
+      "tool_output": {
+        "base": "32a55d50246e401a6a8216a1f14a42930b1590bb",
+        "head": "4e677cc62a1d10254573814540ede80ac9be140e",
+        "total_files": 1,
+        "total_additions": 1,
+        "total_deletions": 1,
+        "truncated": false,
+        "files": [
+          {
+            "path": "src/config.ts",
+            "status": "modified",
+            "additions": 1,
+            "deletions": 1,
+            "patch_excerpt": "@@ -15,5 +15,5 @@ export const config = {\n   ingestUrl: str('ONCALL_INGEST_URL', 'http://localhost:3001/api/v1/ingest'),\n   apiKey: str('ONCALL_API_KEY', 'dev-local-ingest-key'),\n   // Pricing table config default (present in the healthy build).\n-  pricingTable: process.env.PRICING_TABLE ?? 'default-pricing-v1',\n+  pricingTable: process.env.PRICING_TABLE,\n };"
+          }
+        ]
+      },
+      "content": null
+    },
+    {
+      "type": "tool_result",
+      "tool_name": "read_file",
+      "tool_input": null,
+      "tool_output": {
+        "path": "src/routes/pricing.ts",
+        "ref": "main",
+        "total_lines": 22,
+        "returned_lines": 22,
+        "truncated": false,
+        "content": "import { Router } from 'express';\nimport { config } from '../config.js';\n\nexport const pricingRouter = Router();\n\npricingRouter.get('/', (_req, res) => {\n  const pricingTable = config.pricingTable;\n  if (!pricingTable) {\n    // The pricing table config is missing (removed default + unset env).\n    throw new Error('Missing config PRICING_TABLE');\n  }\n  res.status(200).json({\n    ok: true,\n    table: pricingTable,\n    plans: [\n      { id: 'basic', price_cents: 900 },\n      { id: 'pro', price_cents: 2900 },\n      { id: 'scale', price_cents: 9900 },\n    ],\n  });\n});\n"
+      },
+      "content": null
+    },
+    {
+      "type": "thought",
+      "tool_name": null,
+      "tool_input": null,
+      "tool_output": null,
+      "content": "Confirmed root cause. The deploy `4e677cc` removed the fallback default for `pricingTable` (`?? 'default-pricing-v1'`), leaving `process.env.PRICING_TABLE` unset in this environment → `config.pricingTable` is `undefined` → `pricing.ts` throws `Missing config PRICING_TABLE` on every `/api/pricing` request → 500s → error rate spike to 0.6. This is a clean, single-line, high-confidence culprit. I'll open a revert PR."
+    },
+    {
+      "type": "tool_call",
+      "tool_name": "create_fix_pr",
+      "tool_input": {
+        "kind": "revert",
+        "revert_sha": "4e677cc62a1d10254573814540ede80ac9be140e",
+        "confidence": 0.95,
+        "root_cause": "Deploy 4e677cc (\"config: source PRICING_TABLE from env only\") removed the fallback default in src/config.ts, changing `process.env.PRICING_TABLE ?? 'default-pricing-v1'` to `process.env.PRICING_TABLE`. Since PRICING_TABLE is not set in this environment, config.pricingTable is now undefined, causing src/routes/pricing.ts:9 to throw `Error: Missing config PRICING_TABLE` on every request to GET /api/pricing, returning HTTP 500.",
+        "title": "Revert \"config: source PRICING_TABLE from env only\" (4e677cc)",
+        "body": "## Incident\ninc_rec_config_error_1783611514451 — error-rate spike on checkout-api (pricing), observed 0.6 vs threshold 0.2.\n\n## Root cause\nDeploy `4e677cc` changed `src/config.ts`:\n\n```diff\n- pricingTable: process.env.PRICING_TABLE ?? 'default-pricing-v1',\n+ pricingTable: process.env.PRICING_TABLE,\n```\n\nThis dropped the built-in default, relying entirely on the `PRICING_TABLE` env var being set. It is not set in this environment, so `config.pricingTable` is `undefined`.\n\n`src/routes/pricing.ts` explicitly guards against a missing table:\n\n```ts\nif (!pricingTable) {\n  throw new Error('Missing config PRICING_TABLE');\n}\n```\n\nThis throws on every `GET /api/pricing` request, producing HTTP 500s and the observed error-rate spike (0.6 vs 0 baseline).\n\n## Evidence\n- `get_metrics(checkout-api)`: error_rate 0.6 (baseline 0), first_error_at ≈ 1783611484451\n- `search_logs`: `Missing config PRICING_TABLE` at `src/routes/pricing.ts:9`, endpoint `/api/pricing`, status 500\n- `get_recent_deploys`: `4e677cc` is `is_current: true`, committed just before first_error_at\n- `get_deploy_diff(4e677cc)`: single-line change removing the `?? 'default-pricing-v1'` fallback\n\n## Fix\nRevert `4e677cc` to restore the default fallback until `PRICING_TABLE` is properly provisioned via env in this environment."
+      },
+      "tool_output": null,
+      "content": null
+    },
+    {
+      "type": "tool_result",
+      "tool_name": "create_fix_pr",
+      "tool_input": null,
+      "tool_output": {
+        "pr_number": 8,
+        "url": "https://github.com/DIVIJ08070/oncall-ai-victim/pull/8",
+        "branch": "oncall-ai/fix-inc_rec_config_error_1783611514451-d4ebb9",
+        "head_sha": "03147efecac7759638a2c8dce80fcdd1e26f9bd6",
+        "base": "main"
+      },
+      "content": null
+    },
+    {
+      "type": "thought",
+      "tool_name": null,
+      "tool_input": null,
+      "tool_output": null,
+      "content": "PR #8 opened successfully. Now closing out with structured findings."
+    },
+    {
+      "type": "conclusion",
+      "tool_name": "submit_findings",
+      "tool_input": {
+        "root_cause": "Deploy 4e677cc (\"config: source PRICING_TABLE from env only\") edited src/config.ts, removing the default fallback: `process.env.PRICING_TABLE ?? 'default-pricing-v1'` became `process.env.PRICING_TABLE`. With PRICING_TABLE unset in this environment, config.pricingTable is undefined, and src/routes/pricing.ts:9 explicitly throws `Error: Missing config PRICING_TABLE` whenever pricingTable is falsy, returning HTTP 500 on every GET /api/pricing request. This produced the observed error-rate spike (0.6 vs 0.0 baseline).",
+        "evidence": [
+          {
+            "type": "metrics",
+            "ref": "get_metrics(checkout-api): error_rate=0.6 vs baseline=0, req_count=25, first_error_at~1783611484451"
+          },
+          {
+            "type": "log",
+            "ref": "search_logs: 'Missing config PRICING_TABLE' at src/routes/pricing.ts:9, endpoint=/api/pricing, status=500"
+          },
+          {
+            "type": "deploy",
+            "ref": "get_recent_deploys: sha 4e677cc62a1d10254573814540ede80ac9be140e is_current=true, committed 1783601208000 (before first_error_at)"
+          },
+          {
+            "type": "diff",
+            "ref": "get_deploy_diff(4e677cc): src/config.ts pricingTable default fallback 'default-pricing-v1' removed, now raw process.env.PRICING_TABLE"
+          },
+          {
+            "type": "source",
+            "ref": "read_file(src/routes/pricing.ts): throws Error('Missing config PRICING_TABLE') when config.pricingTable is falsy"
+          }
+        ],
+        "confidence": 0.95,
+        "decision": "propose_fix"
+      },
+      "tool_output": null,
+      "content": "Deploy 4e677cc (\"config: source PRICING_TABLE from env only\") edited src/config.ts, removing the default fallback: `process.env.PRICING_TABLE ?? 'default-pricing-v1'` became `process.env.PRICING_TABLE`. With PRICING_TABLE unset in this environment, config.pricingTable is undefined, and src/routes/pricing.ts:9 explicitly throws `Error: Missing config PRICING_TABLE` whenever pricingTable is falsy, returning HTTP 500 on every GET /api/pricing request. This produced the observed error-rate spike (0.6 vs 0.0 baseline)."
+    }
+  ]
+}

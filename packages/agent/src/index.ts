@@ -19,3 +19,4 @@ export * from './mcp.js';
 export * from './stream.js';
 export * from './engine.js';
 export * from './live.js';
+export * from './cached.js';

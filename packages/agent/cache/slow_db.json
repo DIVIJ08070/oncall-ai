@@ -1,0 +1,238 @@
+{
+  "scenario": "slow_db",
+  "recorded_at": 1783611478568,
+  "model": "claude-sonnet-5",
+  "fingerprints": [
+    "record-slow_db"
+  ],
+  "match": {
+    "detector": "latency",
+    "suspect_deploy_sha": "32a55d50246e401a6a8216a1f14a42930b1590bb",
+    "keywords": [
+      "slow",
+      "latency",
+      "timeout",
+      "p95",
+      "report",
+      "query"
+    ]
+  },
+  "outcome": {
+    "status": "completed",
+    "decision": "propose_fix",
+    "root_cause": "Deploy 32a55d5 (\"reports: switch to full report scan for accuracy\"), the currently live commit on checkout-api, replaced the fast indexed report query with a simulated full-table-scan that awaits a 2200–3800ms sleep before responding on GET /api/reports. This directly caused the p95/p99 latency breach.",
+    "confidence": 0.95,
+    "iterations": 9,
+    "cost_usd": 0
+  },
+  "steps": [
+    {
+      "type": "tool_call",
+      "tool_name": "get_metrics",
+      "tool_input": {
+        "service": "checkout-api"
+      },
+      "tool_output": null,
+      "content": null
+    },
+    {
+      "type": "tool_result",
+      "tool_name": "get_metrics",
+      "tool_input": null,
+      "tool_output": {
+        "service": "checkout-api",
+        "window_sec": 900,
+        "current": {
+          "error_rate": 0,
+          "req_count": 30,
+          "p50_ms": 2400,
+          "p95_ms": 3200,
+          "p99_ms": 3800
+        },
+        "baseline": {
+          "error_rate": 0,
+          "p95_ms": 0
+        },
+        "series": [
+          {
+            "ts": 1783611478567,
+            "error_rate": 0,
+            "req_count": 30,
+            "p95_ms": 3200
+          }
+        ]
+      },
+      "content": null
+    },
+    {
+      "type": "tool_call",
+      "tool_name": "search_logs",
+      "tool_input": {
+        "service": "checkout-api",
+        "level": "error"
+      },
+      "tool_output": null,
+      "content": null
+    },
+    {
+      "type": "tool_result",
+      "tool_name": "search_logs",
+      "tool_input": null,
+      "tool_output": {
+        "total_matched": 1,
+        "returned": 1,
+        "truncated": false,
+        "events": [
+          {
+            "ts": 1783611473567,
+            "level": "warn",
+            "message": "GET /api/reports completed in 3187ms (slow query)",
+            "endpoint": "/api/reports",
+            "status": 200,
+            "latency_ms": 3200,
+            "stack_excerpt": ""
+          }
+        ],
+        "patterns": []
+      },
+      "content": null
+    },
+    {
+      "type": "tool_call",
+      "tool_name": "get_recent_deploys",
+      "tool_input": {},
+      "tool_output": null,
+      "content": null
+    },
+    {
+      "type": "tool_result",
+      "tool_name": "get_recent_deploys",
+      "tool_input": null,
+      "tool_output": {
+        "deploys": [
+          {
+            "sha": "4e677cc62a1d10254573814540ede80ac9be140e",
+            "short_sha": "4e677cc",
+            "message_first_line": "config: source PRICING_TABLE from env only",
+            "author": "Victim Dev Team",
+            "committed_at": 1783601208000,
+            "is_current": false
+          },
+          {
+            "sha": "32a55d50246e401a6a8216a1f14a42930b1590bb",
+            "short_sha": "32a55d5",
+            "message_first_line": "reports: switch to full report scan for accuracy",
+            "author": "Victim Dev Team",
+            "committed_at": 1783600608000,
+            "is_current": true
+          },
+          {
+            "sha": "1faea629b497d3250927292cc69072c8c20008be",
+            "short_sha": "1faea62",
+            "message_first_line": "checkout: drop redundant session-cart null check",
+            "author": "Victim Dev Team",
+            "committed_at": 1783600008000,
+            "is_current": false
+          },
+          {
+            "sha": "2ad98c3a0efb0d20b1f114017d8baf9a95874cec",
+            "short_sha": "2ad98c3",
+            "message_first_line": "chore: bootstrap checkout-api service",
+            "author": "Victim Dev Team",
+            "committed_at": 1783599408000,
+            "is_current": false
+          }
+        ]
+      },
+      "content": null
+    },
+    {
+      "type": "tool_call",
+      "tool_name": "get_deploy_diff",
+      "tool_input": {
+        "sha": "32a55d50246e401a6a8216a1f14a42930b1590bb"
+      },
+      "tool_output": null,
+      "content": null
+    },
+    {
+      "type": "tool_result",
+      "tool_name": "get_deploy_diff",
+      "tool_input": null,
+      "tool_output": {
+        "base": "1faea629b497d3250927292cc69072c8c20008be",
+        "head": "32a55d50246e401a6a8216a1f14a42930b1590bb",
+        "total_files": 1,
+        "total_additions": 7,
+        "total_deletions": 4,
+        "truncated": false,
+        "files": [
+          {
+            "path": "src/routes/reports.ts",
+            "status": "modified",
+            "additions": 7,
+            "deletions": 4,
+            "patch_excerpt": "@@ -2,12 +2,15 @@ import { Router } from 'express';\n \n export const reportsRouter = Router();\n \n-/** Fast, indexed report query. */\n-function reportQuery(): { rows: number; window: string } {\n+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));\n+\n+/** Slow full-table-scan report query (missing index) — 2–4s. */\n+async function reportQuery(): Promise<{ rows: number; window: string }> {\n+  await sleep(2200 + Math.floor(Math.random() * 1600));\n   return { rows: 128, window: 'last_24h' };\n }\n \n-reportsRouter.get('/', (_req, res) => {\n-  const result = reportQuery();\n+reportsRouter.get('/', async (_req, res) => {\n+  const result = await reportQuery();\n   res.status(200).json({ ok: true, report: result, generated_at: Date.now() });\n });"
+          }
+        ]
+      },
+      "content": null
+    },
+    {
+      "type": "tool_call",
+      "tool_name": "create_fix_pr",
+      "tool_input": {
+        "kind": "revert",
+        "revert_sha": "32a55d50246e401a6a8216a1f14a42930b1590bb",
+        "confidence": 0.95,
+        "root_cause": "Deploy 32a55d5 (\"reports: switch to full report scan for accuracy\") replaced the fast, indexed report query in src/routes/reports.ts with a synchronous full-table-scan simulation (`await sleep(2200 + rand*1600)`), turning GET /api/reports into a 2.2–3.8s blocking call. This is the currently-live deploy (is_current: true) and its introduced latency range exactly matches the observed incident: p95=3200ms/p99=3800ms in get_metrics, and a log entry showing \"GET /api/reports completed in 3187ms (slow query)\" — both squarely inside the 2200–3800ms window the diff introduces. No error-rate increase (0%) and no other suspicious deploys (4e677cc is a later, unrelated config change and not live) rules out other causes.",
+        "title": "Revert \"reports: switch to full report scan for accuracy\" — fixes checkout-api p95 latency breach",
+        "body": "## Incident\ninc_rec_slow_db_1783611478568 — checkout-api p95 latency breach (observed 3200ms vs 1000ms threshold).\n\n## Root cause\nCommit 32a55d5 (\"reports: switch to full report scan for accuracy\") changed `reportQuery()` in `src/routes/reports.ts` from a synchronous, fast, indexed lookup to an async full-table-scan simulation that sleeps 2200–3800ms before responding:\n\n```\n+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));\n+async function reportQuery() {\n+  await sleep(2200 + Math.floor(Math.random() * 1600));\n   return { rows: 128, window: 'last_24h' };\n }\n-reportsRouter.get('/', (_req, res) => {\n+reportsRouter.get('/', async (_req, res) => {\n   const result = await reportQuery();\n```\n\nThis is the currently live deploy on checkout-api.\n\n## Evidence\n- `get_metrics(checkout-api)`: p95_ms=3200, p99_ms=3800, error_rate=0 (vs baseline p95_ms=0).\n- `search_logs`: `GET /api/reports completed in 3187ms (slow query)`, status 200, latency_ms=3200 — falls squarely inside the 2200–3800ms window introduced by the diff.\n- `get_deploy_diff(32a55d5)`: confirms the sleep-based full-scan simulation replacing the previously fast, indexed query, and that this is `is_current: true`.\n\n## Fix\nRevert 32a55d5 to restore the fast indexed report query and resolve the latency breach. (A proper fix — an actual accurate-but-indexed query — should be designed separately; this revert stops the incident immediately.)\n"
+      },
+      "tool_output": null,
+      "content": null
+    },
+    {
+      "type": "tool_result",
+      "tool_name": "create_fix_pr",
+      "tool_input": null,
+      "tool_output": {
+        "pr_number": 7,
+        "url": "https://github.com/DIVIJ08070/oncall-ai-victim/pull/7",
+        "branch": "oncall-ai/fix-inc_rec_slow_db_1783611478568-3efec5",
+        "head_sha": "73f965ee18ae1e9c72717daff2ee41e068ff1ebb",
+        "base": "main"
+      },
+      "content": null
+    },
+    {
+      "type": "conclusion",
+      "tool_name": "submit_findings",
+      "tool_input": {
+        "root_cause": "Deploy 32a55d5 (\"reports: switch to full report scan for accuracy\"), the currently live commit on checkout-api, replaced the fast indexed report query with a simulated full-table-scan that awaits a 2200–3800ms sleep before responding on GET /api/reports. This directly caused the p95/p99 latency breach.",
+        "evidence": [
+          {
+            "type": "metrics",
+            "ref": "get_metrics(checkout-api): p95_ms=3200, p99_ms=3800, error_rate=0 vs baseline p95_ms=0"
+          },
+          {
+            "type": "log",
+            "ref": "search_logs: 'GET /api/reports completed in 3187ms (slow query)' status=200 latency_ms=3200"
+          },
+          {
+            "type": "deploy",
+            "ref": "get_recent_deploys: 32a55d50246e401a6a8216a1f14a42930b1590bb is_current=true"
+          },
+          {
+            "type": "diff",
+            "ref": "get_deploy_diff(32a55d5): src/routes/reports.ts reportQuery() changed to `await sleep(2200 + rand*1600)` full-scan simulation, replacing prior fast indexed query"
+          }
+        ],
+        "confidence": 0.95,
+        "decision": "propose_fix"
+      },
+      "tool_output": null,
+      "content": "Deploy 32a55d5 (\"reports: switch to full report scan for accuracy\"), the currently live commit on checkout-api, replaced the fast indexed report query with a simulated full-table-scan that awaits a 2200–3800ms sleep before responding on GET /api/reports. This directly caused the p95/p99 latency breach."
+    }
+  ]
+}

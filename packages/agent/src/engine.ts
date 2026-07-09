@@ -86,6 +86,8 @@ export interface AgentEngineConfig extends ToolConfig {
     useClaudeSubscription?: boolean;
     /** Present only for compatibility; empty under subscription (§14). */
     anthropicApiKey?: string;
+    /** §13/§14 CACHE_REAL_PR — cached replay still opens a real PR (default true). */
+    cacheRealPr?: boolean;
   };
 }
 
