@@ -6,18 +6,26 @@ import type { Broker } from './sse/broker.js';
 import { errorBody, codeForStatus } from './http/errors.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerIngestRoutes } from './routes/ingest.js';
+import { registerAuthRoutes } from './routes/auth.js';
+import { registerRepoRoutes } from './routes/repos.js';
+import { registerIntegrationSnippetRoute } from './routes/integration-snippet.js';
+import { createGithubGateway, type GithubGateway } from './github/gateway.js';
 
 /**
  * Fastify instance assembly (SPEC §3 `app.ts`). Wires the C1 `Config`, the C2
  * data layer (`OncallDb`), and the SSE `Broker` into one app context that route
- * modules read from. C3 registers `/health` + `POST /api/v1/ingest`; later chunks
- * (C9/C10) register their routes onto the same instance via `AppContext`.
+ * modules read from. C3 registers `/health` + `POST /api/v1/ingest`; C9 adds the
+ * GitHub OAuth / repo / integration-snippet routes; C10 registers its read/stream
+ * routes onto the same instance via `AppContext`.
  */
 
 export interface AppContext {
   config: Config;
   db: OncallDb;
   broker: Broker;
+  /** GitHub OAuth/repo gateway (C9). Defaults to the real fetch+Octokit gateway;
+   *  tests inject a fake so `.inject()` needs no network. */
+  github?: GithubGateway;
 }
 
 /** Body limit sized for a full 500-event batch (each stack up to 8 KB). */
@@ -56,6 +64,12 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
 
   registerHealthRoutes(app);
   registerIngestRoutes(app, ctx);
+
+  // C9 — GitHub OAuth + repo onboarding + integration snippet (SPEC §7.5/§7.6).
+  const github = ctx.github ?? createGithubGateway(ctx.config);
+  registerAuthRoutes(app, ctx, github);
+  registerRepoRoutes(app, ctx, github);
+  registerIntegrationSnippetRoute(app, ctx);
 
   return app;
 }
