@@ -77,5 +77,8 @@ export const PullRequestSummarySchema = z.object({
   kind: PrKindSchema,
   state: PrStateSchema,
   verification_status: VerificationStatusSchema,
+  branch: z.string(),
+  base: z.string(),
+  head_sha: z.string(),
 });
 export type PullRequestSummary = z.infer<typeof PullRequestSummarySchema>;

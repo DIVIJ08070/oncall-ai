@@ -44,6 +44,9 @@ export function toPullRequestSummary(pr: PullRequestRec): PullRequestSummary {
     kind: pr.kind,
     state: pr.state,
     verification_status: pr.verification_status,
+    branch: pr.branch,
+    base: pr.base_branch,
+    head_sha: pr.head_sha,
   };
 }
 

@@ -111,8 +111,24 @@ export async function main(): Promise<void> {
 
   const app = await buildApp({ config, db, broker, investigation });
 
-  startDetection(db, config, broker, investigation);
-  startMergePoller(db, config, broker);
+  const engine = startDetection(db, config, broker, investigation);
+  const poller = startMergePoller(db, config, broker);
+
+  // Graceful shutdown: stop the background loops (their timers are already
+  // `unref()`'d, so this is deterministic-teardown tidiness, not a leak fix)
+  // and close the HTTP server before exiting. Idempotent under repeated signals.
+  let shuttingDown = false;
+  const shutdown = (signal: NodeJS.Signals): void => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    // eslint-disable-next-line no-console
+    console.log(`[oncall] ${signal} received — shutting down`);
+    engine.stop();
+    poller?.stop();
+    void app.close().finally(() => process.exit(0));
+  };
+  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', shutdown);
 
   await app.listen({ port: config.server.port, host: '0.0.0.0' });
   // eslint-disable-next-line no-console

@@ -382,7 +382,18 @@ describe('C10 — incidents list + detail (SPEC §7.3)', () => {
     expect(body.incident.id).toBe(inc.id);
     expect(body.session?.status).toBe('completed');
     expect(body.steps.length).toBeGreaterThanOrEqual(4);
-    expect(body.pull_request?.number).toBe(7);
+    // SPEC §7.3 pull_request DTO = {number,url,kind,state,verification_status,branch,base,head_sha}
+    // (BUG-009 fix: branch/base/head_sha now on the wire; `base_branch` row → `base`).
+    expect(Object.keys(body.pull_request!).sort()).toEqual(
+      ['base', 'branch', 'head_sha', 'kind', 'number', 'state', 'url', 'verification_status'].sort(),
+    );
+    expect(body.pull_request).toMatchObject({
+      number: 7,
+      kind: 'revert',
+      branch: 'oncall-ai/fix-x-a1b2c3',
+      base: 'main',
+      head_sha: 'deadbeef0000',
+    });
     expect(body.timeline.map((t) => t.kind)).toContain('pr_opened');
     await h.app.close();
   });
