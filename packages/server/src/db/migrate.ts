@@ -217,7 +217,9 @@ CREATE TABLE IF NOT EXISTS chat_messages (
   evidence     TEXT,
   created_at   INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_chat_messages_incident_created ON chat_messages(incident_id, created_at);
+-- id is a monotonic-ULID tiebreaker so same-millisecond rows return in
+-- insertion order (BUG-006); it also fully covers the DAO ORDER BY.
+CREATE INDEX IF NOT EXISTS idx_chat_messages_incident_created ON chat_messages(incident_id, created_at, id);
 
 -- ── notifications (FR-17 stub) ──────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS notifications (

@@ -468,19 +468,51 @@ describe('chat_messages DAO', () => {
       observed_value: 0.8,
     }).incident.id;
 
-    db.dao.chatMessages.insert({ incident_id: incidentId, role: 'user', content: 'why?' });
+    // Pin an identical created_at on both rows so the (created_at, id)
+    // tiebreaker is exercised on EVERY run, not only when the two wall-clock
+    // inserts happen to collide in one millisecond (BUG-006 regression guard).
+    const ts = 1_700_000_000_000;
+    db.dao.chatMessages.insert({ incident_id: incidentId, role: 'user', content: 'why?', created_at: ts });
     const a = db.dao.chatMessages.insert({
       incident_id: incidentId,
       role: 'assistant',
       content: 'because deploy abc',
       evidence: [{ type: 'tool', tool: 'get_deploy_diff', ref: 'abc1234' }],
+      created_at: ts,
     });
     expect(hasPrefix(a.id, ID_PREFIX.chat_message)).toBe(true);
 
     const msgs = db.dao.chatMessages.listByIncident(incidentId);
     expect(msgs).toHaveLength(2);
+    // Insertion order is preserved despite the shared created_at.
     expect(msgs[0].evidence).toBeNull();
     expect(msgs[1].evidence).toEqual([{ type: 'tool', tool: 'get_deploy_diff', ref: 'abc1234' }]);
+  });
+
+  it('lists same-millisecond messages in insertion order (BUG-006)', () => {
+    const customerId = seedCustomer();
+    const incidentId = db.dao.incidents.openOrDedup({
+      customer_id: customerId,
+      service: 's',
+      detector: 'error_rate',
+      fingerprint: 'fp',
+      title: 't',
+      severity: 'low',
+      threshold_value: 0.2,
+      observed_value: 0.8,
+    }).incident.id;
+
+    // Every message shares the exact same created_at, so ordering is decided
+    // entirely by the monotonic-ULID `id` tiebreaker. Without monotonic ids
+    // this assertion fails ~1/2 the time; with them it is deterministic.
+    const ts = 1_700_000_000_000;
+    const contents = ['m0', 'm1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7'];
+    for (const content of contents) {
+      db.dao.chatMessages.insert({ incident_id: incidentId, role: 'user', content, created_at: ts });
+    }
+
+    const listed = db.dao.chatMessages.listByIncident(incidentId).map((m) => m.content);
+    expect(listed).toEqual(contents);
   });
 });
 

@@ -1,4 +1,4 @@
-import { ulid } from 'ulid';
+import { monotonicFactory } from 'ulid';
 
 /**
  * ULID id helpers with type prefixes (SPEC §8: "IDs are string ULIDs with a
@@ -8,7 +8,16 @@ import { ulid } from 'ulid';
  * base32 string that is lexicographically sortable by creation time. The
  * `metric_samples` table is the only one that uses an INTEGER AUTOINCREMENT PK
  * and therefore has no helper here.
+ *
+ * Ids are minted through a single process-wide **monotonic** factory. The bare
+ * `ulid()` re-rolls its 80-bit random component on every call, so two ids
+ * created in the same millisecond sort in random relative order. The monotonic
+ * factory instead increments that component for same-millisecond calls, making
+ * output *strictly increasing* in mint order. That is what lets `ORDER BY
+ * created_at, id` be a correct insertion-order tiebreaker for rows that share a
+ * `created_at` (BUG-006: chat_messages same-ms ordering).
  */
+const monotonicUlid = monotonicFactory();
 
 /** Canonical prefix per table (SPEC §8). */
 export const ID_PREFIX = {
@@ -29,7 +38,7 @@ export type IdPrefix = (typeof ID_PREFIX)[keyof typeof ID_PREFIX];
 
 /** Build a prefixed ULID. `seedTime` is exposed for deterministic tests. */
 export function newId(prefix: IdPrefix, seedTime?: number): string {
-  return `${prefix}_${ulid(seedTime)}`;
+  return `${prefix}_${monotonicUlid(seedTime)}`;
 }
 
 /** Return the prefix of an id (everything before the first `_`), or null. */

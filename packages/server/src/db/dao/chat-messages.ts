@@ -63,6 +63,10 @@ export class ChatMessagesDao {
   listByIncident(incidentId: string): ChatMessageRow[] {
     const rows = this.db
       .prepare(
+        // Stable order: `created_at` then `id`. Ids are monotonic ULIDs (see
+        // db/ids.ts), so `id` is a correct insertion-order tiebreaker for rows
+        // written within the same millisecond (BUG-006). The
+        // (incident_id, created_at, id) index covers this ordering.
         `SELECT * FROM chat_messages WHERE incident_id = ? ORDER BY created_at ASC, id ASC`,
       )
       .all(incidentId) as ChatDbRow[];
