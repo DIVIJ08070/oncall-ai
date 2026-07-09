@@ -13,6 +13,7 @@ import { registerServicesRoute } from './routes/services.js';
 import { registerMetricsRoute } from './routes/metrics.js';
 import { registerLogsRoutes } from './routes/logs.js';
 import { registerIncidentRoutes } from './routes/incidents.js';
+import { registerDemoRoutes } from './routes/demo.js';
 import { createGithubGateway, type GithubGateway } from './github/gateway.js';
 import {
   createInvestigationService,
@@ -98,6 +99,10 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   registerMetricsRoute(app, ctx);
   registerLogsRoutes(app, ctx);
   registerIncidentRoutes(app, ctx);
+
+  // C15 — demo control plane (SPEC §7.7): FailureModeSwitch + TrafficGenerator.
+  // Drives the victim + records correlated deploy rows for the live demo.
+  registerDemoRoutes(app, ctx);
 
   return app;
 }
