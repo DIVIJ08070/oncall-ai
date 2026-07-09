@@ -47,13 +47,7 @@ const STATUS_FILTERS: ReadonlyArray<{ label: string; value: string | undefined }
   { label: 'Escalated', value: 'escalated' },
 ];
 
-/** In-progress statuses render the pulsing LIVE dot (§8.4). */
-const LIVE_STATUSES = new Set<IncidentStatus>([
-  'investigating',
-  'fix_proposed',
-  'awaiting_merge',
-  'verifying',
-]);
+/** Only `investigating` rows render the pulsing LIVE dot (§8.4). */
 
 export function IncidentTimelineList({
   scrollMaxHeight,
@@ -145,7 +139,7 @@ export function IncidentTimelineList({
 function IncidentRow({ inc }: { inc: IncidentSummary }) {
   const sev = severityStyle(inc.severity);
   const st = incidentStatusStyle(inc.status);
-  const live = LIVE_STATUSES.has(inc.status);
+  const live = inc.status === 'investigating';
 
   return (
     <li>

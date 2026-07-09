@@ -219,7 +219,7 @@ export type FailureModeRequest = z.infer<typeof FailureModeRequestSchema>;
 /** Platform `POST /demo/failure-mode` response (SPEC §7.7). */
 export const FailureModeResponseSchema = z.object({
   mode: FailureModeSchema,
-  deploy_sha: z.string().nullable(),
+  deployed_sha: z.string().nullable(),
 });
 export type FailureModeResponse = z.infer<typeof FailureModeResponseSchema>;
 
