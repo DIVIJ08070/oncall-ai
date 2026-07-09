@@ -206,15 +206,21 @@ function ErrorRateChart({
   );
 }
 
-/** Render a `--critical` dot only at points that breach the error-rate threshold. */
+/**
+ * Render a `--critical` dot only at points that breach the error-rate threshold.
+ * Recharts' `<Area>` passes the dot `value` as a `[baseline, y]` range tuple, so a
+ * scalar `value < threshold` guard is a NaN comparison that never hides the dot
+ * (BUG-010). Gate on the real datum (`payload.error_rate`) instead — §9.1.
+ */
 function BreachDot(props: {
   cx?: number;
   cy?: number;
-  value?: number;
+  payload?: { error_rate?: number };
   index?: number;
 }) {
-  const { cx, cy, value } = props;
-  if (cx == null || cy == null || value == null || value < ERROR_RATE_THRESHOLD) {
+  const { cx, cy, payload } = props;
+  const errorRate = payload?.error_rate;
+  if (cx == null || cy == null || errorRate == null || errorRate < ERROR_RATE_THRESHOLD) {
     return <g />;
   }
   return (

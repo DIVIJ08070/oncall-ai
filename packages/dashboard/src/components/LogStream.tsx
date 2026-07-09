@@ -309,7 +309,10 @@ function LogRow({ ev }: { ev: LogEvent }) {
         </span>
         <span
           className="w-12 shrink-0 font-medium uppercase"
-          style={{ color: st.token === 'ink-2' ? v('ink-2') : v(st.token) }}
+          // BUG-011: label text in an ink token, never the raw status hue (§11 —
+          // --warn is illegible on light). The level colour is carried by the 2px
+          // left row border; ink-family levels (info/debug) keep their muted token.
+          style={{ color: st.token.startsWith('ink') ? v(st.token) : v('ink') }}
         >
           {st.label}
         </span>
