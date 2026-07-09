@@ -21,6 +21,14 @@ export default defineWorkspace([
   },
   {
     test: {
+      name: 'agent',
+      root: './packages/agent',
+      environment: 'node',
+      include: ['test/**/*.test.ts', 'src/**/*.test.ts'],
+    },
+  },
+  {
+    test: {
       name: 'server',
       root: './packages/server',
       environment: 'node',
