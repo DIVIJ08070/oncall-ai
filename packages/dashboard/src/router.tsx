@@ -1,12 +1,9 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/shell/AppShell';
 import { DashboardPage } from './pages/DashboardPage';
-import {
-  OnboardingPage,
-  IncidentDetailPage,
-  IncidentsListPage,
-  DemoControlPage,
-} from './pages/stubs';
+import { OnboardingPage } from './pages/OnboardingPage';
+import { IncidentDetailPage, IncidentsListPage } from './pages/IncidentDetailPage';
+import { DemoControlPage } from './pages/DemoControlPage';
 
 /**
  * Route tree (SPEC §6 / DESIGN_SPEC §5). Every route renders inside `AppShell`.
