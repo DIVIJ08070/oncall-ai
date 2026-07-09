@@ -12,7 +12,12 @@
   },
   "dependencies": {
     "@oncall/shared": "*",
+    "better-sqlite3": "^11.3.0",
     "dotenv": "^16.4.5",
+    "ulid": "^2.3.0",
     "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11"
   }
 }
