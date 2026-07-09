@@ -1,0 +1,29 @@
+# Secrets — NEVER commit (BRD NFR-02: .env excluded from VCS from first commit)
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+
+# Data / local stores
+*.sqlite
+*.sqlite3
+*.db
+data/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Test / coverage
+coverage/
+.nyc_output/
+playwright-report/
+test-results/

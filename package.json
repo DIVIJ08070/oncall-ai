@@ -1,0 +1,30 @@
+{
+  "name": "oncall-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OnCall AI — AI Incident Responder (npm workspaces monorepo).",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "tsc -b --clean",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "npm run dev --workspaces --if-present",
+    "seed": "tsx scripts/seed.ts",
+    "demo": "tsx scripts/demo.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.16.0",
+    "typescript": "~5.5.4",
+    "vitest": "^2.0.0"
+  }
+}
