@@ -405,12 +405,27 @@ async function commitTree(
     sha: string;
   }> = [];
   for (const [path, content] of Object.entries(files)) {
-    const blob = await octokit.git.createBlob({
-      owner: OWNER,
-      repo: REPO,
-      content: b64(content),
-      encoding: 'base64',
-    });
+    // Right after a repo's first commit, the Git Data API can briefly still 409
+    // ("Git Repository is empty") — retry a few times with backoff.
+    let blob;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        blob = await octokit.git.createBlob({
+          owner: OWNER,
+          repo: REPO,
+          content: b64(content),
+          encoding: 'base64',
+        });
+        break;
+      } catch (err) {
+        const status = (err as { status?: number }).status;
+        if (status === 409 && attempt < 6) {
+          await new Promise((r) => setTimeout(r, 1500));
+          continue;
+        }
+        throw err;
+      }
+    }
     entries.push({ path, mode: '100644', type: 'blob', sha: blob.data.sha });
   }
   const tree = await octokit.git.createTree({
@@ -430,6 +445,34 @@ async function commitTree(
     committer: author,
   });
   return { commitSha: commit.data.sha, treeSha: tree.data.sha };
+}
+
+/**
+ * The Git Data API (blobs/trees/commits) refuses to operate on a repository with
+ * **zero commits** ("Git Repository is empty", 409). Bootstrap the first commit via
+ * the Contents API (which works on an empty repo and creates the default branch),
+ * then the baseline commit stacks on it. Returns the parent SHA for baseline
+ * (`null` when the repo already has history → baseline is a fresh root commit).
+ */
+async function ensureSeedable(): Promise<string | null> {
+  try {
+    await octokit.git.getRef({ owner: OWNER, repo: REPO, ref: `heads/${DEFAULT_BRANCH}` });
+    return null; // non-empty repo → Git Data API works; baseline is a root commit
+  } catch (err) {
+    // 404 (no ref) or 409 ("Git Repository is empty") both mean: no commits yet.
+    const status = (err as { status?: number }).status;
+    if (status !== 404 && status !== 409) throw err;
+  }
+  const init = await octokit.repos.createOrUpdateFileContents({
+    owner: OWNER,
+    repo: REPO,
+    path: '.oncall-seed',
+    message: 'chore: initialize repository',
+    content: b64('OnCall AI victim — seeded repository.\n'),
+    branch: DEFAULT_BRANCH,
+  });
+  console.log(`[init-victim-repo] bootstrapped empty repo (init ${(init.data.commit.sha ?? '').slice(0, 7)})`);
+  return init.data.commit.sha ?? null;
 }
 
 async function upsertMainRef(sha: string): Promise<void> {
@@ -569,12 +612,13 @@ async function main(): Promise<void> {
   };
   const short = (sha: string): string => sha.slice(0, 7);
 
-  // 1) baseline healthy root commit
+  // 1) baseline healthy commit (bootstrap the repo first if it is empty)
+  const baselineParent = await ensureSeedable();
   const baseAt = at(40);
   const baseline = await commitTree(
     'chore: bootstrap checkout-api service\n\nHealthy baseline: checkout, reports, pricing + telemetry + CI/deploy.',
     baselineTree(packageLock),
-    null,
+    baselineParent,
     null,
     baseAt.iso,
   );
