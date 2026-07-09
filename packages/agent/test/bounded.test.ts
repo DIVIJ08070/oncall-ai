@@ -5,6 +5,7 @@ import {
   clampBytes,
   clampChars,
   enforceResultCap,
+  enforceResultByteCap,
   excerptPatch,
   summarizeBySignature,
 } from '../src/bounded.js';
@@ -90,5 +91,54 @@ describe('bounded — 12KB global cap', () => {
     const result = { rows: Array.from({ length: 5000 }, () => 'y'.repeat(50)) };
     const capped = enforceResultCap(result, 'rows');
     expect(byteLength(JSON.stringify(capped))).toBeLessThanOrEqual(RESULT_MAX_BYTES);
+  });
+});
+
+describe('bounded — whole-result envelope cap (BUG-007/008 regression)', () => {
+  it('enforceResultCap trims MULTIPLE arrays (summary before primary) to fit 12KB', () => {
+    // Mirrors search_logs: a small `events` payload + a huge `patterns` summary.
+    const events = Array.from({ length: 5 }, (_, i) => ({ ts: i, message: 'e'.repeat(100) }));
+    const patterns = Array.from({ length: 500 }, (_, i) => ({
+      signature: `sig-${i}`,
+      count: 1,
+      sample: 'p'.repeat(200),
+    }));
+    const result = { truncated: false, events, patterns };
+    const capped = enforceResultCap(result, ['events', 'patterns']);
+    expect(byteLength(JSON.stringify(capped))).toBeLessThanOrEqual(RESULT_MAX_BYTES);
+    expect(capped.truncated).toBe(true);
+    // the dominant array (patterns, ~100KB) is trimmed; the tiny events payload survives
+    expect(capped.events.length).toBe(events.length);
+    expect(capped.patterns.length).toBeLessThan(patterns.length);
+  });
+
+  it('enforceResultCap with a single field still works (back-compat)', () => {
+    const events = Array.from({ length: 2000 }, (_, i) => ({ ts: i, message: 'x'.repeat(200) }));
+    const capped = enforceResultCap({ truncated: false, events }, 'events');
+    expect(byteLength(JSON.stringify(capped))).toBeLessThanOrEqual(RESULT_MAX_BYTES);
+    expect(capped.truncated).toBe(true);
+  });
+
+  it('enforceResultByteCap shrinks an oversized string field to fit 12KB', () => {
+    // Mirrors read_file: a 20KB `content` string in an otherwise small envelope.
+    const result = { path: 'src/big.ts', truncated: false, content: 'A'.repeat(20 * 1024) };
+    const capped = enforceResultByteCap(result, 'content');
+    expect(byteLength(JSON.stringify(capped))).toBeLessThanOrEqual(RESULT_MAX_BYTES);
+    expect(capped.truncated).toBe(true);
+    expect(capped.content.length).toBeLessThan(20 * 1024);
+    // no split-codepoint replacement chars
+    expect(capped.content).not.toContain('�');
+  });
+
+  it('enforceResultByteCap handles a multi-byte string on a code-point boundary', () => {
+    const result = { truncated: false, content: '€'.repeat(20 * 1024) }; // 3 bytes each
+    const capped = enforceResultByteCap(result, 'content');
+    expect(byteLength(JSON.stringify(capped))).toBeLessThanOrEqual(RESULT_MAX_BYTES);
+    expect(capped.content).not.toContain('�');
+  });
+
+  it('enforceResultByteCap leaves a small string result untouched', () => {
+    const result = { truncated: false, content: 'hello' };
+    expect(enforceResultByteCap(result, 'content')).toEqual(result);
   });
 });

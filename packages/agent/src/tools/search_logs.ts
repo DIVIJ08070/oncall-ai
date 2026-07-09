@@ -6,6 +6,7 @@ import {
 } from '@oncall/shared';
 import type { ToolContext, ToolLogRow } from '../ports.js';
 import {
+  SEARCH_LOGS_MAX_PATTERNS,
   SEARCH_LOGS_MAX_ROWS,
   SEARCH_LOGS_SCAN_LIMIT,
   STACK_EXCERPT_MAX_CHARS,
@@ -48,19 +49,29 @@ export async function searchLogs(
   const remainder = matched.slice(limit);
 
   const events: SearchLogsEvent[] = returned.map((r) => toEvent(r));
-  const patterns = summarizeBySignature(
+
+  // Summarize the remainder by signature, then keep only the top-N groups (by
+  // descending count) so `patterns[]` can't grow unbounded with many distinct
+  // `fingerprint_sig` values (BUG-007). `summarizeBySignature` already sorts by
+  // count desc, so a prefix slice is the top-N.
+  const allPatterns = summarizeBySignature(
     remainder.map((r) => ({ signature: r.fingerprint_sig, sample: r.message })),
   );
+  const patterns = allPatterns.slice(0, SEARCH_LOGS_MAX_PATTERNS);
+  const patternsTruncated = allPatterns.length > patterns.length;
 
   const scanTruncated = scanned.length >= SEARCH_LOGS_SCAN_LIMIT;
   const out: SearchLogsOutput = {
     total_matched: matched.length,
     returned: events.length,
-    truncated: remainder.length > 0 || scanTruncated,
+    truncated: remainder.length > 0 || scanTruncated || patternsTruncated,
     events,
     patterns,
   };
-  return enforceResultCap(out, 'events');
+  // Whole-result 12 KB backstop (NFR-07): enforce the byte budget over the FULL
+  // envelope (both arrays), trimming whichever of `events`/`patterns` currently
+  // dominates the byte count so neither array can blow the cap on its own.
+  return enforceResultCap(out, ['events', 'patterns']);
 }
 
 function toEvent(r: ToolLogRow): SearchLogsEvent {

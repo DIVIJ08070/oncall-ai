@@ -13,6 +13,11 @@ import {
   TOOL_DEFINITIONS,
 } from '../src/tools/index.js';
 import { SafetyViolationError } from '../src/guards.js';
+import {
+  RESULT_MAX_BYTES,
+  SEARCH_LOGS_MAX_PATTERNS,
+  byteLength,
+} from '../src/bounded.js';
 import { makeCtx, makeFakeDb, makeIncident } from './helpers.js';
 import type { ToolLogRow } from '../src/ports.js';
 
@@ -107,6 +112,38 @@ describe('search_logs', () => {
     expect(out.returned).toBe(1);
     expect(out.events[0].stack_excerpt!.length).toBeLessThanOrEqual(1200);
     expect(out.events[0].endpoint).toBe('/api/checkout');
+  });
+
+  // BUG-007 (NFR-07): many DISTINCT fingerprint_sig values must NOT blow the
+  // 12 KB envelope via an unbounded `patterns[]`. Mirrors QA's adversarial probe
+  // (450 distinct-signature rows, long messages) — pre-fix this serialized to
+  // 111,769 B (9.1× the cap).
+  it('BUG-007: bounds patterns[] so the whole result stays ≤ 12 KB with 450 distinct signatures', async () => {
+    const logs: ToolLogRow[] = [];
+    for (let i = 0; i < 450; i++) {
+      logs.push(
+        log({
+          timestamp: 1_752_000_000_000 + i,
+          message: `ERR-${i} ${'x'.repeat(400)}`, // > 200 so clampChars keeps 200
+          fingerprint_sig: `sig-${i}`, // distinct per row → 450 pattern groups pre-cap
+        }),
+      );
+    }
+    const incident = makeIncident({ customer_id: CUS });
+    const db = makeFakeDb({ logs }, incident);
+    const { ctx } = makeCtx({ db, incident });
+
+    const out = await searchLogs(ctx, { limit: 1 });
+    const bytes = byteLength(JSON.stringify(out));
+    expect(bytes).toBeLessThanOrEqual(RESULT_MAX_BYTES);
+    expect(out.patterns.length).toBeLessThanOrEqual(SEARCH_LOGS_MAX_PATTERNS);
+    expect(out.truncated).toBe(true);
+    // the actual returned row survives; only the summary is trimmed to fit
+    expect(out.events.length).toBeGreaterThanOrEqual(1);
+    // patterns remain ordered by descending count (top offenders kept)
+    for (let i = 1; i < out.patterns.length; i++) {
+      expect(out.patterns[i - 1].count).toBeGreaterThanOrEqual(out.patterns[i].count);
+    }
   });
 });
 
@@ -239,6 +276,24 @@ describe('read_file', () => {
     const { ctx } = makeCtx({ incident });
     await expect(readFile(ctx, { path: '../../etc/passwd' })).rejects.toThrow(SafetyViolationError);
     await expect(readFile(ctx, { path: '/etc/passwd' })).rejects.toThrow(SafetyViolationError);
+  });
+
+  // BUG-008 (NFR-07): a large file must not exceed the 12 KB global cap. Mirrors
+  // QA's adversarial probe (a 20 KB file) — pre-fix this serialized to 16,483 B
+  // (34% over) because content was clamped to 16 KB with no global backstop.
+  it('BUG-008: keeps the whole result ≤ 12 KB for a 20 KB file', async () => {
+    const big = 'A'.repeat(20 * 1024);
+    const incident = makeIncident({ customer_id: CUS });
+    const { ctx } = makeCtx({
+      incident,
+      githubSeed: { contents: { 'main:src/big.ts': big } },
+    });
+    const out = await readFile(ctx, { path: 'src/big.ts' });
+    const bytes = byteLength(JSON.stringify(out));
+    expect(bytes).toBeLessThanOrEqual(RESULT_MAX_BYTES);
+    expect(out.truncated).toBe(true);
+    // returned_lines is reconciled with the final (post-backstop) content
+    expect(out.returned_lines).toBe(out.content === '' ? 0 : out.content.split('\n').length);
   });
 });
 

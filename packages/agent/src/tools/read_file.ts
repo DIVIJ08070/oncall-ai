@@ -5,12 +5,18 @@ import {
 } from '@oncall/shared';
 import { SafetyViolationError } from '../guards.js';
 import type { ToolContext } from '../ports.js';
-import { READ_FILE_MAX_BYTES, READ_FILE_MAX_LINES, clampBytes } from '../bounded.js';
+import {
+  READ_FILE_MAX_BYTES,
+  READ_FILE_MAX_LINES,
+  clampBytes,
+  enforceResultByteCap,
+} from '../bounded.js';
 
 /**
  * Tool 5 — `read_file` (SPEC §9). Real file via the pinned client's
  * `getContent`. The path is normalized and `..`/absolute paths are rejected so a
- * read can never escape the pinned repo. Caps: ≤ 400 lines or 16 KB.
+ * read can never escape the pinned repo. Caps: ≤ 400 lines, and the whole
+ * serialized result ≤ 12 KB (SPEC §9 global cap).
  */
 export async function readFile(
   ctx: ToolContext,
@@ -39,7 +45,7 @@ export async function readFile(
   content = capped.text;
   truncated = truncated || capped.truncated;
 
-  return {
+  const result: ReadFileOutput = {
     path: file.path,
     ref: file.ref,
     total_lines: totalLines,
@@ -47,6 +53,15 @@ export async function readFile(
     truncated,
     content,
   };
+
+  // Whole-result 12 KB backstop (NFR-07 / BUG-008): the per-tool byte cap can't
+  // see the JSON envelope or string-escaping, so guarantee the serialized result
+  // ≤ RESULT_MAX_BYTES here, then reconcile returned_lines with the final content.
+  const bounded = enforceResultByteCap(result, 'content');
+  if (bounded.content !== result.content) {
+    bounded.returned_lines = bounded.content === '' ? 0 : bounded.content.split('\n').length;
+  }
+  return bounded;
 }
 
 /**
@@ -73,6 +88,6 @@ export function normalizeRepoPath(raw: string): string {
 export const readFileMeta = {
   name: 'read_file' as const,
   description:
-    'Read a file from the pinned repo at an optional ref and line range (real repos.getContent). Bounded to 400 lines or 16 KB. Path traversal and absolute paths are rejected. Read-only.',
+    'Read a file from the pinned repo at an optional ref and line range (real repos.getContent). Bounded to 400 lines and the 12 KB result cap. Path traversal and absolute paths are rejected. Read-only.',
   inputSchema: ReadFileInputSchema,
 };
