@@ -1,0 +1,42 @@
+{
+  "name": "@oncall/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "@oncall/sdk — zero-friction, non-blocking log shipper for OnCall AI (batched client + Express/Fastify middleware + file/stdout tailer + oncall-tail CLI).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    },
+    "./middleware": {
+      "types": "./dist/middleware.d.ts",
+      "import": "./dist/middleware.js"
+    },
+    "./tailer": {
+      "types": "./dist/tailer.d.ts",
+      "import": "./dist/tailer.js"
+    }
+  },
+  "bin": {
+    "oncall-tail": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "tsc -b --clean",
+    "tail": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@oncall/shared": "*"
+  }
+}

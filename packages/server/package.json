@@ -8,12 +8,16 @@
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b",
-    "clean": "tsc -b --clean"
+    "clean": "tsc -b --clean",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js"
   },
   "dependencies": {
+    "@fastify/cors": "^9.0.1",
     "@oncall/shared": "*",
     "better-sqlite3": "^11.3.0",
     "dotenv": "^16.4.5",
+    "fastify": "^4.28.1",
     "ulid": "^2.3.0",
     "zod": "^3.23.8"
   },

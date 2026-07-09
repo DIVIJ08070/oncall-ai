@@ -13,6 +13,14 @@ export default defineWorkspace([
   },
   {
     test: {
+      name: 'sdk',
+      root: './packages/sdk',
+      environment: 'node',
+      include: ['test/**/*.test.ts', 'src/**/*.test.ts'],
+    },
+  },
+  {
+    test: {
       name: 'server',
       root: './packages/server',
       environment: 'node',
