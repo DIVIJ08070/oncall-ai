@@ -225,7 +225,25 @@ export async function bootstrapEnv(): Promise<void> {
   dotenvLoaded = true;
   try {
     const dotenv = await import('dotenv');
-    dotenv.config();
+    const path = await import('node:path');
+    const fs = await import('node:fs');
+    // Workspace scripts (`npm run -w @oncall/server`) run with cwd set to the
+    // package dir, so a bare `dotenv.config()` misses the repo-root `.env`.
+    // Walk up from cwd to the nearest `.env` (the monorepo root); fall back to
+    // the default cwd lookup if none is found.
+    let dir = process.cwd();
+    let envPath: string | undefined;
+    for (let i = 0; i < 8; i++) {
+      const candidate = path.join(dir, '.env');
+      if (fs.existsSync(candidate)) {
+        envPath = candidate;
+        break;
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    dotenv.config(envPath ? { path: envPath } : {});
   } catch {
     // dotenv absent or .env missing — rely on the ambient environment.
   }
