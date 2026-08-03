@@ -16,7 +16,9 @@ import react from '@vitejs/plugin-react';
  */
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), ['PUBLIC_', 'VITE_']);
-  const target = env.PUBLIC_BASE_URL || 'http://localhost:3001';
+  // Force IPv4: Node 18+ resolves `localhost` to IPv6 `::1` first, but the platform
+  // binds IPv4 (0.0.0.0), so a `localhost` proxy target fails with ECONNREFUSED ::1.
+  const target = (env.PUBLIC_BASE_URL || 'http://localhost:3001').replace('localhost', '127.0.0.1');
   return {
     plugins: [react()],
     envPrefix: ['VITE_', 'PUBLIC_'],

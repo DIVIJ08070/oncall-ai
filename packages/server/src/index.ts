@@ -130,7 +130,10 @@ export async function main(): Promise<void> {
   process.once('SIGTERM', shutdown);
   process.once('SIGINT', shutdown);
 
-  await app.listen({ port: config.server.port, host: '0.0.0.0' });
+  // Bind dual-stack (IPv6 + IPv4) rather than IPv4-only. Node 18+ resolves
+  // `localhost` to IPv6 `::1` first, so an IPv4-only bind (0.0.0.0) leaves the
+  // victim's log shipper and the dashboard proxy failing with ECONNREFUSED ::1.
+  await app.listen({ port: config.server.port, host: '::' });
   // eslint-disable-next-line no-console
   console.log(
     `[oncall] platform listening on :${config.server.port} — dashboard read/stream API ready`,
