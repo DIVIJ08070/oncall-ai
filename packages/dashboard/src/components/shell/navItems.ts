@@ -11,7 +11,12 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: Activity, match: (p) => p === '/' },
+  {
+    to: '/dashboard',
+    label: 'Dashboard',
+    icon: Activity,
+    match: (p) => p.startsWith('/dashboard'),
+  },
   {
     to: '/incidents',
     label: 'Incidents',

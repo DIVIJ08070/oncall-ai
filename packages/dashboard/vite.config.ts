@@ -23,6 +23,10 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       strictPort: false,
+      // Allow sharing the dev server over VS Code dev tunnels / ngrok (any
+      // `*.devtunnels.ms` subdomain). Vite 5.4 otherwise blocks non-localhost
+      // Host headers with "This host is not allowed".
+      allowedHosts: ['.devtunnels.ms'],
       proxy: {
         '/api': {
           target,

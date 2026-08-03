@@ -117,11 +117,18 @@ const config: Config = {
           '0%, 100%': { opacity: '0.6' },
           '50%': { opacity: '1' },
         },
+        boop: {
+          '0%': { transform: 'scale(1)' },
+          '30%': { transform: 'scale(1.06, 0.94) translateY(6px)' },
+          '60%': { transform: 'scale(0.96, 1.04) translateY(-10px)' },
+          '100%': { transform: 'scale(1)' },
+        },
       },
       animation: {
         'enter-up': 'enter-up var(--dur-base) var(--ease-out)',
         'pulse-live': 'pulse2s 2s ease-in-out infinite',
         shimmer: 'shimmer 1.4s ease-in-out infinite',
+        boop: 'boop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)',
       },
     },
   },

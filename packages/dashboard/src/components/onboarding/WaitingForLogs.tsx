@@ -70,7 +70,7 @@ export function WaitingForLogs({ repo }: { repo: RepoRef | null }) {
           )}
         </p>
       </div>
-      <Link to="/" className="text-sm font-medium text-accent-text hover:underline">
+      <Link to="/dashboard" className="text-sm font-medium text-accent-text hover:underline">
         Skip to dashboard
       </Link>
     </div>
@@ -99,7 +99,7 @@ function Connected({ service }: { service: ServiceHealthDto }) {
           Last event {service.last_event_at ? relativeTime(service.last_event_at) : '—'}
         </p>
       </div>
-      <Link to="/" className="w-full">
+      <Link to="/dashboard" className="w-full">
         <Button
           variant="primary"
           className="h-11 w-full"

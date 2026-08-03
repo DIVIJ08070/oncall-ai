@@ -353,7 +353,7 @@ export function InvestigationFeed({
           <button
             type="button"
             onClick={jumpToLatest}
-            className="sticky bottom-2 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-pill bg-accent px-3 py-1 text-sm font-medium text-white shadow-elev-2"
+            className="sticky bottom-2 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-pill bg-accent px-3 py-1 text-sm font-medium text-black shadow-elev-2"
           >
             <Icon icon={ArrowDown} size={14} />
             {newCount} new step{newCount > 1 ? 's' : ''}

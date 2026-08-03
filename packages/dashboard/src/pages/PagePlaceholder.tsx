@@ -30,7 +30,7 @@ export function PagePlaceholder({
           title={`${title} — arriving in ${chunk}`}
           subtitle={description}
           action={
-            <Link to="/">
+            <Link to="/dashboard">
               <Button variant="secondary">Back to dashboard</Button>
             </Link>
           }

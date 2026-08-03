@@ -270,7 +270,7 @@ export function LogStream({
           <button
             type="button"
             onClick={jumpToLatest}
-            className="absolute bottom-3 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-pill bg-accent px-3 py-1 text-sm font-medium text-white shadow-elev-2"
+            className="absolute bottom-3 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-pill bg-accent px-3 py-1 text-sm font-medium text-black shadow-elev-2"
           >
             <Icon icon={ArrowDown} size={14} />
             {newCount} new

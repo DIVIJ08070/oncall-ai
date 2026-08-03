@@ -17,7 +17,7 @@ export function TopBar() {
 
   return (
     <header className="sticky top-0 z-header flex h-14 items-center justify-between border-b border-border bg-surface px-4 shadow-elev-1 md:px-6">
-      <Link to="/" className="flex items-center gap-2 rounded-md">
+      <Link to="/dashboard" className="flex items-center gap-2 rounded-md">
         <span className="text-accent">
           <Icon icon={Activity} size={20} />
         </span>

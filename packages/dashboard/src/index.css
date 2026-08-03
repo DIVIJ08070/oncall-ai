@@ -30,12 +30,13 @@
   --grid: #2c2c2a;
   --axis: #383835;
 
-  /* Action */
-  --primary: #256abf;
-  --primary-hover: #2a78d6;
-  --accent: #3987e5;
-  --accent-text: #5d9dea;
-  --focus-ring: #3987e5;
+  /* Action (brand orange — matches the landing gradient #FF8233 → #FDAC55).
+     Hover darkens (not lightens) to keep white button text readable. */
+  --primary: #f16524;
+  --primary-hover: #d9531a;
+  --accent: #ff8233;
+  --accent-text: #ff9d5c;
+  --focus-ring: #ff8233;
   --scrim: rgba(0, 0, 0, 0.6);
 
   /* Status (reserved) */
@@ -47,7 +48,9 @@
   --silent: #898781;
   --pr-merged: #9085e9;
 
-  /* Chart series + feed accents */
+  /* Chart series + feed accents. series-error stays blue on purpose: a data
+     series must not share a hue with the brand accent or the serious/warn
+     status oranges, or severity scanning breaks. */
   --series-error: #3987e5;
   --series-lat: #199e70;
   --series-lat-band: rgba(25, 158, 112, 0.1);
@@ -60,8 +63,8 @@
   --elev-3: 0 16px 48px rgba(0, 0, 0, 0.65);
 
   /* Type */
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
-    Arial, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas,
     'Liberation Mono', monospace;
 
@@ -91,11 +94,11 @@
   --grid: #e1e0d9;
   --axis: #c3c2b7;
 
-  --primary: #256abf;
-  --primary-hover: #2f7ce0;
-  --accent: #2a78d6;
-  --accent-text: #2a6cc4;
-  --focus-ring: #2a78d6;
+  --primary: #f16524;
+  --primary-hover: #d9531a;
+  --accent: #e85a16;
+  --accent-text: #b54307;
+  --focus-ring: #e85a16;
   --scrim: rgba(11, 11, 11, 0.4);
 
   --ok: #0ca30c;
@@ -175,5 +178,66 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* ── Spotlight hero (public home) ──────────────────────────────────────────
+   Playfair Display (italic) is loaded from index.html; scope it to a class so
+   the console's monospace surfaces keep their own font. */
+.font-playfair {
+  font-family: 'Playfair Display', serif;
+}
+
+@keyframes heroReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(28px);
+    filter: blur(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+@keyframes heroFadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes heroZoom {
+  0% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.hero-anim {
+  opacity: 0;
+  animation-fill-mode: forwards;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hero-reveal {
+  animation-name: heroReveal;
+  animation-duration: 1.1s;
+}
+.hero-fade {
+  animation-name: heroFadeUp;
+  animation-duration: 1s;
+}
+.hero-zoom {
+  animation: heroZoom 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-anim,
+  .hero-zoom {
+    animation: none;
+    opacity: 1;
   }
 }

@@ -80,7 +80,7 @@ export function IncidentDetailPage() {
             subtitle={notFound ? undefined : error.message}
             action={
               notFound ? (
-                <Link to="/">
+                <Link to="/dashboard">
                   <Button variant="primary">Back to dashboard</Button>
                 </Link>
               ) : (
