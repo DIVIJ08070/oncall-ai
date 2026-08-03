@@ -13,7 +13,7 @@ export function DemoControlPage() {
   return (
     <div className="mx-auto flex w-full max-w-[640px] flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-h1 font-semibold text-ink">Demo controls</h1>
+        <h1 className="font-playfair text-h1 italic text-ink">Demo controls</h1>
         <p className="text-body text-ink-2">
           Flip the victim app's failure mode and drive traffic to trigger the live
           detection → investigation → fix-as-PR loop.

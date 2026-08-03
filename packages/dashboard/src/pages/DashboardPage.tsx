@@ -47,7 +47,7 @@ export function DashboardPage() {
     <div className="flex flex-col gap-6">
       {/* Title row */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-h1 font-semibold text-ink">Dashboard</h1>
+        <h1 className="font-playfair text-h1 italic text-ink">Dashboard</h1>
         <div className="flex flex-wrap items-center gap-2">
           <label className="sr-only" htmlFor="service-filter">
             Filter by service

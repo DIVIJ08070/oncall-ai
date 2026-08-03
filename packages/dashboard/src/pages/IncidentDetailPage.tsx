@@ -42,7 +42,7 @@ import { SegmentedControl } from '../components/primitives/SegmentedControl';
 export function IncidentsListPage() {
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-h1 font-semibold text-ink">Incidents</h1>
+      <h1 className="font-playfair text-h1 italic text-ink">Incidents</h1>
       <IncidentTimelineList />
     </div>
   );

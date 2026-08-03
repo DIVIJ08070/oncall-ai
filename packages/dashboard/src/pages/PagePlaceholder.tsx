@@ -23,7 +23,7 @@ export function PagePlaceholder({
 }) {
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="mb-4 text-h1 font-semibold text-ink">{title}</h1>
+      <h1 className="mb-4 font-playfair text-h1 italic text-ink">{title}</h1>
       <Card>
         <EmptyState
           icon={icon}

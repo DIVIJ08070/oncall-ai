@@ -1,4 +1,4 @@
-import { Activity, Github } from 'lucide-react';
+import { Github } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Icon } from '../primitives/Icon';
 import { ConnectionStatus } from '../primitives/ConnectionStatus';
@@ -16,12 +16,24 @@ export function TopBar() {
   const { user, devMode } = useSession();
 
   return (
-    <header className="sticky top-0 z-header flex h-14 items-center justify-between border-b border-border bg-surface px-4 shadow-elev-1 md:px-6">
+    <header
+      className="sticky top-0 z-header flex h-14 items-center justify-between border-b border-border px-4 shadow-elev-1 backdrop-blur-md md:px-6"
+      style={{ backgroundColor: 'color-mix(in srgb, var(--surface) 78%, transparent)' }}
+    >
       <Link to="/dashboard" className="flex items-center gap-2 rounded-md">
-        <span className="text-accent">
-          <Icon icon={Activity} size={20} />
-        </span>
-        <span className="text-h3 font-semibold text-ink">OnCall AI</span>
+        {/* Same diamond mark + Playfair-italic wordmark as the landing hero, so
+            the console reads as one product with the public site. */}
+        <svg
+          width={22}
+          height={22}
+          viewBox="0 0 256 256"
+          className="text-accent"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path d="M 256 256 L 128 256 L 0 128 L 128 128 Z M 256 128 L 128 128 L 0 0 L 128 0 Z" />
+        </svg>
+        <span className="font-playfair text-xl italic text-ink">OnCall AI</span>
       </Link>
 
       <div className="hidden lg:flex">

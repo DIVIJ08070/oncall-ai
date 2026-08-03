@@ -145,7 +145,7 @@ function IncidentRow({ inc }: { inc: IncidentSummary }) {
     <li>
       <Link
         to={`/incidents/${inc.id}`}
-        className="flex items-center gap-3 border-b border-border px-4 py-3 hover:bg-surface-3"
+        className="spot-row flex items-center gap-3 border-b border-border px-4 py-3 hover:bg-surface-3"
       >
         <span
           className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full"
