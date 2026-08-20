@@ -128,21 +128,11 @@ export function SpotlightHero() {
  * state, so it never depends on re-render timing.
  */
 function RevealLayer({ image }: { image: string }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const revealRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
     const reveal = revealRef.current;
-    if (!canvas || !reveal) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const sizeCanvas = (): void => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    sizeCanvas();
+    if (!reveal) return;
 
     // Raw pointer + eased position. Start off-screen so the reveal is hidden
     // until the cursor enters.
@@ -154,62 +144,47 @@ function RevealLayer({ image }: { image: string }) {
       mouse.y = e.clientY;
     };
     window.addEventListener('mousemove', onMove);
-    window.addEventListener('resize', sizeCanvas);
 
     let raf = 0;
     const draw = (): void => {
-      smooth.x += (mouse.x - smooth.x) * 0.1;
-      smooth.y += (mouse.y - smooth.y) * 0.1;
+      const dx = mouse.x - smooth.x;
+      const dy = mouse.y - smooth.y;
+      smooth.x += dx * 0.1;
+      smooth.y += dy * 0.1;
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const g = ctx.createRadialGradient(smooth.x, smooth.y, 0, smooth.x, smooth.y, SPOTLIGHT_R);
-      g.addColorStop(0, 'rgba(255,255,255,1)');
-      g.addColorStop(0.4, 'rgba(255,255,255,1)');
-      g.addColorStop(0.6, 'rgba(255,255,255,0.75)');
-      g.addColorStop(0.75, 'rgba(255,255,255,0.4)');
-      g.addColorStop(0.88, 'rgba(255,255,255,0.12)');
-      g.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(smooth.x, smooth.y, SPOTLIGHT_R, 0, Math.PI * 2);
-      ctx.fill();
-
-      const url = canvas.toDataURL();
-      reveal.style.webkitMaskImage = `url(${url})`;
-      reveal.style.maskImage = `url(${url})`;
-      reveal.style.webkitMaskSize = '100% 100%';
-      reveal.style.maskSize = '100% 100%';
-
+      // PERF: the old implementation painted a canvas and exported it with
+      // canvas.toDataURL() EVERY FRAME — a full-viewport PNG encode + decode
+      // per frame, which made the whole page feel laggy. A CSS radial-gradient
+      // mask with the same falloff stops is visually identical and ~free.
+      if (Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05) {
+        const m = `radial-gradient(circle ${SPOTLIGHT_R}px at ${smooth.x.toFixed(1)}px ${smooth.y.toFixed(1)}px, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 40%, rgba(0,0,0,0.75) 60%, rgba(0,0,0,0.4) 75%, rgba(0,0,0,0.12) 88%, rgba(0,0,0,0) 100%)`;
+        reveal.style.webkitMaskImage = m;
+        reveal.style.maskImage = m;
+      }
       raf = requestAnimationFrame(draw);
     };
-    // Paint one frame immediately (transparent mask → reveal hidden), then loop.
     draw();
 
     return () => {
       window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('resize', sizeCanvas);
       cancelAnimationFrame(raf);
     };
   }, []);
 
   return (
-    <>
-      <canvas
-        ref={canvasRef}
-        className="pointer-events-none absolute inset-0"
-        style={{ display: 'none' }}
-      />
-      <div
-        ref={revealRef}
-        className="pointer-events-none absolute inset-0 z-30 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: `url(${image})`,
-          // The two source images differ only slightly, so warm the revealed
-          // layer hard: the spotlight then clearly "lights up" the lava under it.
-          filter: 'brightness(1.7) saturate(1.9) contrast(1.15)',
-        }}
-      />
-    </>
+    <div
+      ref={revealRef}
+      className="pointer-events-none absolute inset-0 z-30 bg-cover bg-center bg-no-repeat"
+      style={{
+        backgroundImage: `url(${image})`,
+        // The two source images differ only slightly, so warm the revealed
+        // layer hard: the spotlight then clearly "lights up" the lava under it.
+        filter: 'brightness(1.7) saturate(1.9) contrast(1.15)',
+        // Fully hidden until the first mousemove eases the mask on-screen.
+        maskImage: 'radial-gradient(circle 1px at -9999px -9999px, black 0%, transparent 100%)',
+        WebkitMaskImage: 'radial-gradient(circle 1px at -9999px -9999px, black 0%, transparent 100%)',
+      }}
+    />
   );
 }
 

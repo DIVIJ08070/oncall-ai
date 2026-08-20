@@ -415,16 +415,16 @@
 
 /* ── Atmosphere engine (components/atmosphere) — igloo-inspired depth ─────── */
 @keyframes atm-drift-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(8%, 6%) scale(1.12); }
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(8%, 6%); }
 }
 @keyframes atm-drift-2 {
-  0%, 100% { transform: translate(0, 0) scale(1.05); }
-  50% { transform: translate(-7%, 5%) scale(0.95); }
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-7%, 5%); }
 }
 @keyframes atm-drift-3 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(5%, -8%) scale(1.15); }
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(5%, -8%); }
 }
 .atm-aurora { animation: atm-drift-1 22s ease-in-out infinite; }
 .atm-aurora-2 { animation: atm-drift-2 28s ease-in-out infinite; }
