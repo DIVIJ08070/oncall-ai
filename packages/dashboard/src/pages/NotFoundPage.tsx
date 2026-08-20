@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { FallingText } from '../components/primitives/FallingText';
 import { TargetCursor } from '../components/primitives/TargetCursor';
-import { Grain, AtmosphereBackdrop, HudCorners, MonoTag } from '../components/atmosphere';
+import { Grain, Scanlines, AtmosphereBackdrop, HudCorners, MonoTag } from '../components/atmosphere';
 
 /**
  * 404 — dark brand screen matching the console. The explanatory sentence is a
@@ -21,8 +21,9 @@ export function NotFoundPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-bg">
-      {/* Film grain over the whole viewport — the lost-signal texture. */}
+      {/* Film grain + scanlines over the whole viewport — the lost-signal texture. */}
       <Grain />
+      <Scanlines />
 
       {/* Aurora depth + faint HUD grid, behind everything. */}
       <AtmosphereBackdrop />

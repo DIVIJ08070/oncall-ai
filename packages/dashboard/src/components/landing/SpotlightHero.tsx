@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Menu } from 'lucide-react';
 import { MenuOverlay, type LandingNavItem } from './MenuOverlay';
+import { Grain, Scanlines } from '../atmosphere';
 import { TargetCursor } from '../primitives/TargetCursor';
 
 /**
@@ -41,6 +42,10 @@ export function SpotlightHero() {
     >
       {/* Crosshair pointer — brand surfaces only; the console keeps the real cursor. */}
       <TargetCursor spinDuration={2} hoverDuration={0.2} cursorColorOnTarget="#F16524" />
+
+      {/* cinematic overlays on top of the spotlight scene */}
+      <Grain opacity={0.14} />
+      <Scanlines opacity={0.4} />
 
       <Nav onOpenMenu={() => setMenuOpen(true)} />
 

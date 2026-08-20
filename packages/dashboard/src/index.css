@@ -432,3 +432,24 @@
 @media (prefers-reduced-motion: reduce) {
   .atm-aurora, .atm-aurora-2, .atm-aurora-3 { animation: none !important; }
 }
+
+/* ── Atmosphere MAX intensity ─────────────────────────────────────────────── */
+@keyframes atm-grain-shift {
+  0% { transform: translate(0,0); }
+  25% { transform: translate(-3%, 2%); }
+  50% { transform: translate(2%, -3%); }
+  75% { transform: translate(-2%, -2%); }
+  100% { transform: translate(0,0); }
+}
+.atm-grain { animation: atm-grain-shift 6s steps(6) infinite; }
+@keyframes atm-sweep-travel {
+  0% { transform: translateY(-40vh); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(140vh); opacity: 0; }
+}
+.atm-sweep { animation: atm-sweep-travel 7s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .atm-grain, .atm-sweep { animation: none !important; }
+  .atm-sweep { display: none; }
+}

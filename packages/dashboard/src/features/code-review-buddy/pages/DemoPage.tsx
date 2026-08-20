@@ -6,6 +6,7 @@ import {
   Grain,
   HudCorners,
   MonoTag,
+  Scanlines,
 } from '../../../components/atmosphere';
 import { DiffInput } from '../features/review/components/DiffInput';
 import { ReviewResult } from '../features/review/components/ReviewResult';
@@ -57,6 +58,7 @@ export function DemoPage() {
           fixed film-grain overlay across the viewport. Purely decorative. */}
       <AtmosphereBackdrop />
       <Grain />
+      <Scanlines />
 
       <div className="relative z-10">
         <Navbar variant="app" />

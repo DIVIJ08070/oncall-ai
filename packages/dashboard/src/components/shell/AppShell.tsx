@@ -3,7 +3,7 @@ import { TopBar } from './TopBar';
 import { SideNav } from './SideNav';
 import { BottomTabBar } from './BottomTabBar';
 import { CursorSpotlight } from './CursorSpotlight';
-import { Grain, AtmosphereBackdrop } from '../atmosphere';
+import { Grain, AtmosphereBackdrop, Scanlines, ScanSweep } from '../atmosphere';
 
 /**
  * App shell (DESIGN_SPEC §4): TopBar (sticky 56px) + SideNav + Content. Content is
@@ -15,6 +15,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="relative flex min-h-screen flex-col bg-bg">
       {/* Igloo-inspired atmosphere: aurora depth + HUD grid behind everything, film grain on top. */}
       <AtmosphereBackdrop />
+      <Scanlines />
+      <ScanSweep />
       <Grain />
       <CursorSpotlight />
       {/* Content sits above the ambient + atmosphere layers. */}

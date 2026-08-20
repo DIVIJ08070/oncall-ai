@@ -13,18 +13,18 @@ import { useReducedMotion } from 'motion/react';
 const GRAIN_SVG =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
-    "<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>",
+    "<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.85'/></svg>",
   );
 
 /** Fixed film-grain overlay across the whole viewport. */
-export function Grain({ opacity = 0.06 }: { opacity?: number }) {
+export function Grain({ opacity = 0.16 }: { opacity?: number }) {
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed inset-0 z-[80] mix-blend-overlay"
+      className="atm-grain pointer-events-none fixed inset-0 z-[80] mix-blend-soft-light"
       style={{
         backgroundImage: `url("${GRAIN_SVG}")`,
-        backgroundSize: '140px 140px',
+        backgroundSize: '180px 180px',
         opacity,
       }}
     />
@@ -44,16 +44,21 @@ export function Aurora({
   return (
     <div aria-hidden className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`}>
       <span
-        className="atm-aurora absolute -left-[15%] -top-[20%] h-[65vh] w-[65vh] rounded-full blur-[120px]"
-        style={{ background: colors[0], opacity: 0.14, animation: anim }}
+        className="atm-aurora absolute -left-[18%] -top-[25%] h-[85vh] w-[85vh] rounded-full blur-[110px]"
+        style={{ background: colors[0], opacity: 0.42, animation: anim }}
       />
       <span
-        className="atm-aurora-2 absolute -right-[10%] top-[10%] h-[55vh] w-[55vh] rounded-full blur-[130px]"
-        style={{ background: colors[1], opacity: 0.1, animation: anim }}
+        className="atm-aurora-2 absolute -right-[15%] top-[5%] h-[75vh] w-[75vh] rounded-full blur-[120px]"
+        style={{ background: colors[1], opacity: 0.34, animation: anim }}
       />
       <span
-        className="atm-aurora-3 absolute bottom-[-20%] left-[30%] h-[50vh] w-[50vh] rounded-full blur-[140px]"
-        style={{ background: colors[2], opacity: 0.08, animation: anim }}
+        className="atm-aurora-3 absolute bottom-[-25%] left-[25%] h-[70vh] w-[70vh] rounded-full blur-[130px]"
+        style={{ background: colors[2], opacity: 0.3, animation: anim }}
+      />
+      {/* a hot orange core low-down for a cinematic glow-from-below */}
+      <span
+        className="atm-aurora absolute bottom-[-30%] right-[10%] h-[60vh] w-[60vh] rounded-full blur-[120px]"
+        style={{ background: 'var(--accent)', opacity: 0.24, animation: anim }}
       />
     </div>
   );
@@ -110,6 +115,35 @@ export function MonoTag({
   );
 }
 
+/** CRT-style scanlines — fixed, very fine, adds the cinematic HUD texture. */
+export function Scanlines({ opacity = 0.5 }: { opacity?: number }) {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none fixed inset-0 z-[70]"
+      style={{
+        opacity,
+        backgroundImage:
+          'repeating-linear-gradient(0deg, rgba(255,255,255,0.045) 0px, rgba(255,255,255,0.045) 1px, transparent 1px, transparent 3px)',
+      }}
+    />
+  );
+}
+
+/** A slow horizontal scan-sweep bar that travels down the viewport. */
+export function ScanSweep() {
+  return (
+    <div
+      aria-hidden
+      className="atm-sweep pointer-events-none fixed inset-x-0 top-0 z-[71] h-[36vh]"
+      style={{
+        background:
+          'linear-gradient(to bottom, transparent, color-mix(in srgb, var(--accent) 8%, transparent) 60%, transparent)',
+      }}
+    />
+  );
+}
+
 /**
  * Full-bleed background stack for a page/section: grain + aurora + a faint HUD
  * grid. Drop it as the first child of a `relative` container.
@@ -118,8 +152,8 @@ export function AtmosphereBackdrop({ grid = true }: { grid?: boolean }) {
   const gridStyle = useMemo<CSSProperties>(
     () => ({
       backgroundImage:
-        'linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)',
-      backgroundSize: '64px 64px',
+        'linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
+      backgroundSize: '52px 52px',
       maskImage: 'radial-gradient(120% 80% at 50% 0%, black 30%, transparent 85%)',
       WebkitMaskImage: 'radial-gradient(120% 80% at 50% 0%, black 30%, transparent 85%)',
     }),
