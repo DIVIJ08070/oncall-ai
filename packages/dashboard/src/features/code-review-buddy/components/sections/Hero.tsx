@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, ChevronDown, Play, Sparkles } from 'lucide-react';
+import { ArrowRight, ChevronDown, Play } from 'lucide-react';
 import { GlowBackground, Magnet } from '../ui';
 import {
   Parallax,
   ScrollReveal,
   ScrollWords,
 } from '../../../../components/motion/scroll';
+import { MonoTag } from '../../../../components/atmosphere';
 
 const HERO_CSS = `
 @keyframes crb-scrollcue {
@@ -18,13 +19,13 @@ const HERO_CSS = `
 }
 `;
 
-/** Landing hero — full-viewport cinematic intro with a giant gradient headline. */
+/** Landing hero — full-viewport terminal intro with a giant phosphor headline. */
 export function Hero() {
   return (
     <section className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 pb-28 pt-32 sm:px-6">
       <style>{HERO_CSS}</style>
 
-      {/* Layered depth — base glow, parallax blobs, grid, vignette */}
+      {/* Layered depth — solid phosphor bloom circles on parallax */}
       <GlowBackground />
 
       <Parallax
@@ -34,9 +35,9 @@ export function Hero() {
         <div
           className="h-full w-full rounded-full"
           style={{
-            background:
-              'radial-gradient(closest-side, rgba(241,101,36,0.28), transparent 70%)',
-            filter: 'blur(90px)',
+            backgroundColor: 'var(--accent)',
+            opacity: 0.07,
+            filter: 'blur(110px)',
           }}
         />
       </Parallax>
@@ -48,9 +49,9 @@ export function Hero() {
         <div
           className="h-full w-full rounded-full"
           style={{
-            background:
-              'radial-gradient(closest-side, rgba(187,204,215,0.20), transparent 70%)',
-            filter: 'blur(100px)',
+            backgroundColor: 'var(--accent)',
+            opacity: 0.05,
+            filter: 'blur(120px)',
           }}
         />
       </Parallax>
@@ -62,45 +63,25 @@ export function Hero() {
         <div
           className="h-full w-full rounded-full"
           style={{
-            background:
-              'radial-gradient(closest-side, rgba(255,130,51,0.16), transparent 70%)',
-            filter: 'blur(110px)',
+            backgroundColor: 'var(--accent)',
+            opacity: 0.05,
+            filter: 'blur(120px)',
           }}
         />
       </Parallax>
 
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px)',
-          backgroundSize: '64px 64px',
-          maskImage:
-            'radial-gradient(ellipse 72% 60% at 50% 42%, black, transparent 78%)',
-          WebkitMaskImage:
-            'radial-gradient(ellipse 72% 60% at 50% 42%, black, transparent 78%)',
-        }}
-      />
-
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-40 bg-gradient-to-b from-transparent to-[#0C0C0C]"
-      />
-
       {/* Content */}
       <div className="relative z-10 mx-auto flex max-w-5xl flex-col items-center text-center">
         <ScrollReveal y={16} className="mb-8">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-1.5 text-[11px] font-medium uppercase tracking-[0.22em] text-white/55 backdrop-blur">
-            <Sparkles size={13} style={{ color: '#F16524' }} />
-            AI pull request review
-          </span>
+          <MonoTag className="rounded-sm border border-border bg-surface-2 px-4 py-1.5">
+            SYS / AI PULL REQUEST REVIEW
+          </MonoTag>
         </ScrollReveal>
 
         <h1 className="text-6xl font-black uppercase leading-[0.9] tracking-tighter sm:text-7xl md:text-8xl lg:text-[8rem] xl:text-[9.5rem]">
           <ScrollWords
             text="SHIP BETTER PULL REQUESTS"
-            className="bg-[linear-gradient(180deg,#646973_0%,#BBCCD7_100%)] bg-clip-text text-transparent"
+            className="crt-glow-strong text-ink"
           />
         </h1>
 
@@ -108,9 +89,12 @@ export function Hero() {
           y={24}
           blur
           delay={0.35}
-          className="mt-9 max-w-2xl text-base text-white/60 sm:text-lg"
+          className="mt-9 max-w-2xl text-base text-ink-2 sm:text-lg"
         >
           <p>
+            <span aria-hidden className="text-accent">
+              &gt;{' '}
+            </span>
             AI-powered pull request reviews that catch bugs, security issues,
             code smells, and missing tests &mdash; before a human even opens the
             PR.
@@ -125,9 +109,9 @@ export function Hero() {
           <Magnet strength={0.25}>
             <Link
               to="/code-review/app"
-              className="group inline-flex items-center gap-2 rounded-full bg-white px-8 py-3.5 font-medium text-black shadow-[0_0_50px_-12px_rgba(255,255,255,0.55)] transition-all duration-200 hover:scale-[1.03] hover:bg-white/90 active:scale-[0.98]"
+              className="group inline-flex items-center gap-2 rounded-sm bg-primary px-8 py-3.5 font-bold uppercase tracking-[0.12em] text-black shadow-elev-2 transition-all duration-200 hover:scale-[1.03] hover:bg-primary-hover active:scale-[0.98]"
             >
-              Review my code
+              [ Review my code ]
               <ArrowRight
                 size={18}
                 className="transition-transform duration-200 group-hover:translate-x-1"
@@ -136,7 +120,7 @@ export function Hero() {
           </Magnet>
           <a
             href="#how"
-            className="group inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.03] px-8 py-3.5 font-medium text-white/90 backdrop-blur transition-colors duration-200 hover:bg-white/[0.08]"
+            className="group inline-flex items-center gap-2 rounded-sm border border-border-strong bg-surface-2 px-8 py-3.5 font-bold uppercase tracking-[0.12em] text-ink transition-colors duration-200 hover:bg-surface-3"
           >
             <Play
               size={16}
@@ -146,14 +130,10 @@ export function Hero() {
           </a>
         </ScrollReveal>
 
-        <ScrollReveal
-          y={16}
-          delay={0.65}
-          className="mt-7 text-sm text-white/40"
-        >
-          <p>
-            Powered by Gemini &middot; Nothing is committed &mdash; review only
-          </p>
+        <ScrollReveal y={16} delay={0.65} className="mt-7">
+          <MonoTag dot={false}>
+            // POWERED BY GEMINI · NOTHING IS COMMITTED — REVIEW ONLY
+          </MonoTag>
         </ScrollReveal>
       </div>
 
@@ -161,7 +141,7 @@ export function Hero() {
       <a
         href="#how"
         aria-label="Scroll to learn more"
-        className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-2 text-white/40 transition-colors duration-200 hover:text-white/70"
+        className="absolute bottom-8 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-2 text-ink-muted-text transition-colors duration-200 hover:text-accent-text"
       >
         <span className="text-[10px] font-medium uppercase tracking-[0.3em]">
           Scroll

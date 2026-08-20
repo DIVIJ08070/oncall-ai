@@ -22,9 +22,11 @@ type TabId = 'diff' | 'repo' | 'rules';
 
 function LoadingRow() {
   return (
-    <div className="flex items-center gap-3 py-8 text-white/60">
-      <Spinner />
-      <span className="text-sm">Analyzing…</span>
+    <div className="flex items-center gap-3 py-8 text-ink-muted-text">
+      <Spinner className="text-accent" />
+      <span className="text-sm uppercase tracking-[0.18em]">
+        Analyzing<span className="crt-cursor" />
+      </span>
     </div>
   );
 }
@@ -50,12 +52,9 @@ export function DemoPage() {
         : null;
 
   return (
-    <div
-      className="relative min-h-screen bg-[#0C0C0C] text-white"
-      style={{ fontFamily: "'Kanit', sans-serif" }}
-    >
-      {/* Atmosphere: full-bleed aurora + HUD grid behind everything, plus a
-          fixed film-grain overlay across the viewport. Purely decorative. */}
+    <div className="relative min-h-screen bg-bg text-ink">
+      {/* Atmosphere: full-bleed HUD grid behind everything, plus a fixed
+          film-grain overlay across the viewport. Purely decorative. */}
       <AtmosphereBackdrop />
       <Grain />
       <Scanlines />
@@ -69,15 +68,10 @@ export function DemoPage() {
               <MonoTag>REVIEW / ENGINE</MonoTag>
             </div>
 
-            <h1
-              className="text-4xl font-bold text-transparent sm:text-5xl"
-              style={{
-                backgroundImage:
-                  'linear-gradient(180deg, #646973 0%, #BBCCD7 100%)',
-                WebkitBackgroundClip: 'text',
-                backgroundClip: 'text',
-              }}
-            >
+            <h1 className="crt-glow-strong text-4xl font-bold uppercase tracking-tight text-ink sm:text-5xl">
+              <span aria-hidden className="text-accent">
+                &gt;{' '}
+              </span>
               Run a review
             </h1>
 
@@ -89,7 +83,7 @@ export function DemoPage() {
                 <div
                   role="tablist"
                   aria-label="Review mode"
-                  className="inline-flex rounded-md border border-white/10 bg-white/[0.02] p-1"
+                  className="inline-flex rounded-sm border border-border bg-surface-2 p-1"
                 >
                   {tabs.map((t) => {
                     const active = tab === t.id;
@@ -101,16 +95,14 @@ export function DemoPage() {
                         aria-selected={active}
                         onClick={() => setTab(t.id)}
                         style={{
-                          fontFamily:
-                            "'JetBrains Mono', ui-monospace, monospace",
                           boxShadow: active
                             ? 'inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent)'
                             : undefined,
                         }}
                         className={`rounded-[3px] px-3.5 py-1.5 text-[11px] uppercase tracking-[0.18em] transition-colors ${
                           active
-                            ? 'bg-white/[0.06] text-white'
-                            : 'text-white/45 hover:text-white/80'
+                            ? 'crt-glow bg-surface-3 text-accent-text'
+                            : 'text-ink-muted-text hover:text-ink-2'
                         }`}
                       >
                         {t.label}

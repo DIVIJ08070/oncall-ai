@@ -36,9 +36,9 @@ export function ProblemSolution() {
         <div
           className="h-full w-full rounded-full"
           style={{
-            background:
-              'radial-gradient(closest-side, rgba(241,101,36,0.18), transparent 70%)',
-            filter: 'blur(110px)',
+            backgroundColor: 'var(--accent)',
+            opacity: 0.05,
+            filter: 'blur(120px)',
           }}
         />
       </Parallax>
@@ -49,9 +49,9 @@ export function ProblemSolution() {
         <div
           className="h-full w-full rounded-full"
           style={{
-            background:
-              'radial-gradient(closest-side, rgba(187,204,215,0.12), transparent 70%)',
-            filter: 'blur(110px)',
+            backgroundColor: 'var(--accent)',
+            opacity: 0.04,
+            filter: 'blur(120px)',
           }}
         />
       </Parallax>
@@ -59,9 +59,9 @@ export function ProblemSolution() {
       <div className="relative z-10 mx-auto max-w-6xl">
         <div className="mx-auto max-w-3xl text-center">
           <ScrollReveal y={16}>
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-1.5 text-[11px] font-medium uppercase tracking-[0.22em] text-white/55 backdrop-blur">
-              The shift
-            </span>
+            <MonoTag className="rounded-sm border border-border bg-surface-2 px-4 py-1.5">
+              THE SHIFT
+            </MonoTag>
           </ScrollReveal>
 
           <div className="mt-6 flex justify-center">
@@ -71,12 +71,12 @@ export function ProblemSolution() {
           <h2 className="mt-6 text-4xl font-black uppercase leading-[0.95] tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">
             <ScrollWords
               text="SHIP WITHOUT THE WAIT"
-              className="bg-[linear-gradient(180deg,#646973_0%,#BBCCD7_100%)] bg-clip-text text-transparent"
+              className="crt-glow-strong text-ink"
             />
           </h2>
 
           <ScrollReveal y={20} blur delay={0.3} className="mx-auto mt-6 max-w-xl">
-            <p className="text-base text-white/55 sm:text-lg">
+            <p className="text-base text-ink-2 sm:text-lg">
               Human review is a bottleneck. Code Review Buddy makes the first
               pass instant, structured, and impossible to skim past.
             </p>
@@ -84,30 +84,30 @@ export function ProblemSolution() {
         </div>
 
         <ScrollStagger className="relative mt-16 grid gap-6 md:mt-20 md:grid-cols-2 md:gap-0">
-          {/* Glowing divider */}
+          {/* Glowing phosphor divider */}
           <div
             aria-hidden
             className="pointer-events-none absolute left-1/2 top-6 bottom-6 z-10 hidden w-px -translate-x-1/2 md:block"
             style={{
-              background:
-                'linear-gradient(180deg, transparent, rgba(241,101,36,0.55), rgba(255,130,51,0.35), transparent)',
-              boxShadow: '0 0 24px rgba(241,101,36,0.35)',
+              backgroundColor: 'var(--accent)',
+              opacity: 0.45,
+              boxShadow: '0 0 24px var(--accent)',
             }}
           />
 
           {/* Problem — muted */}
           <ScrollStaggerItem className="md:pr-10">
-            <div className="relative h-full rounded-3xl border border-white/10 bg-white/[0.02] p-8 backdrop-blur md:p-10">
-              <HudCorners size={14} inset={14} color="rgba(255,255,255,0.22)" />
+            <div className="relative h-full rounded-sm border border-border bg-surface-2 p-8 md:p-10">
+              <HudCorners size={14} inset={14} color="var(--border-strong)" />
               <div className="flex items-center gap-3">
-                <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/40">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-sm border border-border bg-surface-3 text-ink-muted-text">
                   <Clock3 size={18} />
                 </span>
                 <div>
-                  <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-white/35">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-ink-muted-text">
                     Today
                   </p>
-                  <h3 className="text-xl font-semibold text-white/70">
+                  <h3 className="text-xl font-semibold text-ink-2">
                     The problem
                   </h3>
                 </div>
@@ -116,11 +116,11 @@ export function ProblemSolution() {
                 {PROBLEMS.map((item) => (
                   <li
                     key={item}
-                    className="flex items-start gap-3 text-white/45"
+                    className="flex items-start gap-3 text-ink-muted-text"
                   >
                     <XCircle
                       size={18}
-                      className="mt-0.5 shrink-0 text-white/25"
+                      className="mt-0.5 shrink-0 text-ink-muted"
                     />
                     <span>{item}</span>
                   </li>
@@ -129,58 +129,35 @@ export function ProblemSolution() {
             </div>
           </ScrollStaggerItem>
 
-          {/* Solution — orange-accented */}
+          {/* Solution — phosphor-accented */}
           <ScrollStaggerItem className="md:pl-10">
-            <div
-              className="relative h-full rounded-3xl border p-8 backdrop-blur md:p-10"
-              style={{
-                borderColor: 'rgba(241,101,36,0.28)',
-                background:
-                  'linear-gradient(180deg, rgba(241,101,36,0.08), rgba(255,255,255,0.02))',
-                boxShadow: '0 0 60px -24px rgba(241,101,36,0.45)',
-              }}
-            >
+            <div className="relative h-full rounded-sm border border-border-strong bg-surface-2 p-8 shadow-elev-2 md:p-10">
               <HudCorners size={14} inset={14} />
               <div className="flex items-center gap-3">
-                <span
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl"
-                  style={{
-                    color: '#F16524',
-                    borderWidth: 1,
-                    borderColor: 'rgba(241,101,36,0.35)',
-                    backgroundColor: 'rgba(241,101,36,0.12)',
-                  }}
-                >
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-sm border border-border-strong bg-surface-3 text-accent">
                   <Zap size={18} />
                 </span>
                 <div>
-                  <p
-                    className="text-[11px] font-medium uppercase tracking-[0.2em]"
-                    style={{ color: '#FF8233' }}
-                  >
+                  <p className="crt-glow text-[11px] font-medium uppercase tracking-[0.2em] text-accent-text">
                     With Code Review Buddy
                   </p>
-                  <h3 className="text-xl font-semibold text-white">
+                  <h3 className="text-xl font-semibold text-ink">
                     Instant, structured review
                   </h3>
                 </div>
               </div>
               <ul className="mt-8 space-y-5">
                 {SOLUTIONS.map((item) => (
-                  <li
-                    key={item}
-                    className="flex items-start gap-3 text-white/80"
-                  >
+                  <li key={item} className="flex items-start gap-3 text-ink-2">
                     <CheckCircle2
                       size={18}
-                      className="mt-0.5 shrink-0"
-                      style={{ color: '#F16524' }}
+                      className="mt-0.5 shrink-0 text-accent"
                     />
                     <span>{item}</span>
                   </li>
                 ))}
               </ul>
-              <div className="mt-8 flex flex-wrap gap-2 border-t border-white/10 pt-6">
+              <div className="mt-8 flex flex-wrap gap-2 border-t border-border pt-6">
                 {BADGES.map((severity) => (
                   <ReviewBadge key={severity} severity={severity} />
                 ))}

@@ -10,13 +10,13 @@ interface ReviewResultProps {
 export function ReviewResult({ result }: ReviewResultProps) {
   return (
     <div className="space-y-6">
-      <div className="flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-6 sm:flex-row sm:gap-6">
+      <div className="flex flex-col items-center gap-4 rounded-sm border border-border bg-surface-2 p-6 sm:flex-row sm:gap-6">
         <ReviewScore score={result.overallScore} size="lg" />
         <div className="text-center sm:text-left">
           {result.prTitle && (
-            <h2 className="text-xl font-semibold text-white">{result.prTitle}</h2>
+            <h2 className="crt-glow text-xl font-semibold text-ink">{result.prTitle}</h2>
           )}
-          <p className="mt-1 text-sm text-white/50">
+          <p className="mt-1 text-sm text-ink-muted-text">
             Overall score across {result.categories.length} categories
           </p>
         </div>

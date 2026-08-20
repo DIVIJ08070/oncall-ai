@@ -80,7 +80,7 @@ function SlideIn({
   );
 }
 
-/** One station on the timeline: rail node, ghost numeral, and a glass card. */
+/** One station on the timeline: rail node, ghost numeral, and a terminal card. */
 function StepRow({ step, index }: { step: Step; index: number }) {
   const side: 'left' | 'right' = index % 2 === 0 ? 'left' : 'right';
   const Icon = step.icon;
@@ -92,7 +92,10 @@ function StepRow({ step, index }: { step: Step; index: number }) {
         aria-hidden
         className="absolute left-5 top-1 -translate-x-1/2 md:left-1/2 md:top-1/2 md:-translate-y-1/2"
       >
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#F16524]/40 bg-[#0C0C0C] text-[#F16524] shadow-[0_0_0_7px_#0C0C0C,0_0_34px_-6px_rgba(241,101,36,0.7)]">
+        <div
+          className="flex h-12 w-12 items-center justify-center rounded-sm border border-border-strong bg-bg text-accent"
+          style={{ boxShadow: '0 0 0 7px var(--bg), var(--elev-2)' }}
+        >
           <Icon size={20} />
         </div>
       </div>
@@ -106,14 +109,14 @@ function StepRow({ step, index }: { step: Step; index: number }) {
             : 'pl-16 md:col-start-2 md:row-start-1 md:pl-16 md:pr-0 md:text-left'
         }
       >
-        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-7 backdrop-blur-sm transition-colors duration-300 hover:border-white/20">
-          <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#F16524]">
+        <div className="relative overflow-hidden rounded-sm border border-border bg-surface-2 p-7 transition-colors duration-300 hover:border-border-strong">
+          <span className="crt-glow text-xs font-semibold uppercase tracking-[0.22em] text-accent-text">
             Step {step.number}
           </span>
-          <h3 className="mt-3 text-xl font-semibold text-white sm:text-2xl">
+          <h3 className="mt-3 text-xl font-semibold text-ink sm:text-2xl">
             {step.title}
           </h3>
-          <p className="mt-3 text-sm leading-relaxed text-white/50">
+          <p className="mt-3 text-sm leading-relaxed text-ink-muted-text">
             {step.body}
           </p>
         </div>
@@ -128,7 +131,7 @@ function StepRow({ step, index }: { step: Step; index: number }) {
             : 'pointer-events-none hidden select-none md:col-start-1 md:row-start-1 md:block md:pr-16 md:text-right'
         }
       >
-        <span className="text-[9rem] font-black leading-none tracking-tighter text-white/[0.04]">
+        <span className="text-[9rem] font-black leading-none tracking-tighter text-surface-3">
           {step.number}
         </span>
       </div>
@@ -136,7 +139,7 @@ function StepRow({ step, index }: { step: Step; index: number }) {
   );
 }
 
-/** Three-step scroll journey with a rail that fills with accent as you go. */
+/** Three-step scroll journey with a rail that fills with phosphor as you go. */
 export function HowItWorks() {
   const railRef = useRef<HTMLDivElement>(null);
   const isStatic = useStatic();
@@ -162,9 +165,9 @@ export function HowItWorks() {
         <div
           className="h-full w-full rounded-full"
           style={{
-            background:
-              'radial-gradient(closest-side, rgba(241,101,36,0.12), transparent 70%)',
-            filter: 'blur(55px)',
+            backgroundColor: 'var(--accent)',
+            opacity: 0.04,
+            filter: 'blur(75px)',
           }}
         />
       </Parallax>
@@ -175,29 +178,28 @@ export function HowItWorks() {
         <div
           className="h-full w-full rounded-full"
           style={{
-            background:
-              'radial-gradient(closest-side, rgba(187,204,215,0.09), transparent 70%)',
-            filter: 'blur(60px)',
+            backgroundColor: 'var(--accent)',
+            opacity: 0.03,
+            filter: 'blur(80px)',
           }}
         />
       </Parallax>
 
       <div className="relative mx-auto w-full max-w-5xl">
         <ScrollReveal className="flex justify-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium uppercase tracking-[0.22em] text-white/50">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#F16524]" />
-            How it works
-          </span>
+          <MonoTag className="rounded-sm border border-border bg-surface-2 px-4 py-1.5">
+            HOW IT WORKS
+          </MonoTag>
         </ScrollReveal>
 
         <div className="mt-6 flex justify-center">
           <MonoTag>FLOW / 3 STEPS</MonoTag>
         </div>
 
-        <h2 className="mx-auto mt-7 max-w-3xl text-center text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
+        <h2 className="mx-auto mt-7 max-w-3xl text-center text-4xl font-black uppercase leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
           <ScrollWords
             text="From diff to PR comment in three moves"
-            wordClassName="bg-[linear-gradient(180deg,#646973_0%,#BBCCD7_100%)] bg-clip-text text-transparent"
+            wordClassName="crt-glow-strong text-ink"
           />
         </h2>
 
@@ -206,16 +208,17 @@ export function HowItWorks() {
           {/* rail track */}
           <div
             aria-hidden
-            className="absolute left-5 top-0 h-full w-px -translate-x-1/2 bg-white/10 md:left-1/2"
+            className="absolute left-5 top-0 h-full w-px -translate-x-1/2 md:left-1/2"
+            style={{ backgroundColor: 'var(--border)' }}
           />
-          {/* rail fill — grows with scroll */}
+          {/* rail fill — grows with scroll, solid phosphor */}
           {isStatic ? (
             <div
               aria-hidden
               className="absolute left-5 top-0 h-full w-px -translate-x-1/2 md:left-1/2"
               style={{
-                background:
-                  'linear-gradient(180deg,#F16524 0%,#FF8233 100%)',
+                backgroundColor: 'var(--accent)',
+                boxShadow: '0 0 12px var(--accent)',
               }}
             />
           ) : (
@@ -224,7 +227,8 @@ export function HowItWorks() {
               className="absolute left-5 top-0 h-full w-px origin-top -translate-x-1/2 md:left-1/2"
               style={{
                 scaleY: fill,
-                background: 'linear-gradient(180deg,#F16524 0%,#FF8233 100%)',
+                backgroundColor: 'var(--accent)',
+                boxShadow: '0 0 12px var(--accent)',
               }}
             />
           )}

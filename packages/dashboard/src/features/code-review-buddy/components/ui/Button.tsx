@@ -11,9 +11,10 @@ interface ButtonProps {
 
 const VARIANT_CLASSES: Record<NonNullable<ButtonProps['variant']>, string> = {
   primary:
-    'bg-white text-black hover:scale-[1.03] active:scale-[0.98] hover:bg-white/90',
-  secondary: 'border border-white/20 bg-white/5 text-white hover:bg-white/10',
-  ghost: 'text-white/70 hover:text-white',
+    'bg-primary text-black font-bold uppercase tracking-[0.1em] hover:scale-[1.03] active:scale-[0.98] hover:bg-primary-hover',
+  secondary:
+    'border border-border-strong bg-surface-2 text-ink hover:bg-surface-3',
+  ghost: 'text-ink-muted-text hover:text-ink',
 };
 
 export function Button({
@@ -29,7 +30,7 @@ export function Button({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${VARIANT_CLASSES[variant]} ${className ?? ''}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-sm px-5 py-2.5 font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${VARIANT_CLASSES[variant]} ${className ?? ''}`}
     >
       {children}
     </button>

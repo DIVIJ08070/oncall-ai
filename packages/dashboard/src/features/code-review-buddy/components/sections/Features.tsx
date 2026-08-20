@@ -9,12 +9,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import {
-  motion,
-  useMotionTemplate,
-  useMotionValue,
-  useSpring,
-} from 'framer-motion';
+import { motion, useMotionValue, useSpring } from 'framer-motion';
 import {
   Parallax,
   ScrollReveal,
@@ -63,16 +58,13 @@ const FEATURES: Feature[] = [
   },
 ];
 
-/** A glass feature card with a cursor-tracking spotlight and a soft 3D tilt. */
+/** A terminal module card with a soft 3D tilt and phosphor hover glow. */
 function FeatureCard({ feature }: { feature: Feature }) {
   const ref = useRef<HTMLDivElement>(null);
-  const glowX = useMotionValue(0);
-  const glowY = useMotionValue(0);
   const rotX = useMotionValue(0);
   const rotY = useMotionValue(0);
   const rotateX = useSpring(rotX, { stiffness: 150, damping: 18, mass: 0.3 });
   const rotateY = useSpring(rotY, { stiffness: 150, damping: 18, mass: 0.3 });
-  const spotlight = useMotionTemplate`radial-gradient(240px circle at ${glowX}px ${glowY}px, rgba(241,101,36,0.18), transparent 70%)`;
 
   const handleMove = (e: MouseEvent<HTMLDivElement>) => {
     const el = ref.current;
@@ -80,8 +72,6 @@ function FeatureCard({ feature }: { feature: Feature }) {
     const rect = el.getBoundingClientRect();
     const px = (e.clientX - rect.left) / rect.width;
     const py = (e.clientY - rect.top) / rect.height;
-    glowX.set(e.clientX - rect.left);
-    glowY.set(e.clientY - rect.top);
     rotY.set((px - 0.5) * 9);
     rotX.set((0.5 - py) * 9);
   };
@@ -101,28 +91,22 @@ function FeatureCard({ feature }: { feature: Feature }) {
       whileHover={{ scale: 1.02 }}
       transition={{ type: 'spring', stiffness: 220, damping: 20 }}
       style={{ rotateX, rotateY, transformPerspective: 900 }}
-      className="group relative h-full overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm transition-colors duration-300 hover:border-white/20"
+      className="group relative h-full overflow-hidden rounded-sm border border-border bg-surface-2 p-8 transition-all duration-300 hover:border-border-strong hover:shadow-elev-2"
     >
-      {/* cursor-tracking spotlight */}
-      <motion.div
-        aria-hidden
-        style={{ background: spotlight }}
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-      />
-      {/* top light-catching edge */}
+      {/* top phosphor hairline that lights up on hover */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-primary opacity-0 transition-opacity duration-300 group-hover:opacity-40"
       />
 
       <div className="relative">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#F16524]/25 bg-[#F16524]/10 text-[#F16524] transition-all duration-300 group-hover:border-[#F16524]/50 group-hover:bg-[#F16524]/20 group-hover:shadow-[0_0_28px_-6px_rgba(241,101,36,0.55)]">
+        <div className="flex h-12 w-12 items-center justify-center rounded-sm border border-border-strong bg-surface-3 text-accent transition-shadow duration-300 group-hover:shadow-elev-2">
           <Icon size={22} />
         </div>
-        <h3 className="mt-6 text-lg font-semibold text-white">
+        <h3 className="crt-glow mt-6 text-lg font-semibold uppercase tracking-[0.06em] text-ink">
           {feature.title}
         </h3>
-        <p className="mt-3 text-sm leading-relaxed text-white/50">
+        <p className="mt-3 text-sm leading-relaxed text-ink-muted-text">
           {feature.body}
         </p>
       </div>
@@ -130,18 +114,13 @@ function FeatureCard({ feature }: { feature: Feature }) {
   );
 }
 
-/** Six-card feature grid — a scroll-in moment with alive, tilting glass cards. */
+/** Six-card feature grid — a scroll-in moment with alive, tilting terminal modules. */
 export function Features() {
   return (
     <section
       id="features"
       className="relative flex min-h-screen flex-col justify-center overflow-hidden px-4 py-32 sm:px-6 lg:py-40"
     >
-      {/* layered depth */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.14] [background-image:linear-gradient(to_right,rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:64px_64px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_78%)]"
-      />
       <Parallax
         speed={0.16}
         className="pointer-events-none absolute -left-40 top-16 h-[540px] w-[540px]"
@@ -149,9 +128,9 @@ export function Features() {
         <div
           className="h-full w-full rounded-full"
           style={{
-            background:
-              'radial-gradient(closest-side, rgba(241,101,36,0.13), transparent 70%)',
-            filter: 'blur(50px)',
+            backgroundColor: 'var(--accent)',
+            opacity: 0.04,
+            filter: 'blur(70px)',
           }}
         />
       </Parallax>
@@ -162,34 +141,33 @@ export function Features() {
         <div
           className="h-full w-full rounded-full"
           style={{
-            background:
-              'radial-gradient(closest-side, rgba(187,204,215,0.10), transparent 70%)',
-            filter: 'blur(60px)',
+            backgroundColor: 'var(--accent)',
+            opacity: 0.03,
+            filter: 'blur(80px)',
           }}
         />
       </Parallax>
 
       <div className="relative mx-auto w-full max-w-6xl">
         <ScrollReveal className="flex justify-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium uppercase tracking-[0.22em] text-white/50">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#F16524]" />
-            What it catches
-          </span>
+          <MonoTag className="rounded-sm border border-border bg-surface-2 px-4 py-1.5">
+            WHAT IT CATCHES
+          </MonoTag>
         </ScrollReveal>
 
         <div className="mt-6 flex justify-center">
           <MonoTag>SYS / CAPABILITIES</MonoTag>
         </div>
 
-        <h2 className="mx-auto mt-7 max-w-4xl text-center text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
+        <h2 className="mx-auto mt-7 max-w-4xl text-center text-4xl font-black uppercase leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
           <ScrollWords
             text="Everything a senior reviewer checks"
-            wordClassName="bg-[linear-gradient(180deg,#646973_0%,#BBCCD7_100%)] bg-clip-text text-transparent"
+            wordClassName="crt-glow-strong text-ink"
           />
         </h2>
 
         <ScrollReveal delay={0.1} className="mx-auto mt-6 max-w-xl">
-          <p className="text-center text-white/50">
+          <p className="text-center text-ink-muted-text">
             Five built-in review categories plus your own team rules — run
             against every diff, in seconds.
           </p>

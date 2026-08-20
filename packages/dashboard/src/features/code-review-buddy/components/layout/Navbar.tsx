@@ -14,18 +14,26 @@ const LANDING_LINKS: { label: string; href: string }[] = [
 export function Navbar({ variant = 'landing' }: NavbarProps) {
   return (
     <header
-      className="fixed inset-x-0 top-0 z-50 border-b border-white/10 bg-[#0C0C0C]/70 backdrop-blur-md"
-      style={{ fontFamily: "'Kanit', sans-serif" }}
+      className="fixed inset-x-0 top-0 z-50 border-b border-border backdrop-blur-md"
+      style={{
+        backgroundColor: 'color-mix(in srgb, var(--bg) 78%, transparent)',
+      }}
     >
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         <div className="flex items-center gap-4">
           <Link
             to="/"
-            className="hidden text-sm text-white/50 transition-colors hover:text-white sm:block"
+            className="hidden text-sm text-ink-muted-text transition-colors hover:text-ink sm:block"
           >
             &larr; OnCall AI
           </Link>
-          <Link to="/code-review" className="text-lg font-bold text-white">
+          <Link
+            to="/code-review"
+            className="crt-glow text-sm font-bold uppercase tracking-[0.14em] text-ink"
+          >
+            <span aria-hidden className="text-accent">
+              &gt;{' '}
+            </span>
             Code Review Buddy
           </Link>
         </div>
@@ -36,22 +44,22 @@ export function Navbar({ variant = 'landing' }: NavbarProps) {
               <a
                 key={link.href}
                 href={link.href}
-                className="hidden text-sm text-white/70 transition-colors hover:text-white md:block"
+                className="hidden text-sm uppercase tracking-[0.08em] text-ink-2 transition-colors hover:text-ink md:block"
               >
                 {link.label}
               </a>
             ))}
             <Link
               to="/code-review/app"
-              className="inline-flex items-center justify-center rounded-full bg-white px-5 py-2 text-sm font-medium text-black transition-all duration-200 hover:scale-[1.03] hover:bg-white/90 active:scale-[0.98]"
+              className="inline-flex items-center justify-center rounded-sm bg-primary px-5 py-2 text-sm font-bold uppercase tracking-[0.1em] text-black transition-all duration-200 hover:scale-[1.03] hover:bg-primary-hover active:scale-[0.98]"
             >
-              Open App
+              [ Open App ]
             </Link>
           </div>
         ) : (
           <Link
             to="/code-review"
-            className="text-sm text-white/70 transition-colors hover:text-white"
+            className="text-sm uppercase tracking-[0.08em] text-ink-2 transition-colors hover:text-ink"
           >
             Landing
           </Link>

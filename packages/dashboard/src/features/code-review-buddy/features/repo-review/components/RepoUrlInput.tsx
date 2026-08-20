@@ -35,7 +35,7 @@ export function RepoUrlInput() {
           onChange={(e) => setRepoUrl(e.target.value)}
           placeholder="https://github.com/owner/repo"
           spellCheck={false}
-          className="w-full flex-1 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none transition-colors focus:border-white/30"
+          className="w-full flex-1 rounded-sm border border-border bg-surface-2 px-4 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-border-strong"
         />
         <Button type="submit" disabled={disabled}>
           {loading && <Spinner size={16} />}
@@ -44,13 +44,13 @@ export function RepoUrlInput() {
       </div>
 
       {showHint && (
-        <p className="text-xs text-yellow-400/80">
+        <p className="text-xs text-warn">
           Enter a public GitHub repository URL like https://github.com/owner/repo
         </p>
       )}
 
       {loading && (
-        <p className="text-sm text-white/50">
+        <p className="text-sm text-ink-muted-text">
           Scanning up to 15 source files — this can take a minute.
         </p>
       )}

@@ -7,40 +7,29 @@ import { HowItWorks } from '../components/sections/HowItWorks';
 import { ReviewDemo } from '../components/sections/ReviewDemo';
 import { CtaFooter } from '../components/sections/CtaFooter';
 import { ScrollProgress } from '../../../components/motion/scroll';
-import { Grain, Aurora, Scanlines } from '../../../components/atmosphere';
+import {
+  AtmosphereBackdrop,
+  Grain,
+  Scanlines,
+} from '../../../components/atmosphere';
 
 /** Code Review Buddy marketing landing page (route: /code-review). */
 export function LandingPage() {
   return (
     <div
-      className="relative min-h-screen bg-[#0C0C0C] text-white"
-      style={{ fontFamily: "'Kanit', sans-serif", overflowX: 'clip' }}
+      className="relative min-h-screen bg-bg text-ink"
+      style={{ overflowX: 'clip' }}
     >
       <ScrollProgress />
 
-      {/* page-wide film grain */}
+      {/* page-wide film grain + phosphor scanlines */}
       <Grain />
       <Scanlines />
 
-      {/* subtle fixed aurora depth behind everything */}
+      {/* faint fixed phosphor grid behind everything (shared atmosphere) */}
       <div aria-hidden className="pointer-events-none fixed inset-0 z-0">
-        <Aurora className="opacity-70" />
+        <AtmosphereBackdrop />
       </div>
-
-      {/* faint fixed grid texture behind everything */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 z-0"
-        style={{
-          backgroundImage:
-            'linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px)',
-          backgroundSize: '54px 54px',
-          maskImage:
-            'radial-gradient(ellipse at 50% 0%, black 35%, transparent 82%)',
-          WebkitMaskImage:
-            'radial-gradient(ellipse at 50% 0%, black 35%, transparent 82%)',
-        }}
-      />
 
       <div className="relative z-10">
         <Navbar variant="landing" />

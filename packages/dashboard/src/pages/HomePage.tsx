@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
-import { SpotlightHero } from '../components/landing/SpotlightHero';
+import { TerminalHome } from '../components/landing/TerminalHome';
 
 /**
- * Public home page at `/` — the dark cursor-spotlight hero. The console lives
- * under `/dashboard`; this screen sets the tone and routes people in.
+ * Public home page at `/` — the amber phosphor terminal landing. The console
+ * lives under `/dashboard`; this screen sets the tone and routes people in.
+ * (SpotlightHero remains in the tree for revert.)
  */
 export function HomePage() {
   useEffect(() => {
@@ -13,5 +14,5 @@ export function HomePage() {
     };
   }, []);
 
-  return <SpotlightHero />;
+  return <TerminalHome />;
 }

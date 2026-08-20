@@ -14,7 +14,7 @@ export function FloatingCard({ children, className, float = true }: FloatingCard
 
   return (
     <motion.div
-      className={`rounded-2xl border border-white/10 bg-white/5 ${className ?? ''}`}
+      className={`rounded-sm border border-border bg-surface-2 ${className ?? ''}`}
       animate={shouldFloat ? { y: [0, -8, 0] } : undefined}
       transition={
         shouldFloat ? { duration: 5, repeat: Infinity, ease: 'easeInOut' } : undefined

@@ -23,19 +23,19 @@ export function CategoryCard({ category }: CategoryCardProps) {
       : category.findings;
 
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+    <div className="rounded-sm border border-border bg-surface-2 p-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="font-medium text-white">{category.name}</h3>
+        <h3 className="font-medium uppercase tracking-[0.08em] text-ink">{category.name}</h3>
         <ReviewBadge severity={category.severity} />
       </div>
 
-      <p className="mt-2 text-sm text-white/60">{category.summary}</p>
+      <p className="mt-2 text-sm text-ink-2">{category.summary}</p>
 
       {category.findings.length > 0 && (
         <ul className="mt-3 space-y-1.5">
           {visibleFindings.map((finding, i) => (
-            <li key={i} className="flex gap-2 text-sm text-white/75">
-              <span aria-hidden className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-white/40" />
+            <li key={i} className="flex gap-2 text-sm text-ink-2">
+              <span aria-hidden className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-ink-muted" />
               <span>{finding}</span>
             </li>
           ))}
@@ -46,7 +46,7 @@ export function CategoryCard({ category }: CategoryCardProps) {
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-white/50 transition-colors hover:text-white"
+          className="mt-3 inline-flex items-center gap-1 text-xs font-medium uppercase tracking-[0.08em] text-ink-muted-text transition-colors hover:text-ink"
         >
           <ChevronDown
             size={14}

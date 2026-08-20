@@ -12,62 +12,58 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  /* Surfaces — pure-black premium base to match the landing hero. Cards lift
-     off it in near-black greys so the elevation still reads. */
-  --bg: #000000;
-  --surface: #0e0e0e;
-  --surface-2: #161616;
-  --surface-3: #1f1f1f;
+  /* ── PHOSPHOR TERMINAL THEME ─────────────────────────────────────────
+     The whole product is an amber-phosphor CRT terminal: warm near-black
+     glass, one glowing phosphor hue (#FFB000), mono type. No gradients. */
+  --bg: #070502;
+  --surface: #0d0a04;
+  --surface-2: #131005;
+  --surface-3: #1c1607;
 
-  /* Ink */
-  --ink: #ffffff;
-  --ink-2: #c3c2b7;
-  --ink-muted: #898781;
-  --ink-muted-text: #9c9a93;
+  /* Ink — amber at falling intensities, like phosphor persistence */
+  --ink: #ffd489;
+  --ink-2: #d9a950;
+  --ink-muted: #8a6a2a;
+  --ink-muted-text: #b08636;
 
-  /* Lines */
-  --border: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.16);
-  --grid: #2c2c2a;
-  --axis: #383835;
+  /* Lines — dim phosphor */
+  --border: rgba(255, 176, 0, 0.16);
+  --border-strong: rgba(255, 176, 0, 0.32);
+  --grid: #241a08;
+  --axis: #3a2b0d;
 
-  /* Action (brand orange — matches the landing gradient #FF8233 → #FDAC55).
-     Hover darkens (not lightens) to keep white button text readable. */
-  --primary: #f16524;
-  --primary-hover: #d9531a;
-  --accent: #ff8233;
-  --accent-text: #ff9d5c;
-  --focus-ring: #ff8233;
-  --scrim: rgba(0, 0, 0, 0.6);
+  /* Action — the phosphor itself */
+  --primary: #ffb000;
+  --primary-hover: #ffc533;
+  --accent: #ffb000;
+  --accent-text: #ffc65e;
+  --focus-ring: #ffb000;
+  --scrim: rgba(4, 3, 1, 0.75);
 
-  /* Status (reserved) */
-  --ok: #0ca30c;
-  --ok-text: #0ca30c;
-  --warn: #fab219;
-  --serious: #ec835a;
-  --critical: #d03b3b;
-  --silent: #898781;
-  --pr-merged: #9085e9;
+  /* Status — phosphor CRT palette (green/amber/red tubes) */
+  --ok: #4dff7c;
+  --ok-text: #6fff96;
+  --warn: #ffe066;
+  --serious: #ff8c42;
+  --critical: #ff4d3d;
+  --silent: #8a6a2a;
+  --pr-merged: #c9a0ff;
 
-  /* Chart series + feed accents. series-error stays blue on purpose: a data
-     series must not share a hue with the brand accent or the serious/warn
-     status oranges, or severity scanning breaks. */
-  --series-error: #3987e5;
-  --series-lat: #199e70;
-  --series-lat-band: rgba(25, 158, 112, 0.1);
-  --tool-result: #199e70;
-  --conclusion: #9085e9;
+  /* Chart series — cool data hues so data never collides with status */
+  --series-error: #4da6ff;
+  --series-lat: #35e07c;
+  --series-lat-band: rgba(53, 224, 124, 0.1);
+  --tool-result: #35e07c;
+  --conclusion: #c9a0ff;
 
-  /* Elevation (dark leans on surface+border) */
-  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --elev-2: 0 8px 24px rgba(0, 0, 0, 0.55);
-  --elev-3: 0 16px 48px rgba(0, 0, 0, 0.65);
+  /* Elevation — phosphor bloom instead of drop shadows */
+  --elev-1: 0 0 0 1px rgba(255, 176, 0, 0.06);
+  --elev-2: 0 0 24px rgba(255, 176, 0, 0.1);
+  --elev-3: 0 0 48px rgba(255, 176, 0, 0.14);
 
-  /* Type */
-  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas,
-    'Liberation Mono', monospace;
+  /* Type — MONO EVERYWHERE: it's a terminal */
+  --font-sans: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* Motion */
   --dur-fast: 120ms;
@@ -80,45 +76,46 @@
 :root[data-theme='light'] {
   color-scheme: light;
 
-  --bg: #f9f9f7;
-  --surface: #fcfcfb;
-  --surface-2: #ffffff;
-  --surface-3: #f2f1ec;
+  /* Teletype paper mode — the terminal's printout */
+  --bg: #f2e6c9;
+  --surface: #f8efd9;
+  --surface-2: #fdf6e6;
+  --surface-3: #e9dab8;
 
-  --ink: #0b0b0b;
-  --ink-2: #52514e;
-  --ink-muted: #898781;
-  --ink-muted-text: #6b6a65;
+  --ink: #2a1f08;
+  --ink-2: #55431a;
+  --ink-muted: #8a6a2a;
+  --ink-muted-text: #6e5620;
 
-  --border: rgba(11, 11, 11, 0.1);
-  --border-strong: rgba(11, 11, 11, 0.16);
-  --grid: #e1e0d9;
-  --axis: #c3c2b7;
+  --border: rgba(42, 31, 8, 0.18);
+  --border-strong: rgba(42, 31, 8, 0.34);
+  --grid: #ddcda6;
+  --axis: #c4b189;
 
-  --primary: #f16524;
-  --primary-hover: #d9531a;
-  --accent: #e85a16;
-  --accent-text: #b54307;
-  --focus-ring: #e85a16;
-  --scrim: rgba(11, 11, 11, 0.4);
+  --primary: #a85b00;
+  --primary-hover: #8a4a00;
+  --accent: #a85b00;
+  --accent-text: #8a4a00;
+  --focus-ring: #a85b00;
+  --scrim: rgba(42, 31, 8, 0.4);
 
-  --ok: #0ca30c;
-  --ok-text: #006300;
-  --warn: #fab219;
-  --serious: #ec835a;
-  --critical: #d03b3b;
-  --silent: #898781;
-  --pr-merged: #6c5ce0;
+  --ok: #0f7a35;
+  --ok-text: #0a5c27;
+  --warn: #9a7500;
+  --serious: #b3541a;
+  --critical: #b32419;
+  --silent: #8a6a2a;
+  --pr-merged: #6c4bb5;
 
-  --series-error: #2a78d6;
-  --series-lat: #1baf7a;
-  --series-lat-band: rgba(27, 175, 122, 0.1);
-  --tool-result: #1baf7a;
-  --conclusion: #4a3aa7;
+  --series-error: #1f5fb3;
+  --series-lat: #0f7a35;
+  --series-lat-band: rgba(15, 122, 53, 0.1);
+  --tool-result: #0f7a35;
+  --conclusion: #4a3a8a;
 
-  --elev-1: 0 1px 2px rgba(11, 11, 11, 0.06);
-  --elev-2: 0 6px 16px rgba(11, 11, 11, 0.1);
-  --elev-3: 0 16px 40px rgba(11, 11, 11, 0.16);
+  --elev-1: 0 1px 2px rgba(42, 31, 8, 0.08);
+  --elev-2: 0 4px 12px rgba(42, 31, 8, 0.12);
+  --elev-3: 0 10px 30px rgba(42, 31, 8, 0.16);
 }
 
 @layer base {
@@ -186,7 +183,13 @@
    Playfair Display (italic) is loaded from index.html; scope it to a class so
    the console's monospace surfaces keep their own font. */
 .font-playfair {
-  font-family: 'Playfair Display', serif;
+  /* Terminal theme: the old display serif is retired — every "display" heading
+     becomes bold phosphor mono with a little tracking. Class name kept so no
+     component needs touching. */
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-style: normal !important;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 /* ── TargetCursor (components/primitives/TargetCursor.tsx) ─────────────────
@@ -452,4 +455,35 @@
 @media (prefers-reduced-motion: reduce) {
   .atm-grain, .atm-sweep { animation: none !important; }
   .atm-sweep { display: none; }
+}
+
+
+/* ── PHOSPHOR terminal utilities ─────────────────────────────────────────── */
+.crt-glow { text-shadow: 0 0 6px color-mix(in srgb, var(--accent) 45%, transparent); }
+.crt-glow-strong {
+  text-shadow:
+    0 0 4px color-mix(in srgb, var(--accent) 70%, transparent),
+    0 0 22px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+@keyframes crt-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+.crt-cursor::after {
+  content: '▊';
+  margin-left: 0.15em;
+  color: var(--accent);
+  animation: crt-blink 1.06s steps(1) infinite;
+}
+@keyframes crt-flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.86; }
+  94% { opacity: 1; }
+  97% { opacity: 0.93; }
+}
+.crt-flicker { animation: crt-flicker 6s linear infinite; }
+.ascii-rule {
+  border: none;
+  border-top: 1px dashed var(--border-strong);
+}
+@media (prefers-reduced-motion: reduce) {
+  .crt-cursor::after, .crt-flicker { animation: none !important; }
 }
