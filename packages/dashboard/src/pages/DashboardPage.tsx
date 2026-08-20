@@ -11,7 +11,6 @@ import { Button } from '../components/primitives/Button';
 import { Icon } from '../components/primitives/Icon';
 import { StatTile, SectionHeader } from '../components/primitives/StatTile';
 import { Entrance, StaggerGroup, StaggerItem } from '../components/motion/primitives';
-import { Cursor } from '../components/motion/terminal';
 import { pct, ms } from '../lib/format';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { TIME_RANGES } from '../config';
@@ -57,10 +56,7 @@ export function DashboardPage() {
     <Entrance className="flex flex-col gap-6">
       {/* Title row */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="crt-glow font-playfair text-h1 italic text-ink">
-          <span className="text-ink-muted-text">$ </span>dashboard
-          <Cursor />
-        </h1>
+        <h1 className="font-playfair text-h1 italic text-ink">Dashboard</h1>
         <div className="flex flex-wrap items-center gap-2">
           {/* Code Review Buddy mini-app entry point */}
           <Link
@@ -119,8 +115,6 @@ export function DashboardPage() {
           </Link>
         </div>
       </div>
-
-      <hr className="ascii-rule" />
 
       {/* KPI overview — animated roll-up of the live service list */}
       <StaggerGroup className="grid grid-cols-2 gap-3 lg:grid-cols-4">

@@ -33,7 +33,7 @@ export function DiffInput() {
         value={prTitle}
         onChange={(e) => setPrTitle(e.target.value)}
         placeholder="PR title (optional)"
-        className="w-full rounded-sm border border-border bg-surface-2 px-4 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-border-strong"
+        className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none transition-colors focus:border-white/30"
       />
 
       <div>
@@ -43,10 +43,10 @@ export function DiffInput() {
           placeholder="Paste your diff or code…"
           rows={14}
           spellCheck={false}
-          className="w-full resize-y rounded-sm border border-border bg-surface-2 px-4 py-3 font-mono text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-border-strong"
+          className="w-full resize-y rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 font-mono text-sm text-white placeholder-white/30 outline-none transition-colors focus:border-white/30"
         />
         <p
-          className={`mt-1 text-right text-xs ${overLimit ? 'text-critical' : 'text-ink-muted-text'}`}
+          className={`mt-1 text-right text-xs ${overLimit ? 'text-red-400' : 'text-white/40'}`}
         >
           {diff.length.toLocaleString()} / {CHAR_LIMIT.toLocaleString()} characters
         </p>

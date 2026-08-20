@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import { useReducedMotion } from 'motion/react';
 
 /**
  * Atmosphere engine — the "piece of art" layer (inspired by igloo.inc). A dark,
@@ -30,10 +31,37 @@ export function Grain({ opacity = 0.16 }: { opacity?: number }) {
   );
 }
 
-/** Retired under the phosphor terminal theme (no gradient blobs). The export
- * remains so existing call sites keep compiling; it renders nothing. */
-export function Aurora(_props: { className?: string; colors?: string[] }) {
-  return null;
+/** Slow drifting aurora blobs — the sense of depth behind everything. */
+export function Aurora({
+  className = '',
+  colors = ['var(--accent)', '#2b5cff', '#7a3cff'],
+}: {
+  className?: string;
+  colors?: [string, string, string] | string[];
+}) {
+  const reduced = useReducedMotion();
+  const anim = reduced ? 'none' : undefined;
+  return (
+    <div aria-hidden className={`pointer-events-none absolute inset-0 overflow-hidden ${className}`}>
+      <span
+        className="atm-aurora absolute -left-[18%] -top-[25%] h-[85vh] w-[85vh] rounded-full blur-[110px]"
+        style={{ background: colors[0], opacity: 0.42, animation: anim }}
+      />
+      <span
+        className="atm-aurora-2 absolute -right-[15%] top-[5%] h-[75vh] w-[75vh] rounded-full blur-[120px]"
+        style={{ background: colors[1], opacity: 0.34, animation: anim }}
+      />
+      <span
+        className="atm-aurora-3 absolute bottom-[-25%] left-[25%] h-[70vh] w-[70vh] rounded-full blur-[130px]"
+        style={{ background: colors[2], opacity: 0.3, animation: anim }}
+      />
+      {/* a hot orange core low-down for a cinematic glow-from-below */}
+      <span
+        className="atm-aurora absolute bottom-[-30%] right-[10%] h-[60vh] w-[60vh] rounded-full blur-[120px]"
+        style={{ background: 'var(--accent)', opacity: 0.24, animation: anim }}
+      />
+    </div>
+  );
 }
 
 /** Hairline corner brackets that frame a panel like a viewfinder. */
@@ -96,7 +124,7 @@ export function Scanlines({ opacity = 0.5 }: { opacity?: number }) {
       style={{
         opacity,
         backgroundImage:
-          'repeating-linear-gradient(0deg, rgba(255,176,0,0.05) 0px, rgba(255,176,0,0.05) 1px, transparent 1px, transparent 3px)',
+          'repeating-linear-gradient(0deg, rgba(255,255,255,0.045) 0px, rgba(255,255,255,0.045) 1px, transparent 1px, transparent 3px)',
       }}
     />
   );
@@ -124,7 +152,7 @@ export function AtmosphereBackdrop({ grid = true }: { grid?: boolean }) {
   const gridStyle = useMemo<CSSProperties>(
     () => ({
       backgroundImage:
-        'linear-gradient(rgba(255,176,0,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,176,0,0.05) 1px, transparent 1px)',
+        'linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
       backgroundSize: '52px 52px',
       maskImage: 'radial-gradient(120% 80% at 50% 0%, black 30%, transparent 85%)',
       WebkitMaskImage: 'radial-gradient(120% 80% at 50% 0%, black 30%, transparent 85%)',

@@ -57,13 +57,13 @@ const MARQUEE_CSS = `
 function ChipPill({ chip }: { chip: Chip }) {
   const color = severityColor(chip.severity);
   return (
-    <span className="mx-2.5 inline-flex shrink-0 items-center gap-2.5 rounded-sm border border-border bg-surface-2 px-4 py-2 text-sm text-ink-2 transition-colors duration-200 hover:border-border-strong hover:bg-surface-3">
+    <span className="mx-2.5 inline-flex shrink-0 items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-white/60 backdrop-blur transition-colors duration-200 hover:border-white/20 hover:bg-white/[0.07]">
       <span
         aria-hidden
         className="h-1.5 w-1.5 shrink-0 rounded-full"
         style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }}
       />
-      <chip.icon size={14} className="shrink-0 text-ink-muted-text" />
+      <chip.icon size={14} className="shrink-0 text-white/40" />
       {chip.text}
     </span>
   );
@@ -82,9 +82,17 @@ function ChipRow({ chips, hidden }: { chips: Chip[]; hidden?: boolean }) {
 /** Infinite dual-row marquee of fake git activity; opposite directions, pauses on hover. */
 export function GitActivityMarquee() {
   return (
-    <ScrollReveal className="crb-marquee relative overflow-hidden border-y border-border py-8">
+    <ScrollReveal className="crb-marquee relative overflow-hidden border-y border-white/5 py-8">
       <style>{MARQUEE_CSS}</style>
-      <div className="flex flex-col gap-4">
+      <div
+        className="flex flex-col gap-4"
+        style={{
+          maskImage:
+            'linear-gradient(90deg, transparent, black 8%, black 92%, transparent)',
+          WebkitMaskImage:
+            'linear-gradient(90deg, transparent, black 8%, black 92%, transparent)',
+        }}
+      >
         <div className="crb-track-left flex w-max">
           <ChipRow chips={ROW_A} />
           <ChipRow chips={ROW_A} hidden />

@@ -36,7 +36,6 @@ import { Drawer } from '../components/primitives/Drawer';
 import { SegmentedControl } from '../components/primitives/SegmentedControl';
 import { StatTile, SectionHeader } from '../components/primitives/StatTile';
 import { Entrance, StaggerGroup, StaggerItem, Press } from '../components/motion/primitives';
-import { HudCorners, MonoTag } from '../components/atmosphere';
 
 /**
  * `/incidents` list + `/incidents/:id` detail (DESIGN_SPEC §6.3, FR-14/08/16, NFR-06).
@@ -51,14 +50,11 @@ export function IncidentsListPage() {
   return (
     <Entrance className="flex flex-col gap-5">
       <div className="flex flex-col gap-1">
-        <h1 className="crt-glow font-playfair text-h1 italic text-ink">
-          <span className="text-ink-muted-text">$ </span>incidents
-        </h1>
+        <h1 className="font-playfair text-h1 italic text-ink">Incidents</h1>
         <p className="text-sm text-ink-muted-text">
           Every detection, investigation and fix — newest first.
         </p>
       </div>
-      <hr className="ascii-rule" />
       <div className="flex flex-col gap-3">
         <SectionHeader title="Timeline" icon={Activity} />
         <IncidentTimelineList />
@@ -265,10 +261,7 @@ function Header({
       <BackLink />
       <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="crt-glow text-h1 font-semibold tracking-tight text-ink">
-            <span className="text-ink-muted-text">$ </span>
-            {incident.title}
-          </h1>
+          <h1 className="text-h1 font-semibold tracking-tight text-ink">{incident.title}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <StatusPill token={st.token} label={st.label} pulse={live} />
             <StatusPill token={sev.token} label={`${sev.label} severity`} />
@@ -310,16 +303,11 @@ function Header({
         </div>
       </div>
 
-      <hr className="ascii-rule mt-3" />
-
       {rootCause ? (
-        <div className="relative mt-3 rounded-sm border border-border bg-surface-2 p-3">
-          <HudCorners />
+        <div className="mt-3 rounded-lg border border-border bg-surface-2 p-3">
           <div className="flex items-center gap-1.5 text-accent">
             <Icon icon={Sparkles} size={14} />
-            <MonoTag className="text-accent" dot={false}>
-              ROOT_CAUSE // ANALYSIS
-            </MonoTag>
+            <span className="text-label uppercase tracking-wide">Root cause</span>
           </div>
           <p className="mt-1.5 text-body-md text-ink">{rootCause}</p>
           {confidence != null ? (
@@ -576,10 +564,10 @@ function DetailSkeleton() {
         </div>
       </div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <Skeleton className="h-[60vh] w-full" rounded="rounded-sm" />
+        <Skeleton className="h-[60vh] w-full" rounded="rounded-lg" />
         <div className="flex flex-col gap-4">
-          <Skeleton className="h-40 w-full" rounded="rounded-sm" />
-          <Skeleton className="h-48 w-full" rounded="rounded-sm" />
+          <Skeleton className="h-40 w-full" rounded="rounded-lg" />
+          <Skeleton className="h-48 w-full" rounded="rounded-lg" />
         </div>
       </div>
     </div>

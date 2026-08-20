@@ -33,7 +33,7 @@ function RuleRow({ rule }: { rule: CustomRule }) {
 
   return (
     <li
-      className={`flex items-start gap-3 rounded-sm border border-border bg-surface-2 p-4 transition-opacity ${rule.enabled ? '' : 'opacity-50'}`}
+      className={`flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 transition-opacity ${rule.enabled ? '' : 'opacity-50'}`}
     >
       <span
         aria-hidden
@@ -44,7 +44,7 @@ function RuleRow({ rule }: { rule: CustomRule }) {
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-sm border border-border bg-surface-3 px-2 py-0.5 text-xs uppercase tracking-[0.08em] text-ink-2">
+          <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-xs capitalize text-white/60">
             {rule.category.replace('-', ' ')}
           </span>
           {editing ? (
@@ -52,13 +52,13 @@ function RuleRow({ rule }: { rule: CustomRule }) {
               aria-label="Rule severity"
               value={draftSeverity}
               onChange={(e) => setDraftSeverity(e.target.value as CustomRule['severity'])}
-              className="rounded-sm border border-border-strong bg-surface px-2 py-0.5 text-xs uppercase tracking-[0.08em] text-ink-2"
+              className="rounded-md border border-white/15 bg-[#0C0C0C] px-2 py-0.5 text-xs capitalize text-white/80"
             >
               <option value="warning">warning</option>
               <option value="error">error</option>
             </select>
           ) : (
-            <span className="text-xs uppercase tracking-[0.08em]" style={{ color }}>
+            <span className="text-xs capitalize" style={{ color }}>
               {rule.severity}
             </span>
           )}
@@ -70,10 +70,10 @@ function RuleRow({ rule }: { rule: CustomRule }) {
             onChange={(e) => setDraft(e.target.value)}
             rows={2}
             aria-label="Rule description"
-            className="mt-2 w-full resize-none rounded-sm border border-border-strong bg-surface p-2 text-sm text-ink outline-none focus:border-border-strong"
+            className="mt-2 w-full resize-none rounded-lg border border-white/15 bg-[#0C0C0C] p-2 text-sm text-white/90 outline-none focus:border-white/30"
           />
         ) : (
-          <p className="mt-1.5 text-sm text-ink-2">{rule.description}</p>
+          <p className="mt-1.5 text-sm text-white/80">{rule.description}</p>
         )}
       </div>
 
@@ -84,7 +84,7 @@ function RuleRow({ rule }: { rule: CustomRule }) {
               type="button"
               aria-label="Save rule"
               onClick={save}
-              className="rounded-sm p-1.5 text-ok transition-colors hover:bg-surface-3"
+              className="rounded-md p-1.5 text-emerald-400 transition-colors hover:bg-emerald-500/10"
             >
               <Check size={16} />
             </button>
@@ -92,7 +92,7 @@ function RuleRow({ rule }: { rule: CustomRule }) {
               type="button"
               aria-label="Cancel editing"
               onClick={() => setEditing(false)}
-              className="rounded-sm p-1.5 text-ink-muted-text transition-colors hover:bg-surface-3 hover:text-ink"
+              className="rounded-md p-1.5 text-white/40 transition-colors hover:bg-white/10 hover:text-white"
             >
               <X size={16} />
             </button>
@@ -105,18 +105,18 @@ function RuleRow({ rule }: { rule: CustomRule }) {
               aria-checked={rule.enabled}
               aria-label={`${rule.enabled ? 'Disable' : 'Enable'} rule`}
               onClick={() => toggleRule(rule.id)}
-              className={`relative h-5 w-9 rounded-full transition-colors ${rule.enabled ? 'bg-primary' : 'bg-surface-3'}`}
+              className={`relative h-5 w-9 rounded-full transition-colors ${rule.enabled ? 'bg-white' : 'bg-white/20'}`}
             >
               <span
                 aria-hidden
-                className={`absolute top-0.5 h-4 w-4 rounded-full transition-all ${rule.enabled ? 'left-[18px] bg-black' : 'left-0.5 bg-ink-muted'}`}
+                className={`absolute top-0.5 h-4 w-4 rounded-full transition-all ${rule.enabled ? 'left-[18px] bg-black' : 'left-0.5 bg-white/70'}`}
               />
             </button>
             <button
               type="button"
               aria-label="Edit rule"
               onClick={startEdit}
-              className="rounded-sm p-1.5 text-ink-muted-text transition-colors hover:bg-surface-3 hover:text-ink"
+              className="rounded-md p-1.5 text-white/40 transition-colors hover:bg-white/10 hover:text-white"
             >
               <Pencil size={16} />
             </button>
@@ -124,7 +124,7 @@ function RuleRow({ rule }: { rule: CustomRule }) {
               type="button"
               aria-label="Delete rule"
               onClick={() => deleteRule(rule.id)}
-              className="rounded-sm p-1.5 text-ink-muted-text transition-colors hover:bg-surface-3 hover:text-critical"
+              className="rounded-md p-1.5 text-white/40 transition-colors hover:bg-red-500/10 hover:text-red-400"
             >
               <Trash2 size={16} />
             </button>
@@ -141,9 +141,9 @@ export function RulesManager() {
   return (
     <div className="space-y-6">
       {rules.length === 0 ? (
-        <div className="rounded-sm border border-dashed border-border-strong bg-surface-2 p-6 text-center">
-          <p className="text-ink-2">No custom rules yet.</p>
-          <p className="mx-auto mt-2 max-w-md text-sm text-ink-muted-text">
+        <div className="rounded-xl border border-dashed border-white/15 bg-white/[0.02] p-6 text-center">
+          <p className="text-white/70">No custom rules yet.</p>
+          <p className="mx-auto mt-2 max-w-md text-sm text-white/50">
             Custom rules are extra instructions the AI checks on every review —
             for example &quot;Components must live in src/components&quot;. Add
             one below and it applies to both diff and repo reviews.

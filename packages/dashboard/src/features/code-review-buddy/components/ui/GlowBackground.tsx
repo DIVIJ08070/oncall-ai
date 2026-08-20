@@ -3,9 +3,8 @@ interface GlowBackgroundProps {
 }
 
 /**
- * Decorative layer of blurred solid phosphor bloom circles for section
- * backgrounds. Purely visual — absolutely positioned, pointer-events-none,
- * aria-hidden. No gradients: solid accent color + blur + low opacity only.
+ * Decorative layer of blurred radial gradients for section backgrounds.
+ * Purely visual — absolutely positioned, pointer-events-none, aria-hidden.
  */
 export function GlowBackground({ className }: GlowBackgroundProps) {
   return (
@@ -16,25 +15,25 @@ export function GlowBackground({ className }: GlowBackgroundProps) {
       <div
         className="absolute left-1/2 top-[-160px] h-[420px] w-[720px] -translate-x-1/2 rounded-full"
         style={{
-          backgroundColor: 'var(--accent)',
-          opacity: 0.05,
-          filter: 'blur(90px)',
+          background:
+            'radial-gradient(closest-side, rgba(255,255,255,0.09), transparent 70%)',
+          filter: 'blur(60px)',
         }}
       />
       <div
         className="absolute right-[-120px] top-1/3 h-[360px] w-[360px] rounded-full"
         style={{
-          backgroundColor: 'var(--accent)',
-          opacity: 0.04,
-          filter: 'blur(100px)',
+          background:
+            'radial-gradient(closest-side, rgba(187,204,215,0.08), transparent 70%)',
+          filter: 'blur(70px)',
         }}
       />
       <div
         className="absolute bottom-[-140px] left-[-100px] h-[380px] w-[480px] rounded-full"
         style={{
-          backgroundColor: 'var(--accent)',
-          opacity: 0.03,
-          filter: 'blur(110px)',
+          background:
+            'radial-gradient(closest-side, rgba(255,255,255,0.05), transparent 70%)',
+          filter: 'blur(80px)',
         }}
       />
     </div>

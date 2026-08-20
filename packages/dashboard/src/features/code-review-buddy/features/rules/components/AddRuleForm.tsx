@@ -15,7 +15,7 @@ const CATEGORIES: { value: RuleCategory; label: string }[] = [
 ];
 
 const SELECT_CLASSES =
-  'rounded-sm border border-border bg-surface-2 px-3 py-2.5 text-sm text-ink outline-none transition-colors focus:border-border-strong [&>option]:bg-surface';
+  'rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white outline-none transition-colors focus:border-white/30 [&>option]:bg-[#0C0C0C]';
 
 export function AddRuleForm() {
   const addRule = useRulesStore((s) => s.addRule);
@@ -35,16 +35,16 @@ export function AddRuleForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-3 rounded-sm border border-border bg-surface-2 p-4"
+      className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-4"
     >
-      <h3 className="font-medium uppercase tracking-[0.08em] text-ink">Add a rule</h3>
+      <h3 className="font-medium text-white">Add a rule</h3>
 
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder='Describe the rule, e.g. "Components must live in src/components"'
         rows={3}
-        className="w-full resize-y rounded-sm border border-border bg-surface-2 px-4 py-3 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-border-strong"
+        className="w-full resize-y rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white placeholder-white/30 outline-none transition-colors focus:border-white/30"
       />
 
       <div className="flex flex-wrap items-center gap-3">

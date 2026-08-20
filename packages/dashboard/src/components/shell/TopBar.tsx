@@ -3,15 +3,13 @@ import { Link } from 'react-router-dom';
 import { Icon } from '../primitives/Icon';
 import { ConnectionStatus } from '../primitives/ConnectionStatus';
 import { Chip } from '../primitives/Badge';
-import { MonoTag } from '../atmosphere';
 import { useLiveAggregate } from '../../state/LiveContext';
 import { useSession } from '../../state/SessionContext';
 
 /**
- * TopBar (DESIGN_SPEC §4): sticky 56px terminal titlebar — `--surface` +
- * hairline bottom border + faint CRT flicker.
- * Left = diamond mark + "ONCALL.AI" mono wordmark + TTY1 tag;
- * center (≥1024) = global ConnectionStatus; right = DEV badge / avatar / sign-in.
+ * TopBar (DESIGN_SPEC §4): sticky 56px, `--surface` + bottom border + `--elev-1`.
+ * Left = product mark + wordmark; center (≥1024) = global ConnectionStatus;
+ * right = DEV badge / user avatar / Sign in.
  */
 export function TopBar() {
   const aggregate = useLiveAggregate();
@@ -19,12 +17,12 @@ export function TopBar() {
 
   return (
     <header
-      className="crt-flicker sticky top-0 z-header flex h-14 items-center justify-between border-b border-border px-4 shadow-elev-1 backdrop-blur-md md:px-6"
+      className="sticky top-0 z-header flex h-14 items-center justify-between border-b border-border px-4 shadow-elev-1 backdrop-blur-md md:px-6"
       style={{ backgroundColor: 'color-mix(in srgb, var(--surface) 78%, transparent)' }}
     >
-      <Link to="/dashboard" className="flex items-center gap-2.5 rounded-none">
-        {/* Diamond mark carried over from the landing hero; wordmark is now a
-            phosphor terminal title so the console reads as the machine itself. */}
+      <Link to="/dashboard" className="flex items-center gap-2 rounded-md">
+        {/* Same diamond mark + Playfair-italic wordmark as the landing hero, so
+            the console reads as one product with the public site. */}
         <svg
           width={22}
           height={22}
@@ -35,10 +33,7 @@ export function TopBar() {
         >
           <path d="M 256 256 L 128 256 L 0 128 L 128 128 Z M 256 128 L 128 128 L 0 0 L 128 0 Z" />
         </svg>
-        <span className="crt-glow text-sm font-bold uppercase tracking-[0.22em] text-ink">
-          ONCALL.AI
-        </span>
-        <MonoTag className="hidden sm:inline-flex">TTY1</MonoTag>
+        <span className="font-playfair text-xl italic text-ink">OnCall AI</span>
       </Link>
 
       <div className="hidden lg:flex">
@@ -48,7 +43,7 @@ export function TopBar() {
       <div className="flex items-center gap-2">
         {devMode && (
           <span
-            className="inline-flex h-6 items-center rounded-sm px-2 text-label uppercase tracking-wider text-ink"
+            className="inline-flex h-6 items-center rounded-pill px-2 text-label uppercase text-ink"
             style={{ backgroundColor: 'color-mix(in srgb, var(--warn) 18%, transparent)' }}
             title="DEV_NO_AUTH — read APIs open without a session"
           >
@@ -67,9 +62,9 @@ export function TopBar() {
         ) : (
           <Link
             to="/onboarding"
-            className="inline-flex h-8 items-center rounded-none border border-border-strong px-3 text-label font-medium uppercase tracking-wider text-ink hover:bg-surface-3"
+            className="inline-flex h-8 items-center rounded-md border border-border-strong px-3 text-body-md font-medium text-ink hover:bg-surface-3"
           >
-            {'> '}Sign in
+            Sign in
           </Link>
         )}
       </div>
@@ -87,7 +82,7 @@ function Avatar({ user }: { user: { github_login: string; avatar_url: string | n
         alt={user.github_login}
         width={24}
         height={24}
-        className="h-6 w-6 rounded-sm border border-border object-cover"
+        className="h-6 w-6 rounded-full border border-border object-cover"
         onError={(e) => {
           (e.currentTarget as HTMLImageElement).style.display = 'none';
         }}
@@ -95,7 +90,7 @@ function Avatar({ user }: { user: { github_login: string; avatar_url: string | n
     );
   }
   return (
-    <span className="flex h-6 w-6 items-center justify-center rounded-sm bg-surface-3 text-sm font-medium text-ink-2">
+    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-3 text-sm font-medium text-ink-2">
       {initial}
     </span>
   );

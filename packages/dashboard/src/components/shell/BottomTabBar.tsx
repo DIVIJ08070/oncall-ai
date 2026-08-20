@@ -4,8 +4,8 @@ import { NAV_ITEMS } from './navItems';
 
 /**
  * Mobile bottom tab bar (DESIGN_SPEC §4, <640): 56px, thumb-reachable, 4 icons +
- * prompt-line labels ("> LABEL"), `--surface` + top border, z 100. Active tab =
- * `--accent` icon + glowing accent label.
+ * labels, `--surface` + top border, z 100. Active tab = `--accent` icon +
+ * `--accent-text` label.
  */
 export function BottomTabBar() {
   const { pathname } = useLocation();
@@ -23,12 +23,7 @@ export function BottomTabBar() {
             }`}
           >
             <Icon icon={item.icon} size={20} />
-            <span
-              className={`text-[10px] uppercase tracking-wide ${
-                active ? 'crt-glow text-accent-text' : 'text-ink-muted-text'
-              }`}
-            >
-              {'> '}
+            <span className={`text-label ${active ? 'text-accent-text' : 'text-ink-muted-text'}`}>
               {item.label}
             </span>
           </Link>

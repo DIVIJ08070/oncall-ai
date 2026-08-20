@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, Sparkles } from 'lucide-react';
 import type { ReviewResult } from '../../lib/types';
 import { CategoryCard } from '../../features/review/components/CategoryCard';
 import { ReviewScore } from '../../features/review/components/ReviewScore';
@@ -61,44 +61,48 @@ export function ReviewDemo() {
       id="demo"
       className="relative flex min-h-screen items-center overflow-hidden px-4 py-32 sm:px-6"
     >
-      {/* decorative phosphor bloom field */}
-      <Parallax speed={0.18} className="pointer-events-none absolute inset-0">
+      {/* decorative glow field */}
+      <Parallax
+        speed={0.18}
+        className="pointer-events-none absolute inset-0"
+      >
         <div
           aria-hidden
           className="absolute left-1/2 top-24 h-[520px] w-[820px] -translate-x-1/2 rounded-full"
           style={{
-            backgroundColor: 'var(--accent)',
-            opacity: 0.05,
-            filter: 'blur(110px)',
+            background:
+              'radial-gradient(closest-side, rgba(241,101,36,0.16), transparent 70%)',
+            filter: 'blur(80px)',
           }}
         />
         <div
           aria-hidden
           className="absolute bottom-0 right-[-120px] h-[440px] w-[440px] rounded-full"
           style={{
-            backgroundColor: 'var(--accent)',
-            opacity: 0.03,
-            filter: 'blur(110px)',
+            background:
+              'radial-gradient(closest-side, rgba(187,204,215,0.10), transparent 70%)',
+            filter: 'blur(90px)',
           }}
         />
       </Parallax>
 
       <div className="relative mx-auto w-full max-w-6xl">
         <div className="mx-auto max-w-3xl text-center">
-          <MonoTag className="rounded-sm border border-border bg-surface-2 px-4 py-1.5">
-            LIVE SAMPLE
-          </MonoTag>
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-1.5 text-xs font-medium uppercase tracking-[0.18em] text-white/50">
+            <Sparkles size={13} className="text-[#F16524]" />
+            Live sample
+          </span>
           <div className="mt-6 flex justify-center">
             <MonoTag>LIVE / SAMPLE</MonoTag>
           </div>
-          <h2 className="mt-7 text-4xl font-black uppercase leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
+          <h2 className="mt-7 text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
             <ScrollWords
               text="See a review in action"
-              className="crt-glow-strong text-ink"
+              className="bg-[linear-gradient(180deg,#646973_0%,#BBCCD7_100%)] bg-clip-text text-transparent"
             />
           </h2>
           <ScrollReveal y={20} delay={0.1} className="mx-auto mt-6 max-w-xl">
-            <p className="text-base text-ink-muted-text sm:text-lg">
+            <p className="text-base text-white/50 sm:text-lg">
               A real review of a sample pull request &mdash; scored, severity-tagged
               and ready to paste, exactly what you get for your own code.
             </p>
@@ -115,53 +119,53 @@ export function ReviewDemo() {
           <motion.div
             whileHover={{ y: -6 }}
             transition={{ type: 'spring', stiffness: 160, damping: 20 }}
-            className="relative overflow-hidden rounded-sm border border-border bg-surface shadow-elev-2"
+            className="relative overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.03] shadow-[0_50px_140px_-30px_rgba(0,0,0,0.85)] backdrop-blur-xl"
           >
             <HudCorners size={16} inset={16} className="z-20" />
-            {/* terminal chrome */}
-            <div className="flex items-center gap-4 border-b border-border bg-surface-2 px-5 py-3.5">
+            {/* browser chrome */}
+            <div className="flex items-center gap-4 border-b border-white/10 bg-white/[0.02] px-5 py-3.5">
               <div className="flex items-center gap-2">
-                <span className="h-3 w-3 rounded-full bg-surface-3" />
-                <span className="h-3 w-3 rounded-full bg-surface-3" />
-                <span className="h-3 w-3 rounded-full bg-surface-3" />
+                <span className="h-3 w-3 rounded-full bg-white/15" />
+                <span className="h-3 w-3 rounded-full bg-white/15" />
+                <span className="h-3 w-3 rounded-full bg-white/15" />
               </div>
-              <div className="mx-auto flex max-w-xs flex-1 items-center justify-center gap-2 rounded-sm border border-border bg-bg px-3 py-1.5 text-xs text-ink-muted-text">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+              <div className="mx-auto flex max-w-xs flex-1 items-center justify-center gap-2 rounded-md border border-white/10 bg-black/30 px-3 py-1.5 text-xs text-white/40">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#F16524]" />
                 oncall-ai / code-review
               </div>
-              <span className="hidden text-xs font-medium uppercase tracking-[0.18em] text-ink-muted sm:inline">
+              <span className="hidden text-xs font-medium text-white/30 sm:inline">
                 AI review
               </span>
             </div>
 
             {/* review body */}
             <div className="grid gap-10 p-6 sm:p-10 lg:grid-cols-[280px_1fr]">
-              <div className="flex flex-col items-center gap-6 rounded-sm border border-border bg-surface-2 p-8">
+              <div className="flex flex-col items-center gap-6 rounded-2xl border border-white/10 bg-white/[0.02] p-8">
                 <ReviewScore score={SAMPLE_REVIEW.overallScore} size="lg" />
                 <div className="text-center">
-                  <p className="text-xs uppercase tracking-[0.18em] text-ink-muted-text">
+                  <p className="text-xs uppercase tracking-[0.18em] text-white/35">
                     Overall score
                   </p>
-                  <p className="mt-2 text-sm font-medium text-ink-2">
+                  <p className="mt-2 text-sm font-medium text-white/70">
                     {SAMPLE_REVIEW.prTitle}
                   </p>
                 </div>
-                <div className="flex w-full flex-col gap-2 border-t border-border pt-5 text-xs text-ink-muted-text">
+                <div className="flex w-full flex-col gap-2 border-t border-white/10 pt-5 text-xs text-white/45">
                   <div className="flex items-center justify-between">
                     <span>Categories</span>
-                    <span className="font-medium text-ink">
+                    <span className="font-medium text-white/70">
                       {SAMPLE_REVIEW.categories.length}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Findings</span>
-                    <span className="font-medium text-ink">
+                    <span className="font-medium text-white/70">
                       {TOTAL_FINDINGS}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Critical</span>
-                    <span className="font-medium text-ink">
+                    <span className="font-medium text-white/70">
                       {CRITICAL_COUNT}
                     </span>
                   </div>
@@ -182,9 +186,9 @@ export function ReviewDemo() {
         <ScrollReveal y={20} delay={0.1} className="mt-12 flex justify-center">
           <Link
             to="/code-review/app"
-            className="group inline-flex items-center justify-center gap-2 rounded-sm bg-primary px-8 py-3.5 font-bold uppercase tracking-[0.12em] text-black transition-all duration-200 hover:scale-[1.03] hover:bg-primary-hover active:scale-[0.98]"
+            className="group inline-flex items-center justify-center gap-2 rounded-full bg-white px-8 py-3.5 font-medium text-black transition-all duration-200 hover:scale-[1.03] hover:bg-white/90 active:scale-[0.98]"
           >
-            [ Run your own review ]
+            Run your own review
             <ArrowUpRight
               size={18}
               className="transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"

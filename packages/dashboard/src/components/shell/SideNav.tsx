@@ -2,7 +2,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { Moon, Sun, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { Icon } from '../primitives/Icon';
-import { Cursor } from '../motion/terminal';
 import { NAV_ITEMS } from './navItems';
 import { getTheme, toggleTheme, type Theme } from '../../lib/theme';
 import { apiFetch } from '../../api/client';
@@ -10,8 +9,8 @@ import { apiFetch } from '../../api/client';
 /**
  * SideNav (DESIGN_SPEC §4). Desktop ≥1024 = 220px labelled rail; tablet 640–1023 =
  * 64px icon rail (label in `title` tooltip); hidden <640 (bottom tab bar instead).
- * Rows are prompt lines ("> LABEL"); active row = `--surface-3` fill + 2px left
- * `--accent` bar + phosphor glow + blinking cursor. Footer = theme toggle + logout.
+ * Active row = `--surface-3` fill + 2px left `--accent` bar + `--ink` text.
+ * Footer = theme toggle + logout.
  */
 export function SideNav() {
   const { pathname } = useLocation();
@@ -27,21 +26,17 @@ export function SideNav() {
               to={item.to}
               title={item.label}
               aria-current={active ? 'page' : undefined}
-              className={`relative flex h-10 items-center gap-3 rounded-none px-2 lg:px-3 text-label font-medium uppercase tracking-wide transition-colors duration-fast ${
+              className={`relative flex h-10 items-center gap-3 rounded-lg px-2 lg:px-3 text-body-md font-medium transition-colors duration-fast ${
                 active
                   ? 'bg-surface-3 text-ink'
                   : 'text-ink-2 hover:bg-surface-3 hover:text-ink'
               } justify-center lg:justify-start`}
             >
               {active && (
-                <span className="absolute left-0 top-1/2 h-5 -translate-y-1/2 bg-accent" style={{ width: 2 }} />
+                <span className="absolute left-0 top-1/2 h-5 -translate-y-1/2 rounded-r bg-accent" style={{ width: 2 }} />
               )}
               <Icon icon={item.icon} size={20} />
-              <span className={`hidden lg:inline ${active ? 'crt-glow text-accent' : ''}`}>
-                {'> '}
-                {item.label}
-                {active && <Cursor className="ml-1.5" />}
-              </span>
+              <span className="hidden lg:inline">{item.label}</span>
             </Link>
           );
         })}
@@ -64,10 +59,10 @@ function ThemeToggle() {
       onClick={onToggle}
       title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
       aria-label="Toggle color theme"
-      className="flex h-10 items-center gap-3 rounded-none px-2 lg:px-3 text-label font-medium tracking-wide text-ink-2 transition-colors duration-fast hover:bg-surface-3 hover:text-ink justify-center lg:justify-start"
+      className="flex h-10 items-center gap-3 rounded-lg px-2 lg:px-3 text-body-md font-medium text-ink-2 transition-colors duration-fast hover:bg-surface-3 hover:text-ink justify-center lg:justify-start"
     >
       <Icon icon={theme === 'dark' ? Sun : Moon} size={20} />
-      <span className="hidden lg:inline">{theme === 'dark' ? '> light' : '> dark'}</span>
+      <span className="hidden lg:inline">{theme === 'dark' ? 'Light' : 'Dark'}</span>
     </button>
   );
 }
@@ -87,10 +82,10 @@ function LogoutButton() {
       onClick={() => void onLogout()}
       title="Log out"
       aria-label="Log out"
-      className="flex h-10 items-center gap-3 rounded-none px-2 lg:px-3 text-label font-medium tracking-wide text-ink-2 transition-colors duration-fast hover:bg-surface-3 hover:text-ink justify-center lg:justify-start"
+      className="flex h-10 items-center gap-3 rounded-lg px-2 lg:px-3 text-body-md font-medium text-ink-2 transition-colors duration-fast hover:bg-surface-3 hover:text-ink justify-center lg:justify-start"
     >
       <Icon icon={LogOut} size={20} />
-      <span className="hidden lg:inline">{'> logout'}</span>
+      <span className="hidden lg:inline">Log out</span>
     </button>
   );
 }
