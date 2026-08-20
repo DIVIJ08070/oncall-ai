@@ -3,6 +3,7 @@ import { Github, ArrowRight, CheckCircle2, AlertTriangle, Loader2 } from 'lucide
 import type { User } from '@oncall/shared';
 import { Button } from '../primitives/Button';
 import { Icon } from '../primitives/Icon';
+import { Press } from '../motion/primitives';
 import { v, tint } from '../../lib/tokens';
 import { githubLoginUrl } from './api';
 
@@ -59,14 +60,16 @@ export function SignInStep({
             <Icon icon={CheckCircle2} size={20} />
           </span>
         </div>
-        <Button
-          variant="primary"
-          className="h-11 w-full"
-          onClick={onContinue}
-          leadingIcon={<Icon icon={ArrowRight} size={16} />}
-        >
-          Continue
-        </Button>
+        <Press className="w-full">
+          <Button
+            variant="primary"
+            className="h-11 w-full"
+            onClick={onContinue}
+            leadingIcon={<Icon icon={ArrowRight} size={16} />}
+          >
+            Continue
+          </Button>
+        </Press>
       </div>
     );
   }
@@ -75,22 +78,24 @@ export function SignInStep({
     <div className="flex flex-col gap-5">
       <Header />
 
-      <Button
-        variant="primary"
-        className="h-11 w-full"
-        onClick={() => void signIn()}
-        disabled={probe === 'checking'}
-        aria-busy={probe === 'checking'}
-        leadingIcon={
-          probe === 'checking' ? (
-            <Icon icon={Loader2} size={16} className="animate-spin" />
-          ) : (
-            <Icon icon={Github} size={16} />
-          )
-        }
-      >
-        Sign in with GitHub
-      </Button>
+      <Press className="w-full">
+        <Button
+          variant="primary"
+          className="h-11 w-full"
+          onClick={() => void signIn()}
+          disabled={probe === 'checking'}
+          aria-busy={probe === 'checking'}
+          leadingIcon={
+            probe === 'checking' ? (
+              <Icon icon={Loader2} size={16} className="animate-spin" />
+            ) : (
+              <Icon icon={Github} size={16} />
+            )
+          }
+        >
+          Sign in with GitHub
+        </Button>
+      </Press>
 
       {probe === 'unavailable' && (
         <div
@@ -118,14 +123,16 @@ export function SignInStep({
             <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: v('warn') }} />
             Dev mode — auth bypassed (<code className="text-mono-sm">DEV_NO_AUTH</code>)
           </div>
-          <Button
-            variant="secondary"
-            className="h-11 w-full"
-            onClick={onContinue}
-            leadingIcon={<Icon icon={ArrowRight} size={16} />}
-          >
-            Continue
-          </Button>
+          <Press className="w-full">
+            <Button
+              variant="secondary"
+              className="h-11 w-full"
+              onClick={onContinue}
+              leadingIcon={<Icon icon={ArrowRight} size={16} />}
+            >
+              Continue
+            </Button>
+          </Press>
         </div>
       )}
     </div>

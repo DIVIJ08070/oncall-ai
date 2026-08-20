@@ -14,6 +14,7 @@ import { registerMetricsRoute } from './routes/metrics.js';
 import { registerLogsRoutes } from './routes/logs.js';
 import { registerIncidentRoutes } from './routes/incidents.js';
 import { registerDemoRoutes } from './routes/demo.js';
+import { registerCodeReviewRoutes } from './routes/code-review.js';
 import { createGithubGateway, type GithubGateway } from './github/gateway.js';
 import {
   createInvestigationService,
@@ -103,6 +104,10 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   // C15 — demo control plane (SPEC §7.7): FailureModeSwitch + TrafficGenerator.
   // Drives the victim + records correlated deploy rows for the live demo.
   registerDemoRoutes(app, ctx);
+
+  // Code Review Buddy mini-app — Gemini-backed diff/repo reviews (no session
+  // auth, same openness as the demo routes).
+  registerCodeReviewRoutes(app, ctx);
 
   return app;
 }

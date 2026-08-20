@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Menu } from 'lucide-react';
 import { MenuOverlay, type LandingNavItem } from './MenuOverlay';
+import { TargetCursor } from '../primitives/TargetCursor';
 
 /**
  * Public home hero for OnCall AI — a dark, full-screen scene with a
@@ -38,6 +39,9 @@ export function SpotlightHero() {
       className="min-h-screen bg-white tracking-[-0.02em]"
       style={{ fontFamily: "'Inter', sans-serif" }}
     >
+      {/* Crosshair pointer — brand surfaces only; the console keeps the real cursor. */}
+      <TargetCursor spinDuration={2} hoverDuration={0.2} cursorColorOnTarget="#F16524" />
+
       <Nav onOpenMenu={() => setMenuOpen(true)} />
 
       <section
@@ -95,7 +99,7 @@ export function SpotlightHero() {
           <button
             type="button"
             onClick={() => navigate('/dashboard')}
-            className="rounded-full bg-[#F16524] px-7 py-3 text-sm font-medium text-white shadow-lg shadow-[#F16524]/30 transition-all hover:scale-[1.03] hover:bg-[#d9531a] hover:shadow-lg active:scale-95"
+            className="cursor-target rounded-full bg-[#F16524] px-7 py-3 text-sm font-medium text-white shadow-lg shadow-[#F16524]/30 transition-all hover:scale-[1.03] hover:bg-[#d9531a] hover:shadow-lg active:scale-95"
           >
             Open Dashboard
           </button>
@@ -207,7 +211,7 @@ function RevealLayer({ image }: { image: string }) {
 function Nav({ onOpenMenu }: { onOpenMenu: () => void }) {
   return (
     <nav className="fixed left-0 right-0 top-0 z-[100] flex items-center justify-between p-4 sm:p-5">
-      <Link to="/" className="flex items-center gap-2">
+      <Link to="/" className="cursor-target flex items-center gap-2">
         <svg width={26} height={26} viewBox="0 0 256 256" fill="#ffffff" aria-hidden="true">
           <path d="M 256 256 L 128 256 L 0 128 L 128 128 Z M 256 128 L 128 128 L 0 0 L 128 0 Z" />
         </svg>
@@ -219,7 +223,7 @@ function Nav({ onOpenMenu }: { onOpenMenu: () => void }) {
           <Link
             key={item.to}
             to={item.to}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+            className={`cursor-target rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               item.active ? 'text-white' : 'text-white/80 hover:bg-white/20 hover:text-white'
             }`}
           >
@@ -230,7 +234,7 @@ function Nav({ onOpenMenu }: { onOpenMenu: () => void }) {
 
       <Link
         to="/onboarding"
-        className="hidden rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-100 md:block"
+        className="cursor-target hidden rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-100 md:block"
       >
         Sign Up
       </Link>
@@ -239,7 +243,7 @@ function Nav({ onOpenMenu }: { onOpenMenu: () => void }) {
         type="button"
         onClick={onOpenMenu}
         aria-label="Open menu"
-        className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/20 text-white backdrop-blur-md md:hidden"
+        className="cursor-target flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/20 text-white backdrop-blur-md md:hidden"
       >
         <Menu className="h-5 w-5" />
       </button>

@@ -1,8 +1,11 @@
 import { useState } from 'react';
+import { PlugZap, ShieldCheck } from 'lucide-react';
 import type { RepoRef } from '@oncall/shared';
 import { useSession } from '../state/SessionContext';
 import { Card } from '../components/primitives/Card';
 import { Skeleton } from '../components/primitives/Skeleton';
+import { Icon } from '../components/primitives/Icon';
+import { Entrance } from '../components/motion/primitives';
 import { Stepper } from '../components/onboarding/Stepper';
 import { SignInStep } from '../components/onboarding/SignInStep';
 import { RepoPicker } from '../components/onboarding/RepoPicker';
@@ -31,10 +34,31 @@ export function OnboardingPage() {
   const [repo, setRepo] = useState<RepoRef | null>(null);
 
   return (
-    <div className="mx-auto w-full max-w-[560px] py-6 md:py-12">
-      <Stepper steps={STEP_LABELS} current={step} className="mb-6" />
+    <Entrance className="mx-auto flex w-full max-w-[600px] flex-col gap-6 py-6 md:py-10">
+      {/* Header band — brand frame that spans all four steps */}
+      <header className="flex flex-col gap-2">
+        <span className="inline-flex items-center gap-1.5 text-label uppercase tracking-wide text-accent-text">
+          <Icon icon={PlugZap} size={13} />
+          Guided setup
+        </span>
+        <h1 className="font-playfair text-h1 italic text-ink">Get connected</h1>
+        <p className="max-w-[46ch] text-body text-ink-2">
+          Four quick steps take you from GitHub sign-in to your first AI-detected
+          incident — no config files, no waiting.
+        </p>
+      </header>
 
-      <Card padded={false} className="p-6">
+      {/* Progress — the stepper plus a mobile-friendly meta line */}
+      <div className="flex flex-col gap-2.5">
+        <Stepper steps={STEP_LABELS} current={step} />
+        <p className="text-label uppercase tracking-wide text-ink-muted-text">
+          Step {step} of {STEP_LABELS.length}
+          <span className="text-ink-2"> · {STEP_LABELS[step - 1]}</span>
+        </p>
+      </div>
+
+      {/* Active step */}
+      <Card padded={false} className="p-6 md:p-7">
         {loading ? (
           <StepSkeleton />
         ) : step === 1 ? (
@@ -57,7 +81,13 @@ export function OnboardingPage() {
           <WaitingForLogs repo={repo} />
         )}
       </Card>
-    </div>
+
+      {/* Trust footer */}
+      <p className="flex items-center justify-center gap-1.5 text-sm text-ink-muted-text">
+        <Icon icon={ShieldCheck} size={14} />
+        OnCall AI only ever acts on the repository you authorize.
+      </p>
+    </Entrance>
   );
 }
 

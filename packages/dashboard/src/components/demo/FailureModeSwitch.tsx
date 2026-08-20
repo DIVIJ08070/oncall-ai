@@ -1,7 +1,8 @@
 import { useRef } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import type { FailureMode } from '@oncall/shared';
 import { Icon } from '../primitives/Icon';
+import { Entrance, Press } from '../motion/primitives';
 import { v, tint } from '../../lib/tokens';
 import { FAILURE_MODE_META } from './failureModes';
 
@@ -51,39 +52,66 @@ export function FailureModeSwitch({
     <div
       role="radiogroup"
       aria-label="Victim failure mode"
-      className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+      className="grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2"
     >
       {FAILURE_MODE_META.map((m, idx) => {
         const selected = value === m.mode;
         const isPending = pending === m.mode;
         return (
-          <button
-            key={m.mode}
-            ref={(el) => (btnRefs.current[idx] = el)}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            tabIndex={selected ? 0 : -1}
-            disabled={pending !== null}
-            onClick={() => onSelect(m.mode)}
-            onKeyDown={(e) => onKeyDown(e, idx)}
-            className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed ${
-              selected ? 'border-transparent' : 'border-border hover:bg-surface-3'
-            }`}
-            style={
-              selected
-                ? { boxShadow: `inset 0 0 0 2px ${v(m.token)}`, backgroundColor: tint(m.token, 12) }
-                : undefined
-            }
-          >
-            <span className="mt-0.5 shrink-0" style={{ color: v(m.token) }}>
-              <Icon icon={isPending ? Loader2 : m.icon} size={20} className={isPending ? 'animate-spin' : ''} />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-body-md font-medium text-ink">{m.label}</span>
-              <span className="mt-0.5 block text-sm text-ink-2">{isPending ? 'Switching…' : m.sub}</span>
-            </span>
-          </button>
+          <Entrance key={m.mode} delay={idx * 0.05} className="h-full">
+            <Press className="h-full">
+              <button
+                ref={(el) => (btnRefs.current[idx] = el)}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                tabIndex={selected ? 0 : -1}
+                disabled={pending !== null}
+                onClick={() => onSelect(m.mode)}
+                onKeyDown={(e) => onKeyDown(e, idx)}
+                className={`group flex h-full w-full items-start gap-3 rounded-xl border p-4 text-left transition-all duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed ${
+                  selected
+                    ? 'border-transparent shadow-elev-1'
+                    : 'border-border bg-surface hover:border-border-strong hover:bg-surface-3'
+                }`}
+                style={
+                  selected
+                    ? {
+                        boxShadow: `inset 0 0 0 2px ${v(m.token)}`,
+                        backgroundColor: tint(m.token, 12),
+                      }
+                    : undefined
+                }
+              >
+                <span
+                  className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg transition-colors duration-fast"
+                  style={{
+                    color: v(m.token),
+                    backgroundColor: tint(m.token, selected ? 18 : 12),
+                  }}
+                >
+                  <Icon
+                    icon={isPending ? Loader2 : m.icon}
+                    size={18}
+                    className={isPending ? 'animate-spin' : ''}
+                  />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="block text-body-md font-medium text-ink">{m.label}</span>
+                    {selected && !isPending ? (
+                      <span style={{ color: v(m.token) }}>
+                        <Icon icon={Check} size={16} />
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="mt-0.5 block text-sm text-ink-2">
+                    {isPending ? 'Switching…' : m.sub}
+                  </span>
+                </span>
+              </button>
+            </Press>
+          </Entrance>
         );
       })}
     </div>

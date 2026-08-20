@@ -61,6 +61,10 @@ const EnvSchema = z.object({
   GITHUB_OAUTH_CLIENT_ID: optStr(),
   GITHUB_OAUTH_CLIENT_SECRET: optStr(),
 
+  // code review buddy
+  GEMINI_API_KEY: strEnv(''),
+  CODE_REVIEW_MODEL: strEnv('gemini-2.5-flash'),
+
   // ingest / notify
   INGEST_API_KEY: strEnv('dev-local-ingest-key'),
   SLACK_WEBHOOK_URL: optStr(),
@@ -112,6 +116,10 @@ export interface Config {
     protectedBranches: string[];
     oauthClientId?: string;
     oauthClientSecret?: string;
+  };
+  codeReview: {
+    geminiApiKey: string;
+    model: string;
   };
   ingest: {
     apiKey: string;
@@ -182,6 +190,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       protectedBranches: splitBranches(e.GITHUB_PROTECTED_BRANCHES),
       oauthClientId: e.GITHUB_OAUTH_CLIENT_ID,
       oauthClientSecret: e.GITHUB_OAUTH_CLIENT_SECRET,
+    },
+    codeReview: {
+      geminiApiKey: e.GEMINI_API_KEY,
+      model: e.CODE_REVIEW_MODEL,
     },
     ingest: {
       apiKey: e.INGEST_API_KEY,

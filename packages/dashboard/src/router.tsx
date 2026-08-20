@@ -6,6 +6,8 @@ import { DashboardPage } from './pages/DashboardPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { IncidentDetailPage, IncidentsListPage } from './pages/IncidentDetailPage';
 import { DemoControlPage } from './pages/DemoControlPage';
+import { LandingPage as CodeReviewLandingPage } from './features/code-review-buddy/pages/LandingPage';
+import { DemoPage as CodeReviewAppPage } from './features/code-review-buddy/pages/DemoPage';
 
 /**
  * Route tree. `/` is the full-screen brand home and unknown routes get the
@@ -24,6 +26,9 @@ export function AppRoutes() {
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/demo" element={<DemoControlPage />} />
       </Route>
+      {/* Code Review Buddy — self-branded mini-app, renders without the shell */}
+      <Route path="/code-review" element={<CodeReviewLandingPage />} />
+      <Route path="/code-review/app" element={<CodeReviewAppPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

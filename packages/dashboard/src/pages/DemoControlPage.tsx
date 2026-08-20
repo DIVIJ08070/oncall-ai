@@ -1,36 +1,31 @@
 import { FlaskConical } from 'lucide-react';
-import { Card, CardHeader } from '../components/primitives/Card';
 import { Icon } from '../components/primitives/Icon';
+import { Entrance } from '../components/motion/primitives';
 import { DemoControlPanel } from '../components/demo/DemoControlPanel';
 
 /**
- * DemoControlPage (`/demo`) — DESIGN_SPEC §6.4, C15. A centered 640px card wrapping
- * the shared DemoControlPanel (FailureModeSwitch + current-state readout + traffic
- * generator). Drives the victim's failure mode and generates load so the live demo
- * produces the incident → investigation → PR loop.
+ * DemoControlPage (`/demo`) — DESIGN_SPEC §6.4, C15. Full-page redesign of the shared
+ * DemoControlPanel (FailureModeSwitch + current-state readout + traffic generator),
+ * organised into SectionHeader bands with a StatTile KPI readout. Drives the victim's
+ * failure mode and generates load so the live demo produces the incident →
+ * investigation → PR loop.
  */
 export function DemoControlPage() {
   return (
-    <div className="mx-auto flex w-full max-w-[640px] flex-col gap-6">
-      <div className="flex flex-col gap-1">
+    <div className="mx-auto flex w-full max-w-[760px] flex-col gap-8">
+      <Entrance className="flex flex-col gap-2">
+        <div className="flex items-center gap-2 text-accent">
+          <Icon icon={FlaskConical} size={16} />
+          <span className="text-label uppercase tracking-wide">Live demo</span>
+        </div>
         <h1 className="font-playfair text-h1 italic text-ink">Demo controls</h1>
-        <p className="text-body text-ink-2">
+        <p className="max-w-[60ch] text-body text-ink-2">
           Flip the victim app's failure mode and drive traffic to trigger the live
           detection → investigation → fix-as-PR loop.
         </p>
-      </div>
+      </Entrance>
 
-      <Card>
-        <CardHeader
-          title="Failure &amp; traffic"
-          icon={
-            <span className="text-accent">
-              <Icon icon={FlaskConical} size={18} />
-            </span>
-          }
-        />
-        <DemoControlPanel />
-      </Card>
+      <DemoControlPanel variant="page" />
     </div>
   );
 }

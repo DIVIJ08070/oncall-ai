@@ -7,6 +7,11 @@ import {
   FileText,
   AlertTriangle,
   Loader2,
+  Activity,
+  Gauge,
+  Timer,
+  Clock,
+  Sparkles,
 } from 'lucide-react';
 import type { Incident, IncidentDetailResponse } from '@oncall/shared';
 import { getIncident, getPostmortem, generatePostmortem } from '../api/incidents';
@@ -15,7 +20,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { POLL_INTERVAL_MS } from '../config';
 import { incidentStatusStyle, severityStyle } from '../lib/status';
 import { relativeTime, absoluteTime, pct, ms } from '../lib/format';
-import { tint } from '../lib/tokens';
+import { tint, v } from '../lib/tokens';
 import { IncidentTimelineList, IncidentLifecycle } from '../components/IncidentTimeline';
 import { InvestigationFeed } from '../components/InvestigationFeed';
 import { PRCard } from '../components/PRCard';
@@ -29,6 +34,8 @@ import { EmptyState } from '../components/primitives/EmptyState';
 import { Skeleton } from '../components/primitives/Skeleton';
 import { Drawer } from '../components/primitives/Drawer';
 import { SegmentedControl } from '../components/primitives/SegmentedControl';
+import { StatTile, SectionHeader } from '../components/primitives/StatTile';
+import { Entrance, StaggerGroup, StaggerItem, Press } from '../components/motion/primitives';
 
 /**
  * `/incidents` list + `/incidents/:id` detail (DESIGN_SPEC §6.3, FR-14/08/16, NFR-06).
@@ -41,10 +48,18 @@ import { SegmentedControl } from '../components/primitives/SegmentedControl';
 
 export function IncidentsListPage() {
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="font-playfair text-h1 italic text-ink">Incidents</h1>
-      <IncidentTimelineList />
-    </div>
+    <Entrance className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1">
+        <h1 className="font-playfair text-h1 italic text-ink">Incidents</h1>
+        <p className="text-sm text-ink-muted-text">
+          Every detection, investigation and fix — newest first.
+        </p>
+      </div>
+      <div className="flex flex-col gap-3">
+        <SectionHeader title="Timeline" icon={Activity} />
+        <IncidentTimelineList />
+      </div>
+    </Entrance>
   );
 }
 
@@ -134,6 +149,9 @@ export function IncidentDetailPage() {
         onPostmortem={() => setPmOpen(true)}
       />
 
+      <IncidentStats incident={incident} session={session} />
+
+      <Entrance delay={0.08}>
       {/* Mobile: segmented single-panel switch (§6.3) */}
       {isMobile ? (
         <div className="flex flex-col gap-4">
@@ -168,6 +186,7 @@ export function IncidentDetailPage() {
           {aside}
         </div>
       )}
+      </Entrance>
 
       {/* Chat drawer (side on desktop, bottom sheet on tablet) */}
       {!isMobile ? (
@@ -233,74 +252,173 @@ function Header({
 }) {
   const st = incidentStatusStyle(incident.status);
   const sev = severityStyle(incident.severity);
-  const breach = breachSummary(incident);
   const rootCause = session?.root_cause ?? incident.root_cause;
   const confidence = session?.confidence ?? incident.confidence;
+  const live = incident.status !== 'resolved' && incident.status !== 'closed';
 
   return (
     <div className="sticky top-14 z-20 -mx-3 border-b border-border bg-surface px-3 py-3 sm:-mx-4 sm:px-4 lg:-mx-6 lg:px-6">
       <BackLink />
-      <div className="mt-1.5 flex flex-wrap items-start justify-between gap-3">
+      <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-h1 font-semibold text-ink">{incident.title}</h1>
+          <h1 className="text-h1 font-semibold tracking-tight text-ink">{incident.title}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <StatusPill token={st.token} label={st.label} />
+            <StatusPill token={st.token} label={st.label} pulse={live} />
             <StatusPill token={sev.token} label={`${sev.label} severity`} />
             <Chip>{incident.service}</Chip>
             <Chip>{incident.detector}</Chip>
-            {breach ? (
-              <span className="tabular text-sm text-ink-muted-text">{breach}</span>
-            ) : null}
-            <span
-              className="text-sm text-ink-muted-text"
-              title={absoluteTime(incident.opened_at)}
-            >
-              opened {relativeTime(incident.opened_at)}
-            </span>
-            {incident.resolved_at ? (
-              <span
-                className="text-sm text-ink-muted-text"
-                title={absoluteTime(incident.resolved_at)}
-              >
-                · resolved {relativeTime(incident.resolved_at)}
-              </span>
-            ) : null}
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {hasPr && prUrl ? (
-            <a href={prUrl} target="_blank" rel="noopener noreferrer">
-              <Button variant="secondary" leadingIcon={<Icon icon={GitPullRequest} size={16} />}>
-                View PR
-              </Button>
-            </a>
+            <Press>
+              <a href={prUrl} target="_blank" rel="noopener noreferrer">
+                <Button
+                  variant="secondary"
+                  leadingIcon={<Icon icon={GitPullRequest} size={16} />}
+                >
+                  View PR
+                </Button>
+              </a>
+            </Press>
           ) : null}
-          <Button
-            variant="secondary"
-            leadingIcon={<Icon icon={MessageSquare} size={16} />}
-            onClick={onAskAgent}
-          >
-            Ask agent
-          </Button>
-          <Button
-            variant="secondary"
-            leadingIcon={<Icon icon={FileText} size={16} />}
-            onClick={onPostmortem}
-          >
-            Postmortem
-          </Button>
+          <Press>
+            <Button
+              variant="secondary"
+              leadingIcon={<Icon icon={MessageSquare} size={16} />}
+              onClick={onAskAgent}
+            >
+              Ask agent
+            </Button>
+          </Press>
+          <Press>
+            <Button
+              variant="secondary"
+              leadingIcon={<Icon icon={FileText} size={16} />}
+              onClick={onPostmortem}
+            >
+              Postmortem
+            </Button>
+          </Press>
         </div>
       </div>
 
       {rootCause ? (
-        <div className="mt-3 flex flex-col gap-1.5">
-          <p className="text-body-md text-ink">{rootCause}</p>
+        <div className="mt-3 rounded-lg border border-border bg-surface-2 p-3">
+          <div className="flex items-center gap-1.5 text-accent">
+            <Icon icon={Sparkles} size={14} />
+            <span className="text-label uppercase tracking-wide">Root cause</span>
+          </div>
+          <p className="mt-1.5 text-body-md text-ink">{rootCause}</p>
           {confidence != null ? (
-            <Meter confidence={confidence} className="max-w-xs" />
+            <Meter confidence={confidence} className="mt-2 max-w-xs" />
           ) : null}
         </div>
       ) : null}
     </div>
+  );
+}
+
+/* ── Incident stat row (Status / Confidence / time / signal) ─────────────── */
+
+/** Compact elapsed label — opened→resolved MTTR, or opened→now age. */
+function formatDuration(fromTs: number, toTs: number): string {
+  const diff = Math.max(0, toTs - fromTs);
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const remM = m % 60;
+  if (h < 24) return remM ? `${h}h ${remM}m` : `${h}h`;
+  const d = Math.floor(h / 24);
+  const remH = h % 24;
+  return remH ? `${d}d ${remH}h` : `${d}d`;
+}
+
+function IncidentStats({
+  incident,
+  session,
+}: {
+  incident: Incident;
+  session: IncidentDetailResponse['session'];
+}) {
+  const st = incidentStatusStyle(incident.status);
+  const sev = severityStyle(incident.severity);
+  const confidence = session?.confidence ?? incident.confidence;
+  const breach = breachSummary(incident);
+  const live = incident.status !== 'resolved' && incident.status !== 'closed';
+
+  return (
+    <StaggerGroup className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StaggerItem className="h-full">
+        <StatTile
+          className="h-full"
+          label="Status"
+          icon={Activity}
+          accent={v(st.token)}
+          value={<StatusPill token={st.token} label={st.label} pulse={live} />}
+          caption={`${sev.label} severity`}
+        />
+      </StaggerItem>
+
+      <StaggerItem className="h-full">
+        <StatTile
+          className="h-full"
+          label="Confidence"
+          icon={Gauge}
+          value={confidence != null ? confidence : '—'}
+          format={(n) => `${Math.round(n * 100)}%`}
+          caption={
+            confidence != null ? (
+              <Meter confidence={confidence} showLowChip={false} />
+            ) : (
+              'Awaiting findings'
+            )
+          }
+        />
+      </StaggerItem>
+
+      {incident.resolved_at != null ? (
+        <StaggerItem className="h-full">
+          <StatTile
+            className="h-full"
+            label="MTTR"
+            icon={Timer}
+            value={formatDuration(incident.opened_at, incident.resolved_at)}
+            caption={
+              <span title={absoluteTime(incident.resolved_at)}>
+                resolved {relativeTime(incident.resolved_at)}
+              </span>
+            }
+          />
+        </StaggerItem>
+      ) : (
+        <StaggerItem className="h-full">
+          <StatTile
+            className="h-full"
+            label="Age"
+            icon={Clock}
+            value={formatDuration(incident.opened_at, Date.now())}
+            caption={
+              <span title={absoluteTime(incident.opened_at)}>
+                opened {relativeTime(incident.opened_at)}
+              </span>
+            }
+          />
+        </StaggerItem>
+      )}
+
+      <StaggerItem className="h-full">
+        <StatTile
+          className="h-full"
+          label="Signal"
+          icon={AlertTriangle}
+          value={breach ?? incident.detector}
+          caption={incident.service}
+        />
+      </StaggerItem>
+    </StaggerGroup>
   );
 }
 
@@ -319,40 +437,46 @@ function DetailsAside({
   const decision = session?.decision ?? null;
 
   return (
-    <>
-      <Card>
-        <CardHeader title="Findings" />
-        {rootCause ? (
-          <div className="flex flex-col gap-2">
-            {decision ? (
-              <span
-                className="w-fit rounded-pill px-2 py-0.5 text-label uppercase text-ink"
-                style={{ backgroundColor: tint(decision === 'propose_fix' ? 'accent' : 'serious', 14) }}
-              >
-                {decision === 'propose_fix' ? 'Propose fix' : 'Escalate'}
-              </span>
-            ) : null}
-            <p className="text-body text-ink-2">{rootCause}</p>
-            {confidence != null ? <Meter confidence={confidence} /> : null}
-          </div>
-        ) : (
-          <p className="text-sm text-ink-muted-text">
-            The agent hasn’t submitted findings yet.
-          </p>
-        )}
-      </Card>
+    <StaggerGroup className="flex flex-col gap-4">
+      <StaggerItem>
+        <Card>
+          <CardHeader title="Findings" icon={<Icon icon={Sparkles} size={16} />} />
+          {rootCause ? (
+            <div className="flex flex-col gap-2">
+              {decision ? (
+                <span
+                  className="w-fit rounded-pill px-2 py-0.5 text-label uppercase text-ink"
+                  style={{ backgroundColor: tint(decision === 'propose_fix' ? 'accent' : 'serious', 14) }}
+                >
+                  {decision === 'propose_fix' ? 'Propose fix' : 'Escalate'}
+                </span>
+              ) : null}
+              <p className="text-body text-ink-2">{rootCause}</p>
+              {confidence != null ? <Meter confidence={confidence} /> : null}
+            </div>
+          ) : (
+            <p className="text-sm text-ink-muted-text">
+              The agent hasn’t submitted findings yet.
+            </p>
+          )}
+        </Card>
+      </StaggerItem>
 
-      <PRCard
-        pr={pull_request}
-        incidentStatus={incident.status}
-        onViewFindings={onAskAgent}
-      />
+      <StaggerItem>
+        <PRCard
+          pr={pull_request}
+          incidentStatus={incident.status}
+          onViewFindings={onAskAgent}
+        />
+      </StaggerItem>
 
-      <Card>
-        <CardHeader title="Lifecycle" />
-        <IncidentLifecycle timeline={timeline} status={incident.status} />
-      </Card>
-    </>
+      <StaggerItem>
+        <Card>
+          <CardHeader title="Lifecycle" icon={<Icon icon={Clock} size={16} />} />
+          <IncidentLifecycle timeline={timeline} status={incident.status} />
+        </Card>
+      </StaggerItem>
+    </StaggerGroup>
   );
 }
 

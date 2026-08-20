@@ -3,6 +3,7 @@ import { Play, Square, Radio } from 'lucide-react';
 import { Button } from '../primitives/Button';
 import { Icon } from '../primitives/Icon';
 import { Chip } from '../primitives/Badge';
+import { AnimatedNumber, Press } from '../motion/primitives';
 import { sendTraffic } from './demoApi';
 
 /**
@@ -18,11 +19,18 @@ const MIN_RATE = 10;
 const MAX_RATE = 120;
 const DEFAULT_RATE = 40;
 
+export interface TrafficStats {
+  running: boolean;
+  rate: number;
+  sent: number;
+}
+
 export function TrafficGenerator({
   target,
   targetLabel,
   disabled = false,
   onError,
+  onStats,
 }: {
   /** Traffic target key for `POST /demo/traffic` (from the active mode). */
   target: string;
@@ -30,6 +38,8 @@ export function TrafficGenerator({
   targetLabel: string;
   disabled?: boolean;
   onError?: (message: string) => void;
+  /** Optional live-stats sink (running/rate/sent) so a parent can surface a KPI. */
+  onStats?: (stats: TrafficStats) => void;
 }) {
   const [running, setRunning] = useState(false);
   const [rate, setRate] = useState(DEFAULT_RATE);
@@ -43,6 +53,13 @@ export function TrafficGenerator({
   const carry = useRef(0);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
+  const onStatsRef = useRef(onStats);
+  onStatsRef.current = onStats;
+
+  // Report live stats upward (KPI readout) — additive, never gates the loop.
+  useEffect(() => {
+    onStatsRef.current?.({ running, rate, sent });
+  }, [running, rate, sent]);
 
   useEffect(() => {
     if (!running) {
@@ -87,32 +104,38 @@ export function TrafficGenerator({
   }, [disabled, running]);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {running ? (
-            <span className="flex items-center gap-1.5 text-sm font-medium text-ink">
-              <span className="text-ok">
-                <Icon icon={Radio} size={14} />
+            <span className="flex items-center gap-2 rounded-pill bg-surface-3 py-1 pl-2 pr-3 text-sm font-medium text-ink">
+              <span className="relative flex h-2 w-2 items-center justify-center text-ok">
+                <span className="absolute inline-flex h-full w-full animate-pulse-live rounded-full bg-ok opacity-70" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-ok" />
               </span>
               Sending {rate} req/min
             </span>
           ) : (
-            <span className="text-sm text-ink-2">Idle</span>
+            <span className="inline-flex items-center gap-2 rounded-pill bg-surface-3 py-1 pl-2 pr-3 text-sm text-ink-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-ink-muted" />
+              Idle
+            </span>
           )}
           <Chip title="Victim endpoint this burst drives">{targetLabel}</Chip>
         </div>
-        <Button
-          variant={running ? 'danger' : 'primary'}
-          disabled={disabled}
-          onClick={() => setRunning((r) => !r)}
-          leadingIcon={<Icon icon={running ? Square : Play} size={16} />}
-        >
-          {running ? 'Stop traffic' : 'Start traffic'}
-        </Button>
+        <Press>
+          <Button
+            variant={running ? 'danger' : 'primary'}
+            disabled={disabled}
+            onClick={() => setRunning((r) => !r)}
+            leadingIcon={<Icon icon={running ? Square : Play} size={16} />}
+          >
+            {running ? 'Stop traffic' : 'Start traffic'}
+          </Button>
+        </Press>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 rounded-lg bg-surface-2 px-3 py-2.5">
         <label htmlFor="traffic-rate" className="text-label uppercase text-ink-muted-text">
           Rate
         </label>
@@ -127,13 +150,21 @@ export function TrafficGenerator({
           className="h-1.5 flex-1 cursor-pointer accent-accent"
           aria-valuetext={`${rate} requests per minute`}
         />
-        <span className="w-24 text-right font-mono text-mono-sm tabular-nums text-ink">
+        <span className="w-20 text-right font-mono text-mono-sm tabular text-ink">
           {rate}/min
         </span>
       </div>
 
-      <p className="text-sm text-ink-muted-text">
-        {sent.toLocaleString()} requests sent this session.
+      <p className="flex items-center gap-1.5 text-sm text-ink-muted-text">
+        <span className="text-accent">
+          <Icon icon={Radio} size={13} />
+        </span>
+        <AnimatedNumber
+          value={sent}
+          format={(n) => Math.round(n).toLocaleString()}
+          className="tabular font-medium text-ink-2"
+        />
+        requests sent this session.
       </p>
     </div>
   );

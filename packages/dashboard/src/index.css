@@ -189,6 +189,97 @@
   font-family: 'Playfair Display', serif;
 }
 
+/* ── TargetCursor (components/primitives/TargetCursor.tsx) ─────────────────
+   Crosshair that replaces the pointer on the public brand surfaces. `difference`
+   blending keeps it visible over both the black background and the bright lava
+   image without needing per-surface colours. */
+.target-cursor-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 9999;
+  mix-blend-mode: difference;
+  transform: translate(-50%, -50%);
+}
+.target-cursor-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  will-change: transform;
+}
+.target-cursor-corner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border: 3px solid #fff;
+  will-change: transform;
+}
+.corner-tl {
+  transform: translate(-150%, -150%);
+  border-right: none;
+  border-bottom: none;
+}
+.corner-tr {
+  transform: translate(50%, -150%);
+  border-left: none;
+  border-bottom: none;
+}
+.corner-br {
+  transform: translate(50%, 50%);
+  border-left: none;
+  border-top: none;
+}
+.corner-bl {
+  transform: translate(-150%, 50%);
+  border-right: none;
+  border-top: none;
+}
+
+/* ── FallingText physics effect (components/primitives/FallingText.tsx) ────
+   Words are absolutely positioned from the simulation once it starts; until
+   then they sit in normal flow. Highlight uses the brand accent, not the
+   upstream's cyan. */
+.ft-container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  cursor: grab;
+  text-align: center;
+}
+.ft-container:active {
+  cursor: grabbing;
+}
+.ft-target {
+  display: inline-block;
+}
+.ft-word {
+  display: inline-block;
+  margin: 0 2px;
+  user-select: none;
+  will-change: transform;
+}
+.ft-highlight {
+  color: var(--accent);
+  font-weight: 700;
+}
+.ft-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+}
+
 /* ── Cursor-spotlight interaction system (console) ─────────────────────────
    Carries the landing hero's "light reveals what's underneath" feel into every
    console page. `CursorSpotlight` writes --mx/--my (viewport px) on :root; each

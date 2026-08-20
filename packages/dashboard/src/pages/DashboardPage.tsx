@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FlaskConical } from 'lucide-react';
+import { FlaskConical, SearchCode, Boxes, AlertTriangle, Activity, Gauge } from 'lucide-react';
 import type { ServiceHealth as ServiceHealthDto } from '@oncall/shared';
 import { ServiceHealth } from '../components/ServiceHealth';
 import { MetricsChart } from '../components/MetricsChart';
@@ -9,6 +9,9 @@ import { IncidentListSlot } from '../components/seams/IncidentListSlot';
 import { DemoControlLauncher } from '../components/seams/DemoControlLauncher';
 import { Button } from '../components/primitives/Button';
 import { Icon } from '../components/primitives/Icon';
+import { StatTile, SectionHeader } from '../components/primitives/StatTile';
+import { Entrance, StaggerGroup, StaggerItem } from '../components/motion/primitives';
+import { pct, ms } from '../lib/format';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { TIME_RANGES } from '../config';
 
@@ -43,12 +46,26 @@ export function DashboardPage() {
     }
   };
 
+  // KPIs rolled up from the live ServiceHealth list already loaded on the page.
+  const healthy = services.filter((s) => s.health === 'healthy').length;
+  const activeIncidents = services.filter((s) => s.active_incident_id).length;
+  const worstErrorRate = services.reduce((m, s) => Math.max(m, s.error_rate ?? 0), 0);
+  const worstP95 = services.reduce((m, s) => Math.max(m, s.p95_ms ?? 0), 0);
+
   return (
-    <div className="flex flex-col gap-6">
+    <Entrance className="flex flex-col gap-6">
       {/* Title row */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-playfair text-h1 italic text-ink">Dashboard</h1>
         <div className="flex flex-wrap items-center gap-2">
+          {/* Code Review Buddy mini-app entry point */}
+          <Link
+            to="/code-review"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border-strong px-3 text-body-md font-medium text-ink hover:bg-surface-3"
+          >
+            <Icon icon={SearchCode} size={16} />
+            Code Review
+          </Link>
           <label className="sr-only" htmlFor="service-filter">
             Filter by service
           </label>
@@ -99,6 +116,47 @@ export function DashboardPage() {
         </div>
       </div>
 
+      {/* KPI overview — animated roll-up of the live service list */}
+      <StaggerGroup className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StaggerItem>
+          <StatTile
+            label="Services"
+            value={services.length}
+            icon={Boxes}
+            caption={`${healthy} healthy`}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatTile
+            label="Active incidents"
+            value={activeIncidents}
+            icon={AlertTriangle}
+            accent={activeIncidents > 0 ? 'var(--critical)' : 'var(--ok)'}
+            caption={activeIncidents > 0 ? 'needs attention' : 'all clear'}
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatTile
+            label="Peak error rate"
+            value={worstErrorRate}
+            format={(n) => pct(n)}
+            icon={Activity}
+            accent="var(--series-error)"
+            caption="across services"
+          />
+        </StaggerItem>
+        <StaggerItem>
+          <StatTile
+            label="Peak p95 latency"
+            value={worstP95}
+            format={(n) => ms(n)}
+            icon={Gauge}
+            caption="across services"
+          />
+        </StaggerItem>
+      </StaggerGroup>
+
+      <SectionHeader title="Service health" icon={Activity} className="pt-1" />
       {/* Row A — ServiceHealth strip */}
       <ServiceHealth
         selectedService={selectedService}
@@ -135,6 +193,6 @@ export function DashboardPage() {
       </div>
 
       <DemoControlLauncher />
-    </div>
+    </Entrance>
   );
 }

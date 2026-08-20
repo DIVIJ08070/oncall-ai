@@ -33,23 +33,23 @@ export function Stepper({
             >
               <div className="flex shrink-0 items-center gap-2">
                 <span
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-pill text-sm font-medium ${
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-pill text-body-md font-semibold transition-colors duration-base ${
                     state === 'done'
-                      ? 'bg-ok text-white'
+                      ? 'bg-accent text-white shadow-elev-1'
                       : state === 'current'
-                        ? 'bg-accent text-white'
-                        : 'bg-surface-3 text-ink-muted-text'
+                        ? 'bg-accent text-white shadow-elev-1 ring-2 ring-accent/40 ring-offset-2 ring-offset-bg'
+                        : 'border border-border bg-surface-2 text-ink-muted-text'
                   }`}
                 >
                   {state === 'done' ? <Icon icon={Check} size={16} /> : n}
                 </span>
                 <span
-                  className={`hidden whitespace-nowrap text-sm sm:inline ${
+                  className={`hidden whitespace-nowrap text-sm transition-colors duration-base sm:inline ${
                     state === 'upcoming'
                       ? 'text-ink-muted-text'
                       : state === 'current'
                         ? 'font-medium text-ink'
-                        : 'text-ink'
+                        : 'text-ink-2'
                   }`}
                 >
                   {label}
@@ -58,7 +58,7 @@ export function Stepper({
               {!isLast && (
                 <span
                   aria-hidden="true"
-                  className={`mx-2 h-0.5 flex-1 rounded-pill ${
+                  className={`mx-2 h-[3px] flex-1 rounded-pill transition-colors duration-base ${
                     n < current ? 'bg-accent' : 'bg-surface-3'
                   }`}
                 />
