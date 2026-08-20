@@ -76,12 +76,12 @@ export function HudCorners({
   color?: string;
   className?: string;
 }) {
-  const base: CSSProperties = { position: 'absolute', width: size, height: size, borderColor: color };
+  const base: CSSProperties = { position: 'absolute', width: size, height: size };
   const corners: CSSProperties[] = [
-    { top: inset, left: inset, borderTop: '1px solid', borderLeft: '1px solid' },
-    { top: inset, right: inset, borderTop: '1px solid', borderRight: '1px solid' },
-    { bottom: inset, left: inset, borderBottom: '1px solid', borderLeft: '1px solid' },
-    { bottom: inset, right: inset, borderBottom: '1px solid', borderRight: '1px solid' },
+    { top: inset, left: inset, borderTop: `1px solid ${color}`, borderLeft: `1px solid ${color}` },
+    { top: inset, right: inset, borderTop: `1px solid ${color}`, borderRight: `1px solid ${color}` },
+    { bottom: inset, left: inset, borderBottom: `1px solid ${color}`, borderLeft: `1px solid ${color}` },
+    { bottom: inset, right: inset, borderBottom: `1px solid ${color}`, borderRight: `1px solid ${color}` },
   ];
   return (
     <div aria-hidden className={`pointer-events-none absolute inset-0 ${className}`}>

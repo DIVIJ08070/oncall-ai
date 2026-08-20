@@ -74,12 +74,20 @@ export function NotFoundPage() {
         {/* HUD eyebrow — the error signature, in the atmosphere's mono voice. */}
         <MonoTag className="mb-6">ERR / 404 / ROUTE_NOT_FOUND</MonoTag>
 
-        {/* leading-none + explicit gap: the italic glyphs descend, so the
-            heading needs real clearance rather than a tight negative leading. */}
-        <p className="font-playfair text-[clamp(88px,18vw,190px)] italic leading-none text-ink">
-          404
-        </p>
-        <h1 className="mt-7 text-h1 font-semibold text-ink">Oops, something went wrong!</h1>
+        {/* The digits themselves are physics bodies: they drop in, collide and
+            settle in a pile — the incident that escaped, made literal. */}
+        <div className="h-[190px] w-full sm:h-[220px]">
+          <FallingText
+            text="4 0 4"
+            highlightWords={['0']}
+            trigger="auto"
+            gravity={0.9}
+            mouseConstraintStiffness={0.9}
+            fontSize="clamp(88px,16vw,170px)"
+            className="font-playfair italic leading-none text-ink"
+          />
+        </div>
+        <h1 className="mt-7 text-h1 font-semibold text-ink">Looks like this incident escaped.</h1>
 
         {/* The sentence falls apart on hover — drag the words around. */}
         <div className="mt-4 h-[220px] w-full sm:h-[240px]">
@@ -101,7 +109,13 @@ export function NotFoundPage() {
 }
 
 /** Taunts shown as the button dodges; the last one is where it gives up. */
-const DODGE_LABELS = ['Back to Home', 'Nope.', 'Too slow!', 'Almost…', 'Fine, you win.'];
+const DODGE_LABELS = [
+  '[ CONTAIN INCIDENT ]',
+  '[ IT ESCAPED ]',
+  '[ ALMOST HAD IT ]',
+  '[ ONE MORE TRY ]',
+  '[ FINE. GO HOME ]',
+];
 const MAX_DODGES = DODGE_LABELS.length - 1;
 
 /**

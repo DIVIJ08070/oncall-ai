@@ -1,0 +1,111 @@
+================================================================================
+QA C10 — Read/Stream APIs (SPEC §7)  ·  BACKEND mode  ·  dimension=routes
+Commit: 5763403 (feat(oncall-ai): C10 — read/stream APIs + engine mount + boot)
+App repo: ~/Desktop/oncall-ai   Base path: /api/v1
+Test cases: features/oncall-ai/qa/TEST_CASES-C10.md (derived from SPEC §7 BEFORE reading impl)
+Evidence suites:
+  - packages/server/test/qa-c10-routes.test.ts  (QA-owned, independent — NOT the dev's)
+  - packages/server/test/c10-read-stream.test.ts (dev's, 23 tests — also executed)
+================================================================================
+
+VERDICT: ❌ FAIL — 27/28 QA contract cases green; 1 CONFIRMED contract violation.
+  BUG-009 (MED): GET /incidents/:id `pull_request` DTO omits SPEC §7.3
+  required fields `branch`, `base`, `head_sha`.
+
+--------------------------------------------------------------------------------
+BUILD (QA-owned): cd ~/Desktop/oncall-ai && npm install && npm run build
+--------------------------------------------------------------------------------
+INSTALL_OK / BUILD_OK (tsc -b clean) — see /tmp/c10-install.log, /tmp/c10-build.log
+
+--------------------------------------------------------------------------------
+FULL SUITE: npx vitest run
+--------------------------------------------------------------------------------
+ ✓ |server| test/c10-read-stream.test.ts (23 tests) 1512ms
+ Test Files  27 passed (27)
+      Tests  520 passed (520)
+
+--------------------------------------------------------------------------------
+INDEPENDENT QA SUITE: npx vitest run packages/server/test/qa-c10-routes.test.ts
+--------------------------------------------------------------------------------
+
+ RUN  v2.1.9 /Users/mac/Desktop/oncall-ai
+
+ ❯ |server| test/qa-c10-routes.test.ts (28 tests | 1 failed) 599ms
+   × QA C10 §7.3 incidents list + detail > TC-24 pull_request DTO exposes branch/base/head_sha (SPEC §7.3) — CONTRACT CHECK 25ms
+     → expected { number: 7, …(4) } to have property "branch"
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL |server|  test/qa-c10-routes.test.ts > QA C10 §7.3 incidents list + detail > TC-24 pull_request DTO exposes branch/base/head_sha (SPEC §7.3) — CONTRACT CHECK
+AssertionError: expected { number: 7, …(4) } to have property "branch"
+ ❯ test/qa-c10-routes.test.ts:335:16
+    333|     // SPEC §7.3 pull_request DTO = number,url,kind,state,verification…
+    334|     expect(pr).toMatchObject({ number: 7, kind: 'revert' });
+    335|     expect(pr).toHaveProperty('branch'); // BUG-009: omitted by impl
+       |                ^
+    336|     expect(pr).toHaveProperty('base');
+    337|     expect(pr).toHaveProperty('head_sha');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 27 passed (28)
+   Start at  21:30:58
+   Duration  1.73s (transform 338ms, setup 0ms, collect 653ms, tests 599ms, environment 0ms, prepare 115ms)
+
+
+================================================================================
+PER-ROUTE CONTRACT VERDICT (method/path/auth/request/response DTO vs SPEC §7)
+================================================================================
+Route (base /api/v1)                     | SPEC   | Verdict | Notes
+-----------------------------------------|--------|---------|-----------------------------
+GET  /services                           | §7.2   | PASS    | exact ServiceHealth keys (name,health,error_rate,p95_ms,req_per_min,last_event_at,active_incident_id); health enum; active_incident_id links open incident; empty→[]
+GET  /metrics                            | §7.2   | PASS    | snapshot current{error_rate,req_count,p50,p95,p99}+baseline{error_rate,p95}+series; window/res defaults 900/15; series ≤240; unknown svc→404 not_found; missing service→400 validation_error
+GET  /logs                               | §7.2b  | PASS    | {events:[LogEvent w/o customer_id], next_before}; level/service/since/until filters; keyset cursor; limit>500→400 (contract ≤500)
+GET  /logs/stream (SSE)                  | §7.2b  | PASS    | text/event-stream; `event: log\ndata:<LogEvent>\n\n`; :heartbeat comment every 15s; live publish delivered (dev suite)
+GET  /incidents                          | §7.3   | PASS    | {incidents:[IncidentSummary]}; status+service+limit filters
+GET  /incidents/:id                      | §7.3   | FAIL    | 5 keys {incident,session,steps,pull_request,timeline} present; incident/session/steps/timeline exact; **pull_request DTO MISSING branch,base,head_sha → BUG-009**; unknown→404; nullable session/PR OK
+POST /incidents/:id/investigate          | §7.3   | PASS    | 202 {session_id:ses_...}; session+steps persist to SQLite; unknown→404
+GET  /incidents/:id/feed (SSE)           | §7.3   | PASS    | session_started{session_id,mode,model} → replay{steps} → live; step/pr_created/conclusion/session_completed payloads exact; late-subscriber replay-then-live; seq-dedup drops replayed seq, passes newer
+POST /incidents/:id/chat                 | §7.4   | PASS    | 200 {message:{role:assistant,content,evidence[{type,tool,ref}]}}; READ-ONLY grounded (no write tool); persists user+assistant chat_messages; empty msg→400; unknown→404
+GET  /incidents/:id/chat/stream (SSE)    | §7.4   | PASS    | token frames then done; text/event-stream
+POST /incidents/:id/postmortem           | §7.4   | PASS    | 201 {postmortem:markdown}; stored on incidents.postmortem; unknown→404
+GET  /incidents/:id/postmortem           | §7.4   | PASS    | 200 stored draft; 404 before generate
+GET  /health                             | §7.8   | PASS    | 200 {status:"ok"}
+FR-17 Slack stub (notify/)               | §7,§14 | PASS    | notifications row channel=slack; empty SLACK_WEBHOOK_URL→status=stubbed (log-only)
+error envelope (all non-2xx)             | §7     | PASS    | {error:{code,message,details?}}; codes not_found/validation_error/unauthorized
+auth (read APIs)                         | §6     | PASS    | open under DEV_NO_AUTH (seed customer); DEV_NO_AUTH=false + no session → 401 unauthorized
+
+SSE framing (pure, SPEC §7 conventions): PASS
+  - formatSseEvent('log',{a:1}) === "event: log\ndata: {\"a\":1}\n\n"
+  - :heartbeat emitted as a COMMENT (": heartbeat\n\n") every 15s (SSE_HEARTBEAT_MS=15000) — matches §7 "a `:heartbeat` comment every 15s"
+
+END-TO-END persistence (dev suite, verified independently): PASS
+  ingest → detection.tick() opens incident → auto-start investigation (enqueuer) →
+  investigation_sessions + investigation_steps persist to SQLite → detail DTO complete →
+  feed replays persisted steps for a late subscriber. Closes C7's deferred live-persistence gap.
+
+================================================================================
+BUG-009 (MED) — GET /incidents/:id `pull_request` DTO omits SPEC §7.3 fields
+================================================================================
+SPEC §7.3 (source of truth, lines 319-321) defines the pull_request DTO as:
+  { "number","url","kind","state","verification_status","branch","base","head_sha" }
+Impl returns only 5 of the 8 fields — branch, base, head_sha are dropped:
+  packages/shared/src/github.ts  PullRequestSummarySchema  → {number,url,kind,state,verification_status}
+  packages/server/src/incidents/detail.ts:40 toPullRequestSummary → same 5 fields
+The underlying pull_requests row (§8) HAS branch, base_branch, head_sha — they are
+simply not projected onto the wire DTO.
+
+Traceability: SPEC §7.3 was AMENDED to add branch/base/head_sha as the resolution of
+BUG-003 (C11 DESIGN QA, VERIFIED) specifically so the dashboard PRCard (DESIGN_SPEC §8.6/§13)
+could bind them. C10 shipped the DTO WITHOUT them, reopening that gap at the API layer.
+Downstream impact: C13 PRCard cannot render branch/base/head_sha from the documented
+contract (@oncall/shared consumers get a 5-field object).
+
+Executed proof (qa-c10-routes.test.ts TC-24): with a fully-populated PR row
+(branch 'oncall-ai/fix-inc_x-a1b2c3', base 'main', head_sha 'def5678abcd'),
+GET /incidents/:id → pull_request is { number,url,kind,state,verification_status } —
+`expect(pr).toHaveProperty('branch')` FAILS. See suite output above.
+
+Fix: add branch, base, head_sha to PullRequestSummarySchema (map base_branch→base) and
+project them in toPullRequestSummary. Contract change stays within SPEC §7.3.
