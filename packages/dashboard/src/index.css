@@ -453,3 +453,50 @@
   .atm-grain, .atm-sweep { animation: none !important; }
   .atm-sweep { display: none; }
 }
+
+/* ── ReviewScanner (code-review loading theatre) ──────────────────────────── */
+@keyframes crbs-sweep {
+  0% { transform: translateY(-8%); opacity: 0; }
+  6% { opacity: 1; }
+  94% { opacity: 1; }
+  100% { transform: translateY(340px); opacity: 0; }
+}
+.crbs-beam { animation: crbs-sweep 2.6s cubic-bezier(0.4, 0, 0.4, 1) infinite; }
+
+/* each ghost-code line brightens briefly as the beam era passes it */
+@keyframes crbs-line-glow {
+  0%, 12%, 100% { filter: brightness(1); }
+  6% { filter: brightness(2.4); }
+}
+.crbs-line { animation: crbs-line-glow 2.6s linear infinite; }
+
+/* bug blips: hidden until "detected", then pop + settle */
+@keyframes crbs-blip-pop {
+  0%, 38% { opacity: 0; transform: scale(0.2); }
+  44% { opacity: 1; transform: scale(1.5); }
+  52%, 100% { opacity: 1; transform: scale(1); }
+}
+.crbs-blip { opacity: 0; animation: crbs-blip-pop 8s ease-out infinite; }
+@keyframes crbs-blip-ring-pulse {
+  0%, 42% { opacity: 0; transform: scale(1); }
+  48% { opacity: 0.9; transform: scale(1); }
+  70% { opacity: 0; transform: scale(3.2); }
+  100% { opacity: 0; }
+}
+.crbs-blip-ring { animation: crbs-blip-ring-pulse 8s ease-out infinite; }
+
+/* typewriter reveal for each rotating status message */
+@keyframes crbs-typein {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+.crbs-type { animation: crbs-typein 0.9s steps(24, end) both; white-space: nowrap; }
+@keyframes crbs-caret-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+.crbs-caret { animation: crbs-caret-blink 1s steps(1) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .crbs-beam, .crbs-line, .crbs-blip, .crbs-blip-ring, .crbs-type, .crbs-caret {
+    animation: none !important;
+  }
+  .crbs-blip, .crbs-blip-ring { opacity: 1; }
+}

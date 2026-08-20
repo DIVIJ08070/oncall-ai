@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Navbar } from '../components/layout/Navbar';
-import { Button, ErrorMessage, Spinner } from '../components/ui';
+import { Button, ErrorMessage, ReviewScanner } from '../components/ui';
 import {
   AtmosphereBackdrop,
   Grain,
@@ -21,15 +21,6 @@ import { useRulesStore } from '../store/rulesStore';
 import { useWatchStore } from '../store/watchStore';
 
 type TabId = 'diff' | 'repo' | 'rules' | 'watch';
-
-function LoadingRow() {
-  return (
-    <div className="flex items-center gap-3 py-8 text-white/60">
-      <Spinner />
-      <span className="text-sm">Analyzing…</span>
-    </div>
-  );
-}
 
 export function DemoPage() {
   const [tab, setTab] = useState<TabId>('diff');
@@ -144,14 +135,14 @@ export function DemoPage() {
               <div className="mt-8 space-y-8">
                 <div className={tab === 'diff' ? 'space-y-8' : 'hidden'}>
                   <DiffInput />
-                  {review.loading && <LoadingRow />}
+                  {review.loading && <ReviewScanner mode="diff" />}
                   {review.error && <ErrorMessage message={review.error} />}
                   {review.data && <ReviewResult result={review.data} />}
                 </div>
 
                 <div className={tab === 'repo' ? 'space-y-8' : 'hidden'}>
                   <RepoUrlInput />
-                  {repoReview.loading && <LoadingRow />}
+                  {repoReview.loading && <ReviewScanner mode="repo" />}
                   {repoReview.error && (
                     <ErrorMessage message={repoReview.error} />
                   )}

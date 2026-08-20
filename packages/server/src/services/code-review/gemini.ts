@@ -54,7 +54,7 @@ export type ReviewEngine = 'claude' | 'gemini';
 /** After a Claude failure, skip Claude for a while (a 15-file scan must not
  *  pay the failure latency 15 times). */
 let claudeCooldownUntil = 0;
-const CLAUDE_COOLDOWN_MS = 5 * 60_000;
+const CLAUDE_COOLDOWN_MS = 90_000; // one transient failure shouldn't bench Claude for long
 
 async function generateReviewJson(
   config: Config,
@@ -79,7 +79,7 @@ async function generateReviewJson(
       claudeCooldownUntil = Date.now() + CLAUDE_COOLDOWN_MS;
       // eslint-disable-next-line no-console
       console.warn(
-        '[code-review] Claude engine failed (%s) — using Gemini for the next 5 minutes.',
+        '[code-review] Claude engine failed (%s) — using Gemini for the next 90s.',
         msg,
       );
     }

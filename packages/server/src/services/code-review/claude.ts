@@ -63,7 +63,9 @@ export async function claudeGenerateText(config: Config, prompt: string): Promis
       prompt,
       options: {
         model: config.codeReview.claudeModel,
-        maxTurns: 1,
+        // 3, not 1: with adaptive thinking a turn can end before the final
+        // text lands; 1 made long-diff reviews die with error_max_turns.
+        maxTurns: 3,
         systemPrompt: REVIEW_SYSTEM_PROMPT,
         allowedTools: [],
         permissionMode: 'dontAsk',

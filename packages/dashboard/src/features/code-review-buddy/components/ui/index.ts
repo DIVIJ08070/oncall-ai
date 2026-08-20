@@ -7,3 +7,4 @@ export { GlowBackground } from './GlowBackground';
 export { Magnet } from './Magnet';
 export { ReviewBadge, severityColor } from './ReviewBadge';
 export { Spinner } from './Spinner';
+export { ReviewScanner } from './ReviewScanner';
