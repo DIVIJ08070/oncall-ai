@@ -74,14 +74,26 @@ function ghHeaders(config: Config, accept: string, useToken: boolean): Record<st
  */
 let tokenRejected = false;
 
-async function ghFetch(
+/**
+ * Shared GitHub fetch (exported for the PR-Watch poller): token → anonymous
+ * 401 fallback, 15 s timeout, typed network error. `init` allows non-GET
+ * calls (e.g. posting a PR comment); a JSON content-type is added when a
+ * body is present.
+ */
+export async function ghFetch(
   config: Config,
   path: string,
   accept = 'application/vnd.github+json',
+  init?: { method?: string; body?: string },
 ): Promise<Response> {
   const doFetch = (useToken: boolean): Promise<Response> =>
     fetch(`${API_BASE}${path}`, {
-      headers: ghHeaders(config, accept, useToken),
+      ...(init?.method ? { method: init.method } : {}),
+      ...(init?.body !== undefined ? { body: init.body } : {}),
+      headers: {
+        ...ghHeaders(config, accept, useToken),
+        ...(init?.body !== undefined ? { 'content-type': 'application/json' } : {}),
+      },
       signal: AbortSignal.timeout(15_000),
     }).catch(() => {
       throw new CodeReviewError(
@@ -104,7 +116,7 @@ async function ghFetch(
   return res;
 }
 
-function upstreamStatusError(status: number, what: string): CodeReviewError {
+export function upstreamStatusError(status: number, what: string): CodeReviewError {
   // 403/429 from GitHub is almost always rate limiting (60 req/hr unauthenticated;
   // one scan can spend ~17), so name it plainly instead of a generic upstream error.
   if (status === 403 || status === 429) {

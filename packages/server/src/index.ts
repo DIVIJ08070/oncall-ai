@@ -11,6 +11,7 @@ import {
   type InvestigationService,
 } from './investigation/service.js';
 import { createSlackNotifier } from './notify/index.js';
+import { startCodeReviewWatcher } from './services/code-review/watcher.js';
 
 /**
  * Platform server boot (SPEC §3 `index.ts`). Wires config → db → broker →
@@ -114,6 +115,10 @@ export async function main(): Promise<void> {
   const engine = startDetection(db, config, broker, investigation);
   const poller = startMergePoller(db, config, broker);
 
+  // Code Review Buddy — PR Watch poller (auto-reviews open PRs of watched
+  // repos every CODE_REVIEW_WATCH_INTERVAL_MS; no-ops until a repo is watched).
+  const watcher = startCodeReviewWatcher(config);
+
   // Graceful shutdown: stop the background loops (their timers are already
   // `unref()`'d, so this is deterministic-teardown tidiness, not a leak fix)
   // and close the HTTP server before exiting. Idempotent under repeated signals.
@@ -125,6 +130,7 @@ export async function main(): Promise<void> {
     console.log(`[oncall] ${signal} received — shutting down`);
     engine.stop();
     poller?.stop();
+    watcher.stop();
     void app.close().finally(() => process.exit(0));
   };
   process.once('SIGTERM', shutdown);

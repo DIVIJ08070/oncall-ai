@@ -62,6 +62,35 @@ export interface CustomRule {
   enabled: boolean;
 }
 
+/* ── PR Watch (auto-review poller) ──────────────────────────────────────── */
+
+/** A GitHub repo registered for PR-Watch auto-review. */
+export interface WatchedRepo {
+  id: string;
+  repoUrl: string;
+  owner: string;
+  repo: string;
+  createdAt: number;
+  rules: CustomRule[];
+}
+
+/** One stored auto-review of a `(prNumber, headSha)` pair. */
+export interface AutoReview {
+  id: string;
+  watchId: string;
+  owner: string;
+  repo: string;
+  prNumber: number;
+  prTitle: string;
+  prUrl: string;
+  headSha: string;
+  overallScore: number;
+  categories: ReviewCategory[];
+  markdownComment: string;
+  commented: boolean;
+  reviewedAt: number;
+}
+
 /**
  * Typed failure the route layer converts 1:1 into the SPEC §7 error envelope
  * via `sendError(reply, err.status, err.code, err.message)`.

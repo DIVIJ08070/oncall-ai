@@ -14,11 +14,13 @@ import { FileReviewList } from '../features/repo-review/components/FileReviewLis
 import { RepoScoreSummary } from '../features/repo-review/components/RepoScoreSummary';
 import { RepoUrlInput } from '../features/repo-review/components/RepoUrlInput';
 import { RulesManager } from '../features/rules/components/RulesManager';
+import { WatchManager } from '../features/watch/components/WatchManager';
 import { useRepoReviewStore } from '../store/repoReviewStore';
 import { useReviewStore } from '../store/reviewStore';
 import { useRulesStore } from '../store/rulesStore';
+import { useWatchStore } from '../store/watchStore';
 
-type TabId = 'diff' | 'repo' | 'rules';
+type TabId = 'diff' | 'repo' | 'rules' | 'watch';
 
 function LoadingRow() {
   return (
@@ -35,11 +37,17 @@ export function DemoPage() {
   const review = useReviewStore();
   const repoReview = useRepoReviewStore();
   const rulesCount = useRulesStore((s) => s.rules.length);
+  const watchLoaded = useWatchStore((s) => s.loaded);
+  const autoReviewCount = useWatchStore((s) => s.reviews.length);
 
   const tabs: { id: TabId; label: string }[] = [
     { id: 'diff', label: 'Paste Diff' },
     { id: 'repo', label: 'GitHub Repo' },
     { id: 'rules', label: `Custom Rules (${rulesCount})` },
+    {
+      id: 'watch',
+      label: watchLoaded ? `Auto-Review (${autoReviewCount})` : 'Auto-Review',
+    },
   ];
 
   const clearAction =
@@ -157,6 +165,10 @@ export function DemoPage() {
 
                 <div className={tab === 'rules' ? '' : 'hidden'}>
                   <RulesManager />
+                </div>
+
+                <div className={tab === 'watch' ? '' : 'hidden'}>
+                  <WatchManager />
                 </div>
               </div>
             </div>

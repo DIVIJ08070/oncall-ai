@@ -64,6 +64,7 @@ const EnvSchema = z.object({
   // code review buddy
   GEMINI_API_KEY: strEnv(''),
   CODE_REVIEW_MODEL: strEnv('gemini-2.5-flash'),
+  CODE_REVIEW_WATCH_INTERVAL_MS: numEnv(60000),
 
   // ingest / notify
   INGEST_API_KEY: strEnv('dev-local-ingest-key'),
@@ -120,6 +121,7 @@ export interface Config {
   codeReview: {
     geminiApiKey: string;
     model: string;
+    watchIntervalMs: number;
   };
   ingest: {
     apiKey: string;
@@ -194,6 +196,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     codeReview: {
       geminiApiKey: e.GEMINI_API_KEY,
       model: e.CODE_REVIEW_MODEL,
+      watchIntervalMs: e.CODE_REVIEW_WATCH_INTERVAL_MS,
     },
     ingest: {
       apiKey: e.INGEST_API_KEY,

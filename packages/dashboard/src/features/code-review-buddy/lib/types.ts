@@ -59,3 +59,30 @@ export interface CustomRule {
   severity: 'warning' | 'error';
   enabled: boolean;
 }
+
+/** Tab 4 — PR Watch: a registered repo the server polls for open PRs. */
+export interface WatchedRepo {
+  id: string;
+  repoUrl: string;
+  owner: string;
+  repo: string;
+  createdAt: number;
+  rules: CustomRule[];
+}
+
+/** One automatic review of a (prNumber, headSha) pair on a watched repo. */
+export interface AutoReview {
+  id: string;
+  watchId: string;
+  owner: string;
+  repo: string;
+  prNumber: number;
+  prTitle: string;
+  prUrl: string;
+  headSha: string;
+  overallScore: number;
+  categories: ReviewCategory[];
+  markdownComment: string;
+  commented: boolean;
+  reviewedAt: number;
+}
