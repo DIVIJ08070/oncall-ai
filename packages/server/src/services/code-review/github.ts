@@ -54,33 +54,54 @@ export function parseRepoUrl(url: string): RepoRef | null {
   return { owner, repo };
 }
 
-function ghHeaders(config: Config, accept: string): Record<string, string> {
+function ghHeaders(config: Config, accept: string, useToken: boolean): Record<string, string> {
   const headers: Record<string, string> = {
     accept,
     'user-agent': 'oncall-ai-code-review-buddy',
     'x-github-api-version': '2022-11-28',
   };
-  if (config.github.token) {
+  if (useToken && config.github.token) {
     headers.authorization = `Bearer ${config.github.token}`;
   }
   return headers;
 }
+
+/**
+ * Once GitHub rejects the configured token (401 — typically an EXPIRED
+ * fine-grained PAT), stop sending it for the rest of the process: public-repo
+ * reads work anonymously (the token only raises rate limits), so an expired
+ * token must not take the whole repo-scan feature down.
+ */
+let tokenRejected = false;
 
 async function ghFetch(
   config: Config,
   path: string,
   accept = 'application/vnd.github+json',
 ): Promise<Response> {
-  return fetch(`${API_BASE}${path}`, {
-    headers: ghHeaders(config, accept),
-    signal: AbortSignal.timeout(15_000),
-  }).catch(() => {
-    throw new CodeReviewError(
-      502,
-      'upstream_error',
-      'Could not reach the GitHub API in time — check the server network connection and try again.',
+  const doFetch = (useToken: boolean): Promise<Response> =>
+    fetch(`${API_BASE}${path}`, {
+      headers: ghHeaders(config, accept, useToken),
+      signal: AbortSignal.timeout(15_000),
+    }).catch(() => {
+      throw new CodeReviewError(
+        502,
+        'upstream_error',
+        'Could not reach the GitHub API in time — check the server network connection and try again.',
+      );
+    });
+
+  const useToken = Boolean(config.github.token) && !tokenRejected;
+  let res = await doFetch(useToken);
+  if (res.status === 401 && useToken) {
+    tokenRejected = true;
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[code-review] GITHub token rejected (401 — expired?). Falling back to anonymous GitHub access; regenerate GITHUB_TOKEN in .env to restore higher rate limits.',
     );
-  });
+    res = await doFetch(false);
+  }
+  return res;
 }
 
 function upstreamStatusError(status: number, what: string): CodeReviewError {
