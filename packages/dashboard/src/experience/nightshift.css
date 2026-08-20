@@ -66,3 +66,13 @@
 @media (prefers-reduced-motion: reduce) {
   .ns-root.ns-collapsing { transform: none; filter: none; }
 }
+
+/* Keyboard focus (WCAG 2.4.11/13): a clear orange ring on every interactive
+   element in the experience — the crosshair cursor replaces the pointer, but
+   keyboard users get an unambiguous focus indicator. */
+.ns-root a:focus-visible,
+.ns-root button:focus-visible {
+  outline: 2px solid #f16524;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
