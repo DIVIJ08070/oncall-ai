@@ -22,6 +22,7 @@ import {
   ScrollStaggerItem,
   ScrollWords,
 } from '../../../../components/motion/scroll';
+import { MonoTag } from '../../../../components/atmosphere';
 
 interface Feature {
   icon: LucideIcon;
@@ -175,6 +176,10 @@ export function Features() {
             What it catches
           </span>
         </ScrollReveal>
+
+        <div className="mt-6 flex justify-center">
+          <MonoTag>SYS / CAPABILITIES</MonoTag>
+        </div>
 
         <h2 className="mx-auto mt-7 max-w-4xl text-center text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
           <ScrollWords

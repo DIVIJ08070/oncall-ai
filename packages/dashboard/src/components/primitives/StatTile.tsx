@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { Icon } from './Icon';
 import { AnimatedNumber } from '../motion/primitives';
+import { HudCorners, MonoTag } from '../atmosphere';
 
 /**
  * KPI stat tile for the console redesign. A compact card with an icon, a label,
@@ -31,7 +32,7 @@ export function StatTile({
 }) {
   return (
     <div
-      className={`spot-card group relative overflow-hidden rounded-xl border border-border bg-surface p-4 shadow-elev-1 ${className}`}
+      className={`spot-card group relative overflow-hidden rounded-lg border border-border bg-surface/80 p-4 shadow-elev-1 backdrop-blur-sm ${className}`}
     >
       {/* faint accent wash in the corner */}
       <span
@@ -39,11 +40,13 @@ export function StatTile({
         className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-20 blur-2xl transition-opacity duration-300 group-hover:opacity-40"
         style={{ backgroundColor: accent }}
       />
+      {/* HUD viewfinder brackets that brighten on hover */}
+      <HudCorners size={10} inset={6} color={accent} className="opacity-40 transition-opacity duration-300 group-hover:opacity-90" />
       <div className="flex items-center justify-between">
-        <span className="text-label uppercase tracking-wide text-ink-muted-text">{label}</span>
+        <MonoTag dot={false}>{label}</MonoTag>
         {icon && (
           <span style={{ color: accent }}>
-            <Icon icon={icon} size={16} />
+            <Icon icon={icon} size={15} />
           </span>
         )}
       </div>
@@ -72,16 +75,17 @@ export function SectionHeader({
   className?: string;
 }) {
   return (
-    <div className={`flex items-end justify-between gap-3 ${className}`}>
-      <div className="flex items-center gap-2">
+    <div className={`flex items-center justify-between gap-3 ${className}`}>
+      <div className="flex min-w-0 items-center gap-3">
         {icon && (
           <span className="text-accent">
             <Icon icon={icon} size={18} />
           </span>
         )}
         <h2 className="text-h2 font-semibold text-ink">{title}</h2>
+        <span aria-hidden className="hidden h-px flex-1 bg-gradient-to-r from-border to-transparent sm:block" style={{ minWidth: 40 }} />
       </div>
-      {right && <div className="flex items-center gap-2">{right}</div>}
+      {right && <div className="flex shrink-0 items-center gap-2">{right}</div>}
     </div>
   );
 }

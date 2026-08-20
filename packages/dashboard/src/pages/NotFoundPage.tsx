@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { FallingText } from '../components/primitives/FallingText';
 import { TargetCursor } from '../components/primitives/TargetCursor';
+import { Grain, AtmosphereBackdrop, HudCorners, MonoTag } from '../components/atmosphere';
 
 /**
  * 404 — dark brand screen matching the console. The explanatory sentence is a
@@ -20,6 +21,12 @@ export function NotFoundPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-bg">
+      {/* Film grain over the whole viewport — the lost-signal texture. */}
+      <Grain />
+
+      {/* Aurora depth + faint HUD grid, behind everything. */}
+      <AtmosphereBackdrop />
+
       {/* Crosshair pointer — brand surfaces only; the console keeps the real cursor. */}
       <TargetCursor spinDuration={2} hoverDuration={0.2} cursorColorOnTarget="#F16524" />
 
@@ -31,6 +38,17 @@ export function NotFoundPage() {
             'radial-gradient(900px circle at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%)',
         }}
       />
+
+      {/* Decorative mono coordinate readout — a HUD frozen at the moment of signal loss. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute bottom-6 left-6 z-10 hidden select-none flex-col gap-1 font-mono text-[9px] uppercase leading-relaxed tracking-[0.3em] text-ink-muted-text opacity-40 sm:flex"
+        style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}
+      >
+        <span>LAT 40.7128</span>
+        <span>LON -074.006</span>
+        <span>SIG // LOST</span>
+      </div>
 
       <header className="relative z-10 flex items-center justify-between px-5 py-5 md:px-8">
         <Link to="/" className="cursor-target flex items-center gap-2">
@@ -48,6 +66,13 @@ export function NotFoundPage() {
       </header>
 
       <main className="relative z-10 mx-auto flex w-full max-w-3xl flex-1 flex-col items-center px-5 pt-6 text-center">
+        {/* Hairline viewfinder brackets frame the content column like a HUD.
+            text-accent drives currentColor so the 1px brackets read orange. */}
+        <HudCorners size={22} inset={4} className="text-accent" />
+
+        {/* HUD eyebrow — the error signature, in the atmosphere's mono voice. */}
+        <MonoTag className="mb-6">ERR / 404 / ROUTE_NOT_FOUND</MonoTag>
+
         {/* leading-none + explicit gap: the italic glyphs descend, so the
             heading needs real clearance rather than a tight negative leading. */}
         <p className="font-playfair text-[clamp(88px,18vw,190px)] italic leading-none text-ink">

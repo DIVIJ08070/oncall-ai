@@ -6,6 +6,7 @@ import {
   ScrollWords,
   Parallax,
 } from '../../../../components/motion/scroll';
+import { MonoTag } from '../../../../components/atmosphere';
 
 /** Giant closing moment, then the shared mini-app footer. */
 export function CtaFooter() {
@@ -42,6 +43,10 @@ export function CtaFooter() {
             Ready when you are
           </span>
         </ScrollReveal>
+
+        <div className="mb-6 flex justify-center">
+          <MonoTag>GO</MonoTag>
+        </div>
 
         <h2 className="pb-2 text-6xl font-black leading-[1.03] tracking-tight sm:text-7xl md:text-8xl">
           <ScrollWords

@@ -7,6 +7,7 @@ import { HowItWorks } from '../components/sections/HowItWorks';
 import { ReviewDemo } from '../components/sections/ReviewDemo';
 import { CtaFooter } from '../components/sections/CtaFooter';
 import { ScrollProgress } from '../../../components/motion/scroll';
+import { Grain, Aurora } from '../../../components/atmosphere';
 
 /** Code Review Buddy marketing landing page (route: /code-review). */
 export function LandingPage() {
@@ -16,6 +17,14 @@ export function LandingPage() {
       style={{ fontFamily: "'Kanit', sans-serif", overflowX: 'clip' }}
     >
       <ScrollProgress />
+
+      {/* page-wide film grain */}
+      <Grain />
+
+      {/* subtle fixed aurora depth behind everything */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0">
+        <Aurora className="opacity-70" />
+      </div>
 
       {/* faint fixed grid texture behind everything */}
       <div

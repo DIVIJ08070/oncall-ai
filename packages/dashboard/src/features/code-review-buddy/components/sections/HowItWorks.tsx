@@ -14,6 +14,7 @@ import {
   ScrollReveal,
   ScrollWords,
 } from '../../../../components/motion/scroll';
+import { MonoTag } from '../../../../components/atmosphere';
 
 interface Step {
   number: string;
@@ -188,6 +189,10 @@ export function HowItWorks() {
             How it works
           </span>
         </ScrollReveal>
+
+        <div className="mt-6 flex justify-center">
+          <MonoTag>FLOW / 3 STEPS</MonoTag>
+        </div>
 
         <h2 className="mx-auto mt-7 max-w-3xl text-center text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
           <ScrollWords

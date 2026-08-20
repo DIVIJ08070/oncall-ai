@@ -8,6 +8,7 @@ import {
   ScrollStaggerItem,
   ScrollWords,
 } from '../../../../components/motion/scroll';
+import { MonoTag, HudCorners } from '../../../../components/atmosphere';
 
 const PROBLEMS = [
   'Human review is slow — PRs sit for hours or days waiting for eyes.',
@@ -63,6 +64,10 @@ export function ProblemSolution() {
             </span>
           </ScrollReveal>
 
+          <div className="mt-6 flex justify-center">
+            <MonoTag>WHY / CONTRAST</MonoTag>
+          </div>
+
           <h2 className="mt-6 text-4xl font-black uppercase leading-[0.95] tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">
             <ScrollWords
               text="SHIP WITHOUT THE WAIT"
@@ -92,7 +97,8 @@ export function ProblemSolution() {
 
           {/* Problem — muted */}
           <ScrollStaggerItem className="md:pr-10">
-            <div className="h-full rounded-3xl border border-white/10 bg-white/[0.02] p-8 backdrop-blur md:p-10">
+            <div className="relative h-full rounded-3xl border border-white/10 bg-white/[0.02] p-8 backdrop-blur md:p-10">
+              <HudCorners size={14} inset={14} color="rgba(255,255,255,0.22)" />
               <div className="flex items-center gap-3">
                 <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-white/40">
                   <Clock3 size={18} />
@@ -126,7 +132,7 @@ export function ProblemSolution() {
           {/* Solution — orange-accented */}
           <ScrollStaggerItem className="md:pl-10">
             <div
-              className="h-full rounded-3xl border p-8 backdrop-blur md:p-10"
+              className="relative h-full rounded-3xl border p-8 backdrop-blur md:p-10"
               style={{
                 borderColor: 'rgba(241,101,36,0.28)',
                 background:
@@ -134,6 +140,7 @@ export function ProblemSolution() {
                 boxShadow: '0 0 60px -24px rgba(241,101,36,0.45)',
               }}
             >
+              <HudCorners size={14} inset={14} />
               <div className="flex items-center gap-3">
                 <span
                   className="inline-flex h-10 w-10 items-center justify-center rounded-xl"

@@ -11,6 +11,7 @@ import {
   ScrollWords,
   Parallax,
 } from '../../../../components/motion/scroll';
+import { MonoTag, HudCorners } from '../../../../components/atmosphere';
 
 /** Hard-coded sample review, rendered through the REAL review components. */
 const SAMPLE_REVIEW: ReviewResult = {
@@ -91,6 +92,9 @@ export function ReviewDemo() {
             <Sparkles size={13} className="text-[#F16524]" />
             Live sample
           </span>
+          <div className="mt-6 flex justify-center">
+            <MonoTag>LIVE / SAMPLE</MonoTag>
+          </div>
           <h2 className="mt-7 text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
             <ScrollWords
               text="See a review in action"
@@ -115,8 +119,9 @@ export function ReviewDemo() {
           <motion.div
             whileHover={{ y: -6 }}
             transition={{ type: 'spring', stiffness: 160, damping: 20 }}
-            className="overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.03] shadow-[0_50px_140px_-30px_rgba(0,0,0,0.85)] backdrop-blur-xl"
+            className="relative overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.03] shadow-[0_50px_140px_-30px_rgba(0,0,0,0.85)] backdrop-blur-xl"
           >
+            <HudCorners size={16} inset={16} className="z-20" />
             {/* browser chrome */}
             <div className="flex items-center gap-4 border-b border-white/10 bg-white/[0.02] px-5 py-3.5">
               <div className="flex items-center gap-2">
