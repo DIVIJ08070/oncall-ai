@@ -64,6 +64,9 @@ const EnvSchema = z.object({
   // code review buddy
   GEMINI_API_KEY: strEnv(''),
   CODE_REVIEW_MODEL: strEnv('gemini-2.5-flash'),
+  CODE_REVIEW_ENGINE: strEnv('auto'),
+  CODE_REVIEW_CLAUDE_MODEL: strEnv('claude-sonnet-5'),
+  CLAUDE_CODE_OAUTH_TOKEN: strEnv(''),
   CODE_REVIEW_WATCH_INTERVAL_MS: numEnv(60000),
 
   // ingest / notify
@@ -122,6 +125,11 @@ export interface Config {
     geminiApiKey: string;
     model: string;
     watchIntervalMs: number;
+    /** Review engine priority: 'auto' = Claude first, Gemini fallback. */
+    engine: 'auto' | 'claude' | 'gemini';
+    claudeModel: string;
+    /** Long-lived token from `claude setup-token` — headless subscription auth. */
+    claudeOauthToken: string;
   };
   ingest: {
     apiKey: string;
@@ -197,6 +205,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       geminiApiKey: e.GEMINI_API_KEY,
       model: e.CODE_REVIEW_MODEL,
       watchIntervalMs: e.CODE_REVIEW_WATCH_INTERVAL_MS,
+      engine: (['auto', 'claude', 'gemini'].includes(e.CODE_REVIEW_ENGINE)
+        ? e.CODE_REVIEW_ENGINE
+        : 'auto') as 'auto' | 'claude' | 'gemini',
+      claudeModel: e.CODE_REVIEW_CLAUDE_MODEL,
+      claudeOauthToken: e.CLAUDE_CODE_OAUTH_TOKEN,
     },
     ingest: {
       apiKey: e.INGEST_API_KEY,

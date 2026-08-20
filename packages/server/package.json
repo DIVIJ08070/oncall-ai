@@ -2,7 +2,7 @@
   "name": "@oncall/server",
   "version": "0.1.0",
   "private": true,
-  "description": "@oncall/server — Fastify platform (config loader scaffolded in C1; routes/db land in later chunks).",
+  "description": "@oncall/server \u2014 Fastify platform (config loader scaffolded in C1; routes/db land in later chunks).",
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
@@ -13,6 +13,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.205",
     "@fastify/cors": "^9.0.1",
     "@octokit/rest": "^21.1.1",
     "@oncall/agent": "*",

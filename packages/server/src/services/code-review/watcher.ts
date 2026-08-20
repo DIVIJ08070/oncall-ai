@@ -292,6 +292,7 @@ async function reviewOnePr(
 
   return {
     id: `arev_${randomUUID()}`,
+    ...(result.engine ? { engine: result.engine } : {}),
     watchId: watch.id,
     owner: watch.owner,
     repo: watch.repo,

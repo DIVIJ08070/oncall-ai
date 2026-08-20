@@ -19,6 +19,22 @@ export function ReviewResult({ result }: ReviewResultProps) {
           <p className="mt-1 text-sm text-white/50">
             Overall score across {result.categories.length} categories
           </p>
+          {result.engine && (
+            <span
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-widest text-white/60"
+              title={
+                result.engine === 'claude'
+                  ? 'Reviewed by Claude (subscription) — preferred engine'
+                  : 'Reviewed by Gemini (fallback engine)'
+              }
+            >
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: result.engine === 'claude' ? '#f97316' : '#3b82f6' }}
+              />
+              engine: {result.engine}
+            </span>
+          )}
         </div>
       </div>
 

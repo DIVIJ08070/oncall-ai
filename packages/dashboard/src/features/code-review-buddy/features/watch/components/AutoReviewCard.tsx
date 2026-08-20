@@ -65,6 +65,11 @@ export function AutoReviewCard({ review }: AutoReviewCardProps) {
               {review.owner}/{review.repo} · {review.headSha.slice(0, 7)}
             </span>
             <CommentedBadge commented={review.commented} />
+            {review.engine && (
+              <span className="font-mono text-[10px] uppercase tracking-widest text-white/40">
+                via {review.engine}
+              </span>
+            )}
             <span className="text-xs text-white/40">{timeAgo(review.reviewedAt)}</span>
           </div>
         </div>

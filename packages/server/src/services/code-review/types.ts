@@ -25,6 +25,8 @@ export interface ReviewCategory {
 
 /** `POST /api/v1/code-review` — paste-a-diff review. */
 export interface ReviewResult {
+  /** Which model reviewed: 'claude' (subscription, preferred) or 'gemini' (fallback). */
+  engine?: 'claude' | 'gemini';
   prTitle?: string;
   overallScore: number;
   categories: ReviewCategory[];
@@ -40,6 +42,7 @@ export interface FileReviewResult {
 
 /** `POST /api/v1/code-review/repo` — public GitHub repo scan. */
 export interface RepoReviewResult {
+  engine?: 'claude' | 'gemini';
   overallScore: number;
   repoUrl: string;
   filesReviewed: number;
@@ -76,6 +79,7 @@ export interface WatchedRepo {
 
 /** One stored auto-review of a `(prNumber, headSha)` pair. */
 export interface AutoReview {
+  engine?: 'claude' | 'gemini';
   id: string;
   watchId: string;
   owner: string;

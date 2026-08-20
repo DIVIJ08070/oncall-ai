@@ -1,4 +1,5 @@
 import type { Config } from '../../config.js';
+import { claudeGenerateText } from './claude.js';
 import { buildDiffPrompt, buildFilePrompt } from './prompts.js';
 import {
   CodeReviewError,
@@ -37,6 +38,65 @@ export function assertGeminiConfigured(config: Config): void {
   }
 }
 
+/**
+ * Up-front gate for review routes. Only hard-fails when the config FORCES
+ * Gemini and no key is present; in auto/claude modes the Claude engine may
+ * serve the request, and runtime failures surface a combined message.
+ */
+export function assertReviewEngineAvailable(config: Config): void {
+  if (config.codeReview.engine === 'gemini') assertGeminiConfigured(config);
+}
+
+/* ── engine priority: Claude first (subscription), Gemini fallback ──────── */
+
+export type ReviewEngine = 'claude' | 'gemini';
+
+/** After a Claude failure, skip Claude for a while (a 15-file scan must not
+ *  pay the failure latency 15 times). */
+let claudeCooldownUntil = 0;
+const CLAUDE_COOLDOWN_MS = 5 * 60_000;
+
+async function generateReviewJson(
+  config: Config,
+  prompt: string,
+): Promise<{ raw: unknown; engine: ReviewEngine }> {
+  const mode = config.codeReview.engine; // 'auto' | 'claude' | 'gemini'
+  const tryClaude = mode !== 'gemini' && Date.now() >= claudeCooldownUntil;
+
+  if (tryClaude) {
+    try {
+      const text = await claudeGenerateText(config, prompt);
+      const parsed = parseModelJson(text);
+      if (parsed === undefined) throw new Error('Claude returned unparseable JSON');
+      return { raw: parsed, engine: 'claude' };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (mode === 'claude') {
+        throw err instanceof CodeReviewError
+          ? err
+          : new CodeReviewError(502, 'upstream_error', `The Claude engine failed: ${msg}`);
+      }
+      claudeCooldownUntil = Date.now() + CLAUDE_COOLDOWN_MS;
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[code-review] Claude engine failed (%s) — using Gemini for the next 5 minutes.',
+        msg,
+      );
+    }
+  }
+
+  if (!config.codeReview.geminiApiKey) {
+    throw new CodeReviewError(
+      503,
+      'upstream_error',
+      mode === 'gemini'
+        ? MISSING_KEY_MESSAGE
+        : 'The Claude engine (Claude Code subscription) was unavailable and GEMINI_API_KEY is not set — sign in to Claude Code on this machine or add a Gemini key to .env.',
+    );
+  }
+  return { raw: await generateJson(config, prompt), engine: 'gemini' };
+}
+
 /* ── raw call + lenient JSON extraction ─────────────────────────────────── */
 
 interface GeminiResponse {
@@ -70,6 +130,13 @@ async function generateJson(config: Config, prompt: string): Promise<unknown> {
   });
 
   if (!res.ok) {
+    if (res.status === 429) {
+      throw new CodeReviewError(
+        429,
+        'rate_limited',
+        'Gemini free-tier rate limit reached — wait a minute and retry (or set CLAUDE_CODE_OAUTH_TOKEN so Claude is the primary engine).',
+      );
+    }
     throw new CodeReviewError(
       502,
       'upstream_error',
@@ -165,23 +232,27 @@ export async function reviewDiff(
   config: Config,
   input: { diff: string; prTitle?: string; customRules?: CustomRule[] },
 ): Promise<ReviewResult> {
-  const raw = asRecord(await generateJson(config, buildDiffPrompt(input)));
+  const { raw: rawJson, engine } = await generateReviewJson(config, buildDiffPrompt(input));
+  const raw = asRecord(rawJson);
   return {
     ...(input.prTitle ? { prTitle: input.prTitle } : {}),
     overallScore: clampScore(raw.overallScore),
     categories: normalizeCategories(raw.categories),
     markdownComment:
       typeof raw.markdownComment === 'string' ? raw.markdownComment : '',
+    engine,
   };
 }
 
 export async function reviewFile(
   config: Config,
   input: { filePath: string; content: string; customRules?: CustomRule[] },
-): Promise<{ score: number; categories: ReviewCategory[] }> {
-  const raw = asRecord(await generateJson(config, buildFilePrompt(input)));
+): Promise<{ score: number; categories: ReviewCategory[]; engine: ReviewEngine }> {
+  const { raw: rawJson, engine } = await generateReviewJson(config, buildFilePrompt(input));
+  const raw = asRecord(rawJson);
   return {
     score: clampScore(raw.score),
     categories: normalizeCategories(raw.categories),
+    engine,
   };
 }

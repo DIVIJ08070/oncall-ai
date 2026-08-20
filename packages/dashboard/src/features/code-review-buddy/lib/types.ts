@@ -23,6 +23,8 @@ export interface ReviewCategory {
 
 /** Tab 1 — paste a diff. */
 export interface ReviewResult {
+  /** Which model produced the review: 'claude' (preferred) or 'gemini' (fallback). */
+  engine?: 'claude' | 'gemini';
   prTitle?: string;
   overallScore: number;
   categories: ReviewCategory[];
@@ -38,6 +40,7 @@ export interface FileReviewResult {
 
 /** Tab 2 — public GitHub repo. */
 export interface RepoReviewResult {
+  engine?: 'claude' | 'gemini';
   overallScore: number;
   repoUrl: string;
   filesReviewed: number;
@@ -72,6 +75,7 @@ export interface WatchedRepo {
 
 /** One automatic review of a (prNumber, headSha) pair on a watched repo. */
 export interface AutoReview {
+  engine?: 'claude' | 'gemini';
   id: string;
   watchId: string;
   owner: string;

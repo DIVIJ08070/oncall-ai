@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { AppContext } from '../app.js';
 import { sendError } from '../http/errors.js';
 import {
-  assertGeminiConfigured,
+  assertReviewEngineAvailable,
   reviewDiff,
   reviewFile,
 } from '../services/code-review/gemini.js';
@@ -121,7 +121,7 @@ export function registerCodeReviewRoutes(
 
     try {
       // Fail fast on a missing key (exact 503) before any GitHub traffic.
-      assertGeminiConfigured(config);
+      assertReviewEngineAvailable(config);
 
       const files = await collectRepoFiles(config, ref);
 
@@ -129,17 +129,19 @@ export function registerCodeReviewRoutes(
       const slots: (FileReviewResult | null)[] = new Array<FileReviewResult | null>(
         files.length,
       ).fill(null);
+      let usedEngine: 'claude' | 'gemini' | undefined;
       let cursor = 0;
       async function worker(): Promise<void> {
         while (cursor < files.length) {
           const index = cursor++;
           const file = files[index];
           try {
-            const { score, categories } = await reviewFile(config, {
+            const { score, categories, engine } = await reviewFile(config, {
               filePath: file.path,
               content: file.content,
               ...(customRules ? { customRules } : {}),
             });
+            usedEngine = usedEngine ?? engine;
             slots[index] = { filePath: file.path, score, categories };
           } catch (err) {
             console.log(
@@ -169,6 +171,7 @@ export function registerCodeReviewRoutes(
         fileReviews.reduce((sum, r) => sum + r.score, 0) / fileReviews.length,
       );
       const result: RepoReviewResult = {
+        ...(usedEngine ? { engine: usedEngine } : {}),
         overallScore,
         repoUrl,
         filesReviewed: fileReviews.length,
