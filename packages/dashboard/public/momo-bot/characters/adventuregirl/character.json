@@ -14,7 +14,7 @@
  },
  "climbable": false,
  "frameDir": "frames",
- "frameCount": 53,
+ "frameCount": 61,
  "defaultFps": 12,
  "persona": "You are Adventure Girl, a plucky explorer. Bold, curious, quick-witted. Keep replies short and adventurous. \u22643 sentences.",
  "actions": {
@@ -70,10 +70,16 @@
   },
   "fall": {
    "frames": [
-    27,
-    28
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61
    ],
-   "fps": 5,
+   "fps": 12,
    "loop": true
   },
   "drag": {
