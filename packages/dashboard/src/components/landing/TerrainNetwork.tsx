@@ -18,7 +18,12 @@ const RIDGES: Array<Array<[number, number]>> = [
   [[0.3, 0.45], [0.4, 0.42], [0.5, 0.4], [0.6, 0.38], [0.68, 0.34]],
   [[0.55, 0.3], [0.65, 0.22], [0.75, 0.15], [0.85, 0.12], [0.93, 0.1]],
   [[0.7, 0.55], [0.78, 0.48], [0.86, 0.42], [0.95, 0.35]],
+  [[0.15, 0.85], [0.3, 0.78], [0.45, 0.74], [0.62, 0.7], [0.8, 0.66], [0.95, 0.6]],
+  [[0.42, 0.62], [0.52, 0.56], [0.62, 0.5], [0.72, 0.44], [0.82, 0.36]],
 ];
+
+/** Per-ridge stroke colors for the living circuit lines. */
+const RIDGE_COLORS = ['200,204,220', '255,138,90', '176,123,255', '239,110,80', '200,204,220', '255,138,90'];
 
 /** Glow pockets (image fractions) matching the baked hot zones. */
 const GLOWS = [
@@ -64,14 +69,20 @@ export function TerrainNetwork({ className }: { className?: string }) {
     let ty = 0;
     let cx = 0;
     let cy = 0;
+    let px = -1e4; // pointer in canvas fractions
+    let py = -1e4;
     const onMove = (e: PointerEvent): void => {
       const r = wrap.getBoundingClientRect();
       tx = ((e.clientX - r.left) / r.width - 0.5) * -2;
       ty = ((e.clientY - r.top) / r.height - 0.5) * -2;
+      px = (e.clientX - r.left) / r.width;
+      py = (e.clientY - r.top) / r.height;
     };
     const onLeave = (): void => {
       tx = 0;
       ty = 0;
+      px = -1e4;
+      py = -1e4;
     };
     wrap.addEventListener('pointermove', onMove);
     wrap.addEventListener('pointerleave', onLeave);
@@ -122,6 +133,39 @@ export function TerrainNetwork({ className }: { className?: string }) {
         ctx.fillStyle = grad;
         ctx.fillRect(g.x * W - R, g.y * H - R, R * 2, R * 2);
       }
+
+      // living circuit lines along the ridges — marching dashes that flow
+      // continuously and BRIGHTEN near the cursor (interactive, alive)
+      RIDGES.forEach((ridge, ri) => {
+        const color = RIDGE_COLORS[ri % RIDGE_COLORS.length];
+        // proximity of the pointer to this ridge (nearest sample point)
+        let near = 0;
+        if (px > -100) {
+          for (let k = 0; k <= 10; k++) {
+            const [fx, fy] = pointOn(ridge, k / 10);
+            const d = Math.hypot(fx - px, fy - py);
+            near = Math.max(near, Math.max(0, 1 - d / 0.22));
+          }
+        }
+        ctx.beginPath();
+        ridge.forEach(([fx, fy], i) => {
+          if (i === 0) ctx.moveTo(fx * W, fy * H);
+          else ctx.lineTo(fx * W, fy * H);
+        });
+        ctx.setLineDash([3 * (W / 800), 14 * (W / 800)]);
+        ctx.lineDashOffset = -t * 26 * (1 + near * 3) - ri * 7;
+        ctx.lineWidth = (1 + near * 2.6) * (W / 1400);
+        ctx.strokeStyle = `rgba(${color},${Math.min(1, 0.14 + near * 0.86 + hot * 0.05)})`;
+        ctx.stroke();
+        if (near > 0.35) {
+          // hot segment glow under the cursor
+          ctx.setLineDash([]);
+          ctx.lineWidth = 6 * (W / 1400);
+          ctx.strokeStyle = `rgba(${color},${0.16 * near})`;
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      });
 
       for (const m of motes) {
         m.u += m.speed * (1 + hot * 1.4) * (1 / 60);

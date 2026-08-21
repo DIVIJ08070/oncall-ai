@@ -76,7 +76,7 @@ export function FuturisticHome() {
       />
       <Grain opacity={0.12} />
 
-      <div className="relative mx-auto flex max-w-[1400px] items-start gap-6 p-4 sm:p-6">
+      <div className="relative flex w-full items-start gap-6 p-4 sm:p-6">
         <Sidebar />
 
         <main className="min-w-0 flex-1">
@@ -273,7 +273,7 @@ const SERVICE_CHIPS: {
 
 function Hero() {
   return (
-    <section className="relative min-h-[520px] overflow-hidden rounded-3xl border border-white/10 bg-[#070608]">
+    <section className="relative min-h-[calc(100vh-150px)] overflow-hidden rounded-3xl border border-white/10 bg-[#070608]">
       <TerrainNetwork className="absolute inset-0" />
 
       {/* floating service chips — decorative, cursor passes through to the terrain */}
@@ -323,7 +323,7 @@ function Hero() {
       />
 
       <StaggerGroup
-        className="pointer-events-none relative z-20 flex min-h-[520px] flex-col justify-center gap-6 p-7 sm:p-10 lg:max-w-[58%] lg:p-12"
+        className="pointer-events-none relative z-20 flex min-h-[calc(100vh-150px)] flex-col justify-center gap-6 p-7 sm:p-10 lg:max-w-[58%] lg:p-12"
         delay={0.15}
       >
         <StaggerItem>
