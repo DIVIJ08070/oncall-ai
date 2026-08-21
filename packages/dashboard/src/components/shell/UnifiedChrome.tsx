@@ -7,7 +7,6 @@ import {
   GraduationCap,
   PlayCircle,
   ArrowRight,
-  Moon,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Entrance } from '../motion/primitives';
@@ -66,7 +65,7 @@ export function LogoDiamond({ size = 22 }: { size?: number }) {
 export function UnifiedSidebar() {
   return (
     <Entrance className="sticky top-6 hidden w-[260px] shrink-0 self-start lg:block" y={12}>
-      <GlassCard className="flex max-h-[calc(100vh-48px)] flex-col gap-5 p-4">
+      <GlassCard className="flex h-[calc(100vh-48px)] flex-col gap-5 p-4">
         <Link to="/" className="flex items-center gap-2.5 px-2 pt-1">
           <LogoDiamond />
           <span className="text-[17px] font-bold tracking-tight text-white">OnCall AI</span>
@@ -160,12 +159,6 @@ export function UnifiedTopBar() {
           >
             System Status · All Systems Operational
           </span>
-        </span>
-        <span
-          aria-hidden
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/50"
-        >
-          <Moon className="h-3.5 w-3.5" />
         </span>
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#F16524] to-[#6d4aff] text-[10px] font-bold text-white">
           OA
