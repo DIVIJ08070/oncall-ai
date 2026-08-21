@@ -3,60 +3,60 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 /**
- * TerrainNetwork — the hero's live-infrastructure visualization (master-brief
- * §MAIN 3D VISUALIZATION): a procedurally displaced Three.js mountain terrain
- * (layered FBM noise, irregular, peaks center-right) rendered as near-black
- * ground + faint wireframe + star-dust vertices, with EMISSIVE NETWORK PATHS
- * flowing over the topology (green healthy, orange warning, red critical,
- * purple AI), glowing service nodes, and a FEW slow signal particles drifting
- * along the paths. Every ~16s a subtle incident plays out on the API Gateway
- * path: node warms to red, the path pulses, its particles hurry, then it
- * recovers. Camera drifts almost imperceptibly and parallaxes 1–3% with the
- * mouse. Reduced motion or missing WebGL → static fallback.
+ * TerrainNetwork — the hero mountain, matched to the user's reference image:
+ * a tall, sharp wireframe massif rising diagonally to the upper-right against
+ * pure black. A fine silver NET is draped over the ridges with bright dots at
+ * every mesh intersection; the glow lives IN the mesh — per-vertex colors
+ * paint an ember-orange/crimson flank on the right and two violet pockets —
+ * with soft bloom sprites above the hot zones. Life: bloom breathing, a FEW
+ * slow signal motes tracing ridge lines, a subtle ~16s incident (the crimson
+ * flank flares, motes hurry), and 1–3% mouse parallax. Reduced motion / no
+ * WebGL → static fallback.
  */
 
-const COLORS = {
-  healthy: '#22C55E',
-  warning: '#F16524',
-  critical: '#EF4444',
-  ai: '#8B5CF6',
-} as const;
+const SILVER = new THREE.Color('#a7abbd');
+const EMBER = new THREE.Color('#ff5a28');
+const CRIMSON = new THREE.Color('#ef4444');
+const VIOLET = new THREE.Color('#8B5CF6');
 
-/* ── procedural height field (deterministic) ─────────────────────────────── */
+const W_SEG = 220;
+const H_SEG = 140;
+const SIZE_X = 34;
+const SIZE_Z = 20;
+
+/* ── height field: sharp ridged massif rising toward upper-right ─────────── */
 
 const noise2 = (x: number, z: number): number =>
-  Math.sin(x * 1.35 + Math.sin(z * 1.05) * 1.7) *
-  Math.cos(z * 0.95 + Math.sin(x * 0.75) * 1.35);
+  Math.sin(x * 1.31 + Math.sin(z * 1.07) * 1.9) *
+  Math.cos(z * 0.93 + Math.sin(x * 0.71) * 1.5);
 
-/** Layered ridged FBM + mountain mask: tall center-right/back, flat front-left. */
 function heightAt(x: number, z: number): number {
   let h = 0;
   let amp = 1;
-  let f = 0.42;
-  for (let o = 0; o < 4; o++) {
-    h += (1 - Math.abs(noise2(x * f + o * 11.3, z * f - o * 7.1))) * amp;
-    amp *= 0.52;
-    f *= 2.05;
+  let f = 0.34;
+  for (let o = 0; o < 5; o++) {
+    h += (1 - Math.abs(noise2(x * f + o * 13.7, z * f - o * 5.3))) * amp;
+    amp *= 0.5;
+    f *= 2.1;
   }
-  h /= 1.9;
-  const mask = 0.12 + 0.88 * Math.max(0, 1 - Math.hypot((x - 3.2) / 11.5, (z + 4.2) / 8.5));
-  return Math.pow(h, 1.7) * mask * 3.1;
+  h /= 1.94;
+  // diagonal mask: flat near lower-left, massive toward upper-right (-z = back)
+  const diag = THREE.MathUtils.clamp((x + 10) / 22 + (-z + 8) / 26, 0, 1.15);
+  const mask = 0.06 + Math.pow(diag, 2.1) * 1.15;
+  return Math.pow(h, 2.05) * mask * 6.4;
 }
 
-/** Terrain-following path through XZ waypoints, floated slightly above ground. */
-function makePath(points: Array<[number, number]>): THREE.CatmullRomCurve3 {
-  return new THREE.CatmullRomCurve3(
-    points.map(([x, z]) => new THREE.Vector3(x, heightAt(x, z) + 0.07, z)),
-  );
-}
+/** Glow pockets (world XZ): two hot flanks right, two violet accents. */
+const POCKETS = [
+  { x: 7.0, z: -2.0, r: 4.4, color: EMBER, hot: false },
+  { x: 11.5, z: -5.5, r: 3.6, color: CRIMSON, hot: true }, // incident flank
+  { x: -0.5, z: 1.0, r: 1.7, color: VIOLET, hot: false },
+  { x: 4.8, z: -4.6, r: 1.3, color: VIOLET, hot: false },
+];
 
-interface PathSpec {
-  color: string;
-  curve: THREE.CatmullRomCurve3;
-  motes: number;
+function pocketStrength(x: number, z: number, p: (typeof POCKETS)[number]): number {
+  return Math.max(0, 1 - Math.hypot((x - p.x) / p.r, (z - p.z) / p.r));
 }
-
-/* ── scene ───────────────────────────────────────────────────────────────── */
 
 function glowTexture(): THREE.Texture {
   const c = document.createElement('canvas');
@@ -64,180 +64,158 @@ function glowTexture(): THREE.Texture {
   const g = c.getContext('2d')!;
   const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
   grad.addColorStop(0, 'rgba(255,255,255,1)');
-  grad.addColorStop(0.35, 'rgba(255,255,255,0.35)');
+  grad.addColorStop(0.4, 'rgba(255,255,255,0.3)');
   grad.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = grad;
   g.fillRect(0, 0, 64, 64);
   return new THREE.CanvasTexture(c);
 }
 
+/* ── scene ───────────────────────────────────────────────────────────────── */
+
 function Scene({ reduced }: { reduced: boolean }) {
   const { camera } = useThree();
 
+  /** Displaced, vertex-colored net: silver shaded by height, blended toward
+   *  the pocket hues so the glow follows the mesh exactly like the image. */
   const terrain = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(30, 19, 190, 120);
+    const geo = new THREE.PlaneGeometry(SIZE_X, SIZE_Z, W_SEG, H_SEG);
     geo.rotateX(-Math.PI / 2);
     const pos = geo.getAttribute('position') as THREE.BufferAttribute;
+    const colors = new Float32Array(pos.count * 3);
+    let hMax = 0.001;
+    for (let i = 0; i < pos.count; i++) hMax = Math.max(hMax, heightAt(pos.getX(i), pos.getZ(i)));
+    const tmp = new THREE.Color();
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const z = pos.getZ(i);
-      pos.setY(i, heightAt(x, z));
+      const h = heightAt(x, z);
+      pos.setY(i, h);
+      const shade = 0.28 + 0.72 * Math.pow(h / hMax, 0.85);
+      tmp.copy(SILVER).multiplyScalar(shade);
+      for (const p of POCKETS) {
+        const s = Math.pow(pocketStrength(x, z, p), 1.5);
+        if (s > 0.02) tmp.lerp(p.color, Math.min(0.92, s * 1.05));
+      }
+      colors[i * 3] = tmp.r;
+      colors[i * 3 + 1] = tmp.g;
+      colors[i * 3 + 2] = tmp.b;
     }
     pos.needsUpdate = true;
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     return geo;
   }, []);
 
-  const paths = useMemo<PathSpec[]>(
-    () => [
-      { color: COLORS.healthy, motes: 2, curve: makePath([[-9, 5], [-5.5, 2.5], [-2, 1.5], [1.5, -0.5], [4.5, -2.5]]) },
-      { color: COLORS.healthy, motes: 1, curve: makePath([[-7, -2], [-3.5, -3], [0.5, -4.2], [4, -5]]) },
-      { color: COLORS.warning, motes: 2, curve: makePath([[8.5, 4.5], [5.5, 2.2], [3, 0], [1.5, -2.6], [2.5, -5]]) },
-      { color: COLORS.warning, motes: 1, curve: makePath([[-1, 6], [1.5, 3.5], [3.8, 1.2], [6.5, -1]]) },
-      { color: COLORS.critical, motes: 1, curve: makePath([[7.5, -0.5], [6, -2.2], [6.8, -4.2], [8.5, -3]]) },
-      { color: COLORS.ai, motes: 2, curve: makePath([[-6, 7], [-2.5, 5], [0.5, 2.2], [2.5, -1], [1, -4]]) },
-    ],
-    [],
-  );
-
-  const nodes = useMemo(
-    () => [
-      { pos: new THREE.Vector3(-5.5, heightAt(-5.5, 2.5) + 0.1, 2.5), color: COLORS.healthy },
-      { pos: new THREE.Vector3(4, heightAt(4, -5) + 0.1, -5), color: COLORS.healthy },
-      { pos: new THREE.Vector3(3, heightAt(3, 0) + 0.1, 0), color: COLORS.warning },
-      { pos: new THREE.Vector3(6.5, heightAt(6.5, -1) + 0.1, -1), color: COLORS.warning },
-      { pos: new THREE.Vector3(6.8, heightAt(6.8, -4.2) + 0.1, -4.2), color: COLORS.critical },
-      { pos: new THREE.Vector3(0.5, heightAt(0.5, 2.2) + 0.1, 2.2), color: COLORS.ai },
-    ],
-    [],
-  );
+  /** A handful of crest polylines for the motes to travel. */
+  const crestCurves = useMemo(() => {
+    const curves: THREE.CatmullRomCurve3[] = [];
+    for (const z of [-6.5, -4.5, -2.5, -0.5]) {
+      const pts: THREE.Vector3[] = [];
+      for (let x = -12; x <= 16; x += 1.4) {
+        pts.push(new THREE.Vector3(x, heightAt(x, z) + 0.06, z));
+      }
+      curves.push(new THREE.CatmullRomCurve3(pts));
+    }
+    return curves;
+  }, []);
 
   const tex = useMemo(glowTexture, []);
-  const incidentTube = useRef<THREE.Mesh | null>(null);
-  const incidentNode = useRef<THREE.Sprite | null>(null);
-  const moteRefs = useRef<THREE.Sprite[]>([]);
-  const nodeRefs = useRef<THREE.Sprite[]>([]);
   const world = useRef<THREE.Group>(null);
-  const moteState = useRef(
-    paths.flatMap((p, pi) =>
-      Array.from({ length: p.motes }, (_, k) => ({
-        path: pi,
-        u: (k * 0.47 + pi * 0.19) % 1,
-        speed: 0.014 + (pi % 3) * 0.004, // slow — "few and slow"
-      })),
-    ),
+  const bloomRefs = useRef<THREE.Sprite[]>([]);
+  const moteRefs = useRef<THREE.Sprite[]>([]);
+  const motes = useRef(
+    Array.from({ length: 8 }, (_, i) => ({
+      curve: i % 4,
+      u: (i * 0.37) % 1,
+      speed: 0.011 + (i % 3) * 0.004, // few and slow
+      hue: i % 3 === 0 ? '#ffffff' : i % 3 === 1 ? '#ff8a5a' : '#b07bff',
+    })),
   );
 
   useFrame((state) => {
     if (reduced) return;
     const t = state.clock.elapsedTime;
 
-    // near-imperceptible drift + 1-3% mouse parallax
-    camera.position.x = state.pointer.x * 0.45 + Math.sin(t * 0.05) * 0.15;
-    camera.position.y = 4.6 - state.pointer.y * 0.22;
-    camera.lookAt(0.8, 0.4, -1.5);
-    if (world.current) world.current.rotation.y = Math.sin(t * 0.03) * 0.012;
+    // 1-3% parallax + near-imperceptible drift
+    camera.position.x = -6.2 + state.pointer.x * 0.5 + Math.sin(t * 0.05) * 0.16;
+    camera.position.y = 4.0 - state.pointer.y * 0.25 + Math.sin(t * 0.07) * 0.08;
+    camera.lookAt(4.5, 2.8, -3);
+    if (world.current) world.current.rotation.y = Math.sin(t * 0.028) * 0.01;
 
-    // incident cycle every 16s on the API-Gateway (warning) path
+    // blooms breathe; the crimson flank plays a subtle ~16s incident
     const cycle = (t % 16) / 16;
     const hot = cycle > 0.45 && cycle < 0.75 ? Math.sin(((cycle - 0.45) / 0.3) * Math.PI) : 0;
-    if (incidentTube.current) {
-      const m = incidentTube.current.material as THREE.MeshBasicMaterial;
-      m.color.set(COLORS.warning).lerp(new THREE.Color(COLORS.critical), hot);
-      m.opacity = 0.45 + hot * 0.45 + Math.sin(t * 2.2) * 0.05;
-    }
-    if (incidentNode.current) {
-      incidentNode.current.scale.setScalar(0.55 + hot * 0.5 + Math.sin(t * 3) * 0.04);
-      (incidentNode.current.material as THREE.SpriteMaterial).color
-        .set(COLORS.warning)
-        .lerp(new THREE.Color(COLORS.critical), hot);
-    }
-
-    // slow signal motes; the incident path's motes hurry while hot
-    moteState.current.forEach((m, i) => {
-      const sp = moteRefs.current[i];
+    bloomRefs.current.forEach((sp, i) => {
       if (!sp) return;
-      const rush = m.path === 2 ? 1 + hot * 2.2 : 1;
-      m.u = (m.u + m.speed * rush * (1 / 60)) % 1;
-      sp.position.copy(paths[m.path].curve.getPointAt(m.u));
-      sp.position.y += 0.05;
+      const p = POCKETS[i];
+      const breathe = 0.85 + Math.sin(t * 0.5 + i * 2.1) * 0.15;
+      const mat = sp.material as THREE.SpriteMaterial;
+      mat.opacity = (p.hot ? 0.16 + hot * 0.3 : 0.14) * breathe;
+      sp.scale.setScalar(p.r * (1.6 + (p.hot ? hot * 0.5 : 0)));
     });
 
-    // service nodes breathe softly
-    nodeRefs.current.forEach((sp, i) => {
-      if (sp && i !== 2) sp.scale.setScalar(0.42 + Math.sin(t * 1.1 + i * 1.7) * 0.05);
+    // few slow motes along the ridges; they hurry a little during the flare
+    motes.current.forEach((m, i) => {
+      const sp = moteRefs.current[i];
+      if (!sp) return;
+      m.u = (m.u + m.speed * (1 + hot * 1.6) * (1 / 60)) % 1;
+      sp.position.copy(crestCurves[m.curve].getPointAt(m.u));
     });
   });
 
   return (
-    <group ref={world}>
-      <fog attach="fog" args={['#050505', 9, 27]} />
-      {/* solid near-black ground so the mountain reads as mass, not mesh */}
-      <mesh geometry={terrain} position={[0, -0.02, 0]}>
-        <meshBasicMaterial color="#0a0a0d" />
+    <group ref={world} position={[0, -1.1, 0]}>
+      <fog attach="fog" args={['#030304', 11, 36]} />
+      {/* solid black mass under the net (occludes far side → reads as rock) */}
+      <mesh geometry={terrain} position={[0, -0.03, 0]}>
+        <meshBasicMaterial color="#060608" />
       </mesh>
-      {/* faint wireframe topology */}
+      {/* the draped net */}
       <mesh geometry={terrain}>
-        <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.065} />
+        <meshBasicMaterial vertexColors wireframe transparent opacity={0.34} />
       </mesh>
-      {/* star-dust vertices */}
+      {/* bright dots at every mesh intersection */}
       <points geometry={terrain}>
         <pointsMaterial
-          color="#aab0c8"
-          size={0.036}
+          vertexColors
+          size={0.05}
           sizeAttenuation
           transparent
-          opacity={0.55}
+          opacity={0.9}
           depthWrite={false}
         />
       </points>
-      {/* emissive dependency paths over the terrain */}
-      {paths.map((p, i) => (
-        <mesh
-          key={i}
-          ref={i === 2 ? incidentTube : undefined}
-          geometry={new THREE.TubeGeometry(p.curve, 110, 0.014, 6, false)}
-        >
-          <meshBasicMaterial
-            color={p.color}
-            transparent
-            opacity={0.5}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-      ))}
-      {/* glowing service nodes */}
-      {nodes.map((n, i) => (
+      {/* soft blooms above the hot zones */}
+      {POCKETS.map((p, i) => (
         <sprite
           key={i}
-          position={n.pos}
-          scale={0.42}
+          position={[p.x, heightAt(p.x, p.z) + 0.5, p.z]}
           ref={(s) => {
-            if (s) nodeRefs.current[i] = s;
-            if (i === 2 && s) incidentNode.current = s;
+            if (s) bloomRefs.current[i] = s;
           }}
         >
           <spriteMaterial
             map={tex}
-            color={n.color}
+            color={p.color}
             transparent
+            opacity={0.15}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
         </sprite>
       ))}
       {/* the few slow signal motes */}
-      {moteState.current.map((m, i) => (
+      {motes.current.map((m, i) => (
         <sprite
           key={i}
-          scale={0.16}
+          scale={0.14}
           ref={(s) => {
             if (s) moteRefs.current[i] = s;
           }}
         >
           <spriteMaterial
             map={tex}
-            color={paths[m.path].color}
+            color={m.hue}
             transparent
             blending={THREE.AdditiveBlending}
             depthWrite={false}
@@ -264,14 +242,13 @@ export function TerrainNetwork({ className }: { className?: string }) {
   );
 
   if (!webgl) {
-    // static fallback: layered dark gradient suggesting the ridgeline
     return (
       <div
         aria-hidden
         className={`absolute inset-0 ${className ?? ''}`}
         style={{
           background:
-            'radial-gradient(60% 55% at 68% 42%, rgba(139,92,246,0.14), transparent 65%), radial-gradient(45% 45% at 82% 60%, rgba(239,68,68,0.10), transparent 70%), linear-gradient(200deg, #0b0b0f 0%, #050505 60%)',
+            'radial-gradient(55% 50% at 72% 45%, rgba(239,68,68,0.12), transparent 65%), radial-gradient(35% 35% at 45% 55%, rgba(139,92,246,0.10), transparent 70%), linear-gradient(210deg, #0a0a0d 0%, #030304 60%)',
         }}
       />
     );
@@ -283,10 +260,10 @@ export function TerrainNetwork({ className }: { className?: string }) {
         dpr={[1, 1.75]}
         frameloop={reduced ? 'demand' : 'always'}
         gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
-        camera={{ fov: 42, position: [0, 4.6, 9.5], near: 0.1, far: 40 }}
+        camera={{ fov: 40, position: [-6.2, 4.0, 11.5], near: 0.1, far: 50 }}
         onCreated={({ gl, camera }) => {
           gl.setClearColor(0x000000, 0);
-          camera.lookAt(0.8, 0.4, -1.5);
+          camera.lookAt(4.5, 2.8, -3);
         }}
       >
         <Scene reduced={reduced} />
