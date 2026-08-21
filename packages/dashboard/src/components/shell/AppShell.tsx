@@ -14,12 +14,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* pure black + drifting particle dust — the only console background */}
       <div className="pointer-events-none fixed inset-0">
         <Particles
-          particleCount={140}
+          particleCount={260}
           particleSpread={11}
           speed={0.06}
-          particleColors={['#F16524', '#8a857e', '#6d4aff', '#ffffff']}
+          particleColors={['#ffffff']}
           alphaParticles
-          particleBaseSize={70}
+          particleBaseSize={110}
           sizeRandomness={1}
           disableRotation={false}
           pixelRatio={1.5}

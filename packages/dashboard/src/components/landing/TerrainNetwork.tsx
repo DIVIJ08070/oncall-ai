@@ -168,7 +168,7 @@ export function TerrainNetwork({ className }: { className?: string }) {
         ctx.setLineDash([3 * (W / 800), 14 * (W / 800)]);
         ctx.lineDashOffset = -t * 26 * (1 + near * 3) - ri * 7;
         ctx.lineWidth = (1 + near * 2.6) * (W / 1400);
-        ctx.strokeStyle = `rgba(${color},${Math.min(1, 0.07 + near * 0.8 + hot * 0.04)})`;
+        ctx.strokeStyle = `rgba(${color},${Math.min(1, 0.07 + near * 0.5 + hot * 0.04)})`;
         ctx.stroke();
         if (near > 0.35) {
           // hot segment glow under the cursor
@@ -192,12 +192,12 @@ export function TerrainNetwork({ className }: { className?: string }) {
         const bx = Math.min(Math.max(px * W - tw / 2, 8), W - tw - 8);
         const by = Math.max(py * H - 26 * (W / 1400), fs + 6);
         ctx.globalCompositeOperation = 'source-over';
-        ctx.fillStyle = 'rgba(5,5,7,0.78)';
+        ctx.fillStyle = 'rgba(4,4,6,0.9)';
         ctx.fillRect(bx - 8, by - fs - 5, tw + 16, fs + 12);
-        ctx.strokeStyle = `rgba(${route.color},0.55)`;
+        ctx.strokeStyle = `rgba(${route.color},0.28)`;
         ctx.lineWidth = 1;
         ctx.strokeRect(bx - 8, by - fs - 5, tw + 16, fs + 12);
-        ctx.fillStyle = `rgba(${route.color},1)`;
+        ctx.fillStyle = `rgba(${route.color},0.72)`;
         ctx.fillText(text, bx, by);
         ctx.globalCompositeOperation = 'lighter';
       }
