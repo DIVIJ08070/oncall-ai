@@ -89,6 +89,7 @@ export function makeEdges(nodes: ServiceNode[]): Array<[number, number]> {
 
 export interface NetworkRefs {
   root: THREE.Group;
+  halo: THREE.Sprite;
   nodeMeshes: THREE.Mesh[];
   lines: THREE.LineSegments;
   pulses: THREE.Points;
@@ -123,8 +124,8 @@ export function updateNetwork(net: NetworkRefs, w: WorldState, t: number): void 
   let heal = 0; // 0 → 1 repaired (green)
   if (act === 1) fail = clamp01(ap * 3 - 0.75);
   else if (act === 2) {
-    fail = clamp01(1 - Math.max(0, ap - 0.45) * 3.2);
-    heal = clamp01((ap - 0.55) * 3);
+    fail = clamp01(1 - Math.max(0, ap - 0.35) * 3.2);
+    heal = clamp01((ap - 0.45) * 4);
   } else if (act > 2 && act < 8) heal = 0.6;
   else if (act === 8) heal = 1;
 
@@ -144,12 +145,14 @@ export function updateNetwork(net: NetworkRefs, w: WorldState, t: number): void 
         node.pos.z,
       );
     } else {
-      mat.color.copy(OK).lerp(i === 0 ? GREEN : OK, heal * (i === 0 ? 1 : 0.25));
+      mat.color.copy(OK).lerp(GREEN, heal * (i === 0 ? 1 : 0.45));
       const breathe = 1 + Math.sin(t * 0.9 + i * 1.3) * 0.12;
       mesh.position.copy(node.pos);
-      mesh.scale.setScalar((node.major ? 0.07 : 0.04) * breathe);
+      mesh.scale.setScalar(
+        (node.major ? 0.07 : 0.04) * breathe * (i === 0 && heal > 0.3 ? 1.9 : 1),
+      );
     }
-    if (isFailing) mesh.scale.setScalar(0.09 * flicker);
+    if (isFailing) mesh.scale.setScalar(0.2 * flicker);
     mat.opacity = presence * (node.major ? 0.95 : 0.55);
   });
 
@@ -188,7 +191,8 @@ export function updateNetwork(net: NetworkRefs, w: WorldState, t: number): void 
   });
   (net.lines.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
   (net.lines.geometry.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
-  (net.lines.material as THREE.LineBasicMaterial).opacity = presence * 0.35;
+  (net.lines.material as THREE.LineBasicMaterial).opacity =
+    presence * (fail > 0.02 ? 0.85 : 0.35);
 
   // -- pulses travelling along edges ----------------------------------------
   const ppos = (net.pulses.geometry.getAttribute('position') as THREE.BufferAttribute)
@@ -205,6 +209,23 @@ export function updateNetwork(net: NetworkRefs, w: WorldState, t: number): void 
   const pmat = net.pulses.material as THREE.PointsMaterial;
   pmat.opacity = presence * (fail > 0.3 ? 0.15 : 0.8);
   pmat.color.copy(fail > 0.3 ? FAIL : heal > 0.5 ? GREEN : ORANGE);
+
+  // status halo hugging the payment node — the failure/recovery focal point
+  net.halo.position.copy(net.nodeMeshes[0].position);
+  const haloMat = net.halo.material as THREE.SpriteMaterial;
+  if (fail > 0.02) {
+    net.halo.visible = true;
+    net.halo.scale.setScalar(1.1 + Math.sin(t * 7) * 0.15);
+    haloMat.color.copy(FAIL);
+    haloMat.opacity = 0.75 * fail * flicker * presence;
+  } else if (heal > 0.15) {
+    net.halo.visible = true;
+    net.halo.scale.setScalar(0.9);
+    haloMat.color.copy(GREEN);
+    haloMat.opacity = 0.5 * heal * presence;
+  } else {
+    net.halo.visible = false;
+  }
 
   net.grid.visible = presence > 0.05;
   (net.grid.material as THREE.LineBasicMaterial).opacity = presence * 0.07;
@@ -226,8 +247,23 @@ function makeGridGeometry(): THREE.BufferGeometry {
   return g;
 }
 
+/** Soft radial sprite texture for the status halo. */
+function makeHaloTexture(): THREE.Texture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+  grad.addColorStop(0.4, 'rgba(255,255,255,0.25)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+
 export function NetworkWorldGroup({ onReady }: { onReady: (refs: NetworkRefs) => void }) {
   const nodes = useMemo(makeNodes, []);
+  const haloTex = useMemo(makeHaloTexture, []);
   const edges = useMemo(() => makeEdges(nodes), [nodes]);
   const gridGeom = useMemo(makeGridGeometry, []);
   const built = useRef(false);
@@ -248,6 +284,7 @@ export function NetworkWorldGroup({ onReady }: { onReady: (refs: NetworkRefs) =>
   const linesRef = useRef<THREE.LineSegments | null>(null);
   const pulsesRef = useRef<THREE.Points | null>(null);
   const gridRef = useRef<THREE.LineSegments | null>(null);
+  const haloRef = useRef<THREE.Sprite | null>(null);
   const meshRefs = useRef<THREE.Mesh[]>([]);
 
   const tryReady = (): void => {
@@ -257,11 +294,13 @@ export function NetworkWorldGroup({ onReady }: { onReady: (refs: NetworkRefs) =>
       linesRef.current &&
       pulsesRef.current &&
       gridRef.current &&
+      haloRef.current &&
       meshRefs.current.filter(Boolean).length === nodes.length
     ) {
       built.current = true;
       onReady({
         root: rootRef.current,
+        halo: haloRef.current,
         nodeMeshes: meshRefs.current,
         lines: linesRef.current,
         pulses: pulsesRef.current,
@@ -313,6 +352,18 @@ export function NetworkWorldGroup({ onReady }: { onReady: (refs: NetworkRefs) =>
       >
         <lineBasicMaterial vertexColors transparent opacity={0.35} depthWrite={false} />
       </lineSegments>
+      <sprite
+        ref={(r) => { haloRef.current = r as THREE.Sprite; tryReady(); }}
+        visible={false}
+      >
+        <spriteMaterial
+          map={haloTex}
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          opacity={0}
+        />
+      </sprite>
       <points
         ref={(r) => { pulsesRef.current = r as THREE.Points; tryReady(); }}
         geometry={pulseGeom}

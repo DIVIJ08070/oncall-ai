@@ -1,30 +1,57 @@
-/** ACT 02 — BREAK. 03:17 AM. The dashboard tears itself apart; nobody answers the page. */
+/** ACT 02 — BREAK. 03:17 AM. The 3D world carries the failure now: the payment
+ * node tears red lower-center-right from ap ~0.25 and the diamond edge-enters
+ * from the right at ~0.5 (see DiamondScene poseFor / NetworkWorld
+ * updateNetwork). The DOM stays out of its way — no dashboard, no cards:
+ * three floating log fragments disintegrate as the world fails, huge dim
+ * timestamps rotate past, the colossal statement holds the upper-left, and a
+ * small orange status marks the responder coming online lower-right as the
+ * diamond arrives.
+ *
+ * Timing: the sticky viewport releases at --p = 1 − 100/220 ≈ 0.545; every
+ * entrance completes by then, --out windows sit past 1 so late elements exit
+ * by riding off with the slide (the responder line, pinned near the bottom,
+ * is the last to leave while the fixed-canvas diamond keeps arriving).
+ */
 import type { CSSProperties } from 'react';
 import './ActBreak.css';
 
-const seg = (inP: number, outP: number): CSSProperties =>
-  ({ '--in': inP, '--out': outP }) as CSSProperties;
+const seg = (inP: number, outP: number, extra?: CSSProperties): CSSProperties =>
+  ({ '--in': inP, '--out': outP, ...extra }) as CSSProperties;
 
-const tumble = (dx: number, dy: number, dr: number): CSSProperties =>
-  ({ '--dx': dx, '--dy': dy, '--dr': dr }) as CSSProperties;
+/** --dx/--dy px drift, --dr deg, --fs = the --p at which the fragment's fade begins. */
+const frag = (dx: number, dy: number, dr: number, fs: number): CSSProperties =>
+  ({ '--dx': dx, '--dy': dy, '--dr': dr, '--fs': fs }) as CSSProperties;
 
-const GLASS = 'rounded-md border border-white/10 bg-white/[0.04] backdrop-blur-sm';
-
-/** Error-rate sparkline: flat, flat, then the spike. */
-const BARS = [34, 30, 36, 32, 31, 35, 33, 30, 34, 32, 38, 52, 74, 92, 88, 96];
-
-const LOGS: Array<{ line: string; hot: boolean }> = [
-  { line: '03:17:41  gateway  200  GET /api/v2/orders', hot: false },
-  { line: '03:17:41  auth     200  POST /oauth/token', hot: false },
-  { line: '03:17:42  db       ERR  connection pool exhausted', hot: true },
-  { line: '03:17:42  gateway  502  GET /api/v2/orders', hot: true },
+/** The last log lines on screen — healthy dies first, the ERR next, the
+    unanswered page lingers longest. All clear of the failing payment node
+    (screen ~55–75vw / 60–78vh) and of the statement's upper-left block. */
+const FRAGS: Array<{ text: string; pos: string; cls: string; v: CSSProperties }> = [
+  {
+    text: '03:17:41  gateway  200  GET /api/v2/orders',
+    pos: 'left-[36%] top-[38%]',
+    cls: 'text-white/40',
+    v: frag(280, -380, 8, 0.16),
+  },
+  {
+    text: '03:17:42  db  ERR  connection pool exhausted',
+    pos: 'left-[10%] top-[27%]',
+    cls: 'text-[#FF3B30]/75',
+    v: frag(-420, -220, -10, 0.22),
+  },
+  {
+    text: '03:18:03  pager  r. sharma  paged ×3 · no ack',
+    pos: 'left-[16%] top-[57%]',
+    cls: 'text-white/60',
+    v: frag(-220, 470, -6, 0.28),
+  },
 ];
 
-/** Huge dim timestamps rotating past in sequential windows. */
+/** Huge dim timestamps rotating past in sequential windows, composed to dodge
+    the statement (upper-left, from 0.34) and the failing node (lower-right). */
 const STAMPS: Array<{ text: string; pos: string; rot: number; io: [number, number] }> = [
-  { text: '03:17:42', pos: 'left-[4%] top-[9%]', rot: -3, io: [0.02, 0.28] },
-  { text: '03:18:07', pos: 'right-[3%] top-[32%]', rot: 2.5, io: [0.22, 0.44] },
-  { text: '03:18:15', pos: 'left-[7%] bottom-[12%]', rot: -2, io: [0.36, 0.58] },
+  { text: '03:17:42', pos: 'left-[4%] top-[6%]', rot: -3, io: [0.02, 0.2] },
+  { text: '03:18:07', pos: 'right-[3%] top-[30%]', rot: 2.5, io: [0.16, 0.34] },
+  { text: '03:18:15', pos: 'left-[6%] bottom-[10%]', rot: -2, io: [0.3, 0.48] },
 ];
 
 export function ActBreak() {
@@ -42,95 +69,37 @@ export function ActBreak() {
         </div>
       ))}
 
-      {/* the mini-dashboard: assembled at --p 0, disintegrates as --p grows */}
-      <div className="absolute left-1/2 top-[45%] w-[min(88vw,56rem)] -translate-x-1/2 -translate-y-1/2">
-        <div className="grid grid-cols-3 gap-3 text-left">
-          <div
-            className={`ns-break-card ${GLASS} col-span-3 flex items-center justify-between px-4 py-2.5`}
-            style={tumble(60, -340, -8)}
-          >
-            <span className="ns-mono text-[10px] uppercase tracking-[0.3em] text-white/45">
-              prod-dashboard
-            </span>
-            <span className="ns-mono text-[10px] text-white/30">live · 03:17 AM</span>
-          </div>
-
-          <div className={`ns-break-card ${GLASS} col-span-2 p-4`} style={tumble(-430, -180, -13)}>
-            <p className="ns-mono text-[10px] uppercase tracking-[0.25em] text-white/40">
-              error rate
-            </p>
-            <div className="mt-3 flex h-16 items-end gap-[3px]">
-              {BARS.map((h, i) => (
-                <span
-                  key={i}
-                  className={`flex-1 ${i >= BARS.length - 5 ? 'bg-white/70' : 'bg-white/20'}`}
-                  style={{ height: `${h}%` }}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className={`ns-break-card ${GLASS} p-4`} style={tumble(440, -260, 11)}>
-            <p className="ns-mono text-[10px] uppercase tracking-[0.25em] text-white/40">
-              p99 latency
-            </p>
-            <p className="ns-mono mt-3 text-2xl text-white/90">
-              2,340<span className="text-sm text-white/50"> ms</span>
-            </p>
-            <p className="ns-mono mt-1 text-[10px] text-white/50">▲ 612% vs 1h ago</p>
-          </div>
-
-          <div className={`ns-break-card ${GLASS} col-span-2 p-4`} style={tumble(-520, 150, 7)}>
-            <p className="ns-mono text-[10px] uppercase tracking-[0.25em] text-white/40">services</p>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {['api-gateway', 'auth', 'payments', 'search', 'cdn', 'db-primary'].map((s) => (
-                <span
-                  key={s}
-                  className="ns-mono rounded-full border border-white/15 px-2.5 py-0.5 text-[10px] text-white/50"
-                >
-                  {s}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className={`ns-break-card ${GLASS} p-4`} style={tumble(500, 260, 18)}>
-            <p className="ns-mono text-[10px] uppercase tracking-[0.25em] text-white/40">on-call</p>
-            <p className="ns-mono mt-3 text-sm text-white/80">r. sharma</p>
-            <p className="ns-mono mt-1 text-[10px] text-white/50">paged ×3 · no ack</p>
-          </div>
-
-          <div className={`ns-break-card ${GLASS} col-span-3 p-4`} style={tumble(-140, 420, -5)}>
-            {LOGS.map((l) => (
-              <p
-                key={l.line}
-                className={`ns-mono whitespace-pre text-[10px] leading-relaxed ${
-                  l.hot ? 'text-white/80' : 'text-white/35'
-                }`}
-              >
-                {l.line}
-              </p>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* the biggest statement of the act — silence around it */}
-      <div className="absolute inset-0 flex items-center justify-center px-6">
-        <h2
-          className="ns-seg ns-display text-center text-white"
-          style={{ ...seg(0.45, 0.88), fontSize: 'clamp(3rem, 10.5vw, 11rem)' }}
+      {/* the last log lines — assembled at --p 0, torn apart as the world fails */}
+      {FRAGS.map((f) => (
+        <p
+          key={f.text}
+          className={`ns-break-frag ns-mono absolute text-[11px] md:text-xs ${f.pos} ${f.cls}`}
+          style={f.v}
         >
-          Your on-call
-          <br />
-          engineer
-          <br />
-          is asleep.
-        </h2>
-      </div>
+          {f.text}
+        </p>
+      ))}
 
-      {/* the responder comes online — canvas diamond enters center-right on this window */}
-      <div className="ns-seg absolute bottom-[16%] left-[8%] md:left-[12%]" style={seg(0.78, 1.2)}>
+      {/* the statement — colossal, upper-left, silence around it; lands while
+          pinned as the last fragments die, rides off with the slide-out */}
+      <h2
+        className="ns-display pointer-events-none absolute left-[4vw] top-[8vh] text-white"
+        style={{ fontSize: 'clamp(2.75rem, 10vw, 10.5rem)' }}
+      >
+        <span className="ns-seg block" style={seg(0.34, 1.2, { '--rise': '40px' } as CSSProperties)}>
+          Your on-call
+        </span>
+        <span className="ns-seg block" style={seg(0.38, 1.2, { '--rise': '40px' } as CSSProperties)}>
+          engineer
+        </span>
+        <span className="ns-seg block" style={seg(0.42, 1.2, { '--rise': '40px' } as CSSProperties)}>
+          is asleep.
+        </span>
+      </h2>
+
+      {/* the responder comes online — lower-right, as the diamond edge-enters
+          (~0.5); anchored near the bottom, so it is the last DOM to ride off */}
+      <div className="ns-seg absolute bottom-[10%] right-[5%] text-right" style={seg(0.48, 1.3)}>
         <p className="ns-mono text-xs font-medium tracking-[0.32em] text-[#F16524]">
           AI RESPONDER · ONLINE
         </p>

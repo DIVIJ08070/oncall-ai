@@ -1,19 +1,25 @@
-/* ACT 02 — BREAK: dashboard pieces tumble apart as the act's --p grows.
-   Each piece hardcodes --dx/--dy (px) and --dr (deg); displacement scales
-   linearly with --p, opacity collapses past ~0.45 (gone by ~0.78). */
-.ns-break-card {
+/* ACT 02 — BREAK: floating log fragments disintegrate as the act's --p grows.
+   Each fragment hardcodes --dx/--dy (px) and --dr (deg); displacement and
+   rotation scale linearly with --p from an assembled state at 0. From --fs
+   (per-fragment fade start) the letters spread apart and opacity collapses,
+   fully gone 0.25 later. Pure CSS from the section's --p — no listeners. */
+.ns-break-frag {
+  --gone: clamp(0, (var(--p, 0) - var(--fs, 0.3)) * 4, 1);
   transform: translate(
       calc(var(--dx, 0) * var(--p, 0) * 1px),
       calc(var(--dy, 0) * var(--p, 0) * 1px)
     )
     rotate(calc(var(--dr, 0) * var(--p, 0) * 1deg));
-  opacity: clamp(0, 1 - (var(--p, 0) - 0.45) * 3, 1);
+  letter-spacing: calc(var(--gone) * 0.5em);
+  opacity: calc(1 - var(--gone));
+  white-space: nowrap;
   will-change: transform, opacity;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ns-break-card {
+  .ns-break-frag {
     transform: none;
     opacity: 1;
+    letter-spacing: normal;
   }
 }

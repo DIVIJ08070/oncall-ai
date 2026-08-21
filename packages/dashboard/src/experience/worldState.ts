@@ -53,12 +53,17 @@ export function computeWorld(scrollY: number, vw: number, vh: number): WorldStat
 
   let acc = 0;
   for (let i = 0; i < ACTS.length; i++) {
-    const span = px[i] - (i === ACTS.length - 1 ? vh : 0);
-    if (scrollY < acc + span || i === ACTS.length - 1) {
-      const ap = clamp01(span > 0 ? (scrollY - acc) / span : 1);
+    const extent = px[i] - (i === ACTS.length - 1 ? vh : 0);
+    if (scrollY < acc + extent || i === ACTS.length - 1) {
+      // Normalize over the PINNED span (section height minus one viewport):
+      // the sticky frame releases after that, so ap must reach 1 while the
+      // act is still fully on screen. The final viewport of each section
+      // holds the completed state as the frame slides away.
+      const pinned = Math.max(px[i] - vh, 1);
+      const ap = clamp01((scrollY - acc) / pinned);
       return { wp, act: i, ap, vw, vh };
     }
-    acc += span;
+    acc += extent;
   }
   return { wp, act: ACTS.length - 1, ap: 1, vw, vh };
 }

@@ -1,10 +1,11 @@
 /** ACT 03 — THE INCIDENT ENGINE. A spatial timeline the camera travels:
  *  DETECT → INVESTIGATE → FIX → VERIFY. The act's --p (written on
  *  <section data-ns-act="engine"> by the scroll engine) drives a 260vw plane
- *  via translateX; the canvas diamond rides the same rail (keyframed in
- *  WorldCanvas — we never draw our own). Every reveal below is a pure
- *  function of --p: .ns-seg windows, .ns-char indices, inline clamp() math.
- *  No listeners, no rAF.
+ *  via translateX; the canvas diamond rides the same rail LOW in frame
+ *  (pose y -0.25, rail at 60vh) — so every DOM composition sits HIGH and the
+ *  3D world shows through beneath. Every reveal is a pure function of --p:
+ *  .ns-seg windows, .ns-char indices, inline clamp() math. No listeners,
+ *  no rAF.
  *
  *  TIMING: the sticky frame stays pinned only while --p ∈ [0, (340-100)/340
  *  ≈ 0.706] — after that the whole screen scrolls away (the act handoff).
@@ -58,11 +59,12 @@ const DIFF: ReadonlyArray<{ kind: 'meta' | 'ctx' | 'del' | 'add'; text: string }
   { kind: 'ctx', text: '  }' },
 ];
 
+/* failure red #FF3B30 · recovery green #52D273 (art direction) */
 const DIFF_STYLE: Record<'meta' | 'ctx' | 'del' | 'add', CSS> = {
   meta: { color: 'rgba(255,255,255,0.32)' },
   ctx: { color: 'rgba(255,255,255,0.45)' },
-  del: { color: 'rgba(229,83,75,0.92)', background: 'rgba(229,83,75,0.07)' },
-  add: { color: 'rgba(63,185,80,0.92)', background: 'rgba(63,185,80,0.07)' },
+  del: { color: 'rgba(255,59,48,0.92)', background: 'rgba(255,59,48,0.07)' },
+  add: { color: 'rgba(82,210,115,0.92)', background: 'rgba(82,210,115,0.07)' },
 };
 
 /* ── ZONE VERIFY ─────────────────────────────────────────────────────── */
@@ -123,21 +125,21 @@ export function ActEngine() {
         {ZONE_TAGS.map((tag, i) => (
           <p
             key={tag}
-            className="ns-mono absolute top-[9vh] text-[10px] tracking-[0.34em] text-white/25"
+            className="ns-mono absolute top-[7vh] text-[10px] tracking-[0.34em] text-white/25"
             style={{ left: `${i * 65 + 6}vw` }}
           >
             {tag}
           </p>
         ))}
 
-        {/* ── ZONE DETECT (0–65vw) ── */}
-        <div className="absolute top-0 flex h-[56vh] w-[65vw] items-center justify-center px-[5vw]" style={{ left: 0 }}>
+        {/* ── ZONE DETECT (0–65vw) — the failure, in red ── */}
+        <div className="absolute top-0 flex h-[54vh] w-[65vw] items-center justify-center px-[5vw]" style={{ left: 0 }}>
           <div className="flex flex-col items-start">
-            <div className="ns-mono whitespace-pre text-[10px] leading-[1.75] md:text-[11px]">
+            <div className="ns-mono whitespace-pre text-xs leading-[1.8] md:text-[13px]">
               {LOGS.map((l, i) => (
                 <p
                   key={l.text}
-                  className={`ns-seg ${l.hot ? 'text-[#FF8233]' : 'text-white/35'}`}
+                  className={`ns-seg ${l.hot ? 'text-[#FF3B30]' : 'text-white/35'}`}
                   style={seg(l.hot ? 0.04 : -0.08 + i * 0.0132, 0.33, 14)}
                 >
                   {l.text}
@@ -146,8 +148,8 @@ export function ActEngine() {
             </div>
             {/* the moment: per-character materialize via .ns-char */}
             <p
-              className="ns-seg ns-display mt-8 text-4xl text-[#F16524] md:text-6xl"
-              style={{ ...seg(-0.2, 0.37, 0), textShadow: '0 0 30px rgba(241,101,36,0.35)' }}
+              className="ns-seg ns-display mt-8 text-[clamp(2.5rem,5.2vw,5rem)] text-[#FF3B30]"
+              style={{ ...seg(-0.2, 0.37, 0), textShadow: '0 0 34px rgba(255,59,48,0.35)' }}
               data-e2e="engine-errorline"
             >
               {ERROR_LINE.map((c, i) => (
@@ -159,14 +161,14 @@ export function ActEngine() {
           </div>
         </div>
 
-        {/* ── ZONE INVESTIGATE (65–130vw) ── */}
-        <div className="absolute top-0 flex h-[56vh] w-[65vw] items-center justify-center px-[5vw]" style={{ left: '65vw' }}>
+        {/* ── ZONE INVESTIGATE (65–130vw) — squared terminal, hairline border ── */}
+        <div className="absolute top-0 flex h-[54vh] w-[65vw] items-center justify-center px-[5vw]" style={{ left: '65vw' }}>
           <div
-            className="ns-seg w-full max-w-[560px] rounded-md border border-white/10 bg-white/[0.045] p-6 shadow-2xl backdrop-blur-md md:p-7"
+            className="ns-seg w-full max-w-[640px] border border-white/10 bg-[#030303]/60 p-6 md:p-8"
             style={seg(0.092, 0.42)}
             data-e2e="engine-terminal"
           >
-            <div className="ns-mono flex flex-col gap-2 text-left text-xs leading-relaxed md:text-sm">
+            <div className="ns-mono flex flex-col gap-2.5 text-left text-sm leading-relaxed md:text-base xl:text-lg">
               {TERMINAL.map((line) => (
                 <p
                   key={line.text}
@@ -189,14 +191,14 @@ export function ActEngine() {
           </div>
         </div>
 
-        {/* ── ZONE FIX (130–195vw) ── */}
-        <div className="absolute top-0 flex h-[56vh] w-[65vw] items-center justify-center px-[5vw]" style={{ left: '130vw' }}>
+        {/* ── ZONE FIX (130–195vw) — the diff, floating, no chrome ── */}
+        <div className="absolute top-0 flex h-[54vh] w-[65vw] items-center justify-center px-[5vw]" style={{ left: '130vw' }}>
           <div className="flex flex-col items-start">
-            <div className="ns-mono whitespace-pre text-sm leading-relaxed lg:text-lg xl:text-2xl">
+            <div className="ns-mono whitespace-pre text-base leading-relaxed lg:text-xl xl:text-2xl">
               {DIFF.map((l, i) => (
                 <p
                   key={l.text}
-                  className={`ns-seg rounded-sm ${l.kind === 'meta' ? 'mb-2 text-xs lg:text-sm' : 'px-2'}`}
+                  className={`ns-seg ${l.kind === 'meta' ? 'mb-2 text-sm lg:text-base' : 'px-2'}`}
                   style={{ ...seg(0.29 + i * 0.0145, 0.7, 20), ...DIFF_STYLE[l.kind] }}
                 >
                   {l.text}
@@ -204,12 +206,12 @@ export function ActEngine() {
               ))}
             </div>
             <div
-              className="ns-seg mt-8 inline-flex items-center gap-3 rounded-md border border-white/10 bg-white/[0.05] px-5 py-3.5 shadow-xl backdrop-blur-md"
+              className="ns-seg mt-8 inline-flex items-center gap-3 border border-white/10 bg-[#030303]/60 px-5 py-3.5"
               style={seg(0.435, 0.75)}
               data-e2e="engine-pr"
             >
-              <span className="h-2 w-2 rounded-full bg-[#3fb950]" />
-              <span className="ns-mono text-xs text-white/80 md:text-sm">
+              <span className="h-2 w-2 rounded-full bg-[#52D273]" />
+              <span className="ns-mono text-sm text-white/80 md:text-base">
                 PULL REQUEST OPENED · <span className="font-bold text-[#F16524]">#1842</span>
                 <span className="text-white/45"> · fix: null payment session</span>
               </span>
@@ -217,16 +219,12 @@ export function ActEngine() {
           </div>
         </div>
 
-        {/* ── ZONE VERIFY (195–260vw) ── */}
+        {/* ── ZONE VERIFY (195–260vw) — floating chart, then RECOVERED. colossal ── */}
         <div
-          className="absolute top-0 flex h-[58vh] w-[65vw] flex-col items-center justify-center px-[5vw]"
+          className="absolute top-0 flex h-full w-[65vw] flex-col items-center px-[5vw] pt-[7vh]"
           style={{ left: '195vw', '--vv': 'clamp(0, (var(--p, 0) - 0.515) * 6.9, 1)' } as CSS}
         >
-          <div
-            className="ns-seg rounded-lg border border-white/10 bg-white/[0.04] p-5 backdrop-blur-md"
-            style={seg(0.475, 1.4, 24)}
-            data-e2e="engine-chart"
-          >
+          <div className="ns-seg flex flex-col items-start" style={seg(0.475, 1.4, 24)} data-e2e="engine-chart">
             <p className="ns-mono mb-3 text-[10px] tracking-[0.3em] text-white/35">
               ERROR RATE · PAYMENTS-SERVICE
             </p>
@@ -235,17 +233,17 @@ export function ActEngine() {
                 <line x1={8} y1={24} x2={352} y2={24} stroke="rgba(255,255,255,0.07)" strokeDasharray="3 5" />
                 <line x1={8} y1={140} x2={352} y2={140} stroke="rgba(255,255,255,0.07)" strokeDasharray="3 5" />
                 {/* the curve heals: red → orange → green, all from --vv (⇐ --p) */}
-                <path d={CURVE} fill="none" stroke="#e5534b" strokeWidth={2.5}
+                <path d={CURVE} fill="none" stroke="#FF3B30" strokeWidth={2.5}
                   style={{ opacity: 'calc(1 - clamp(0, var(--vv) * 2.2, 1))' } as CSS} />
                 <path d={CURVE} fill="none" stroke="#F16524" strokeWidth={2.5}
                   style={{ opacity: 'clamp(0, min(var(--vv) * 4, (0.85 - var(--vv)) * 4), 1)' } as CSS} />
-                <path d={CURVE} fill="none" stroke="#3fb950" strokeWidth={2.5}
+                <path d={CURVE} fill="none" stroke="#52D273" strokeWidth={2.5}
                   style={{ opacity: 'clamp(0, (var(--vv) - 0.55) * 3.3, 1)' } as CSS} />
               </svg>
               <span className="ns-mono absolute left-2 top-1 text-[9px] text-white/30">17.4%</span>
               <span className="ns-mono absolute bottom-1 right-2 text-[9px] text-white/30">
                 0.02%
-                <span className="absolute inset-0 text-[#3fb950]"
+                <span className="absolute inset-0 text-[#52D273]"
                   style={{ opacity: 'clamp(0, (var(--vv) - 0.75) * 4, 1)' } as CSS}>
                   0.02%
                 </span>
@@ -262,8 +260,8 @@ export function ActEngine() {
             </div>
           </div>
           <h2
-            className="ns-seg ns-display mt-10 text-5xl text-white md:text-7xl"
-            style={seg(0.585, 1.4)}
+            className="ns-seg ns-display mt-[4vh] whitespace-nowrap text-[clamp(4rem,11vw,11.5rem)] leading-[0.9] text-[#F5F5F2]"
+            style={seg(0.575, 1.4)}
             data-e2e="engine-recovered"
           >
             Recovered.

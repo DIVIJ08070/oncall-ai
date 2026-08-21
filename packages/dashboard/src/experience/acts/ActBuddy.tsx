@@ -21,7 +21,7 @@ export function ActBuddy() {
           NIGHT SHIFT · DAY SHIFT
         </p>
         <h2
-          className="ns-seg ns-display mt-6 text-[clamp(3rem,7vw,6.75rem)] text-[#F5F5F2]"
+          className="ns-seg ns-display mt-6 text-[clamp(3.5rem,9.5vw,9rem)] text-[#F5F5F2]"
           style={seg(0.07, 0.31)}
         >
           Code Review Buddy
