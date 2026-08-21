@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
-import { TopBar } from './TopBar';
-import { SideNav } from './SideNav';
+import { UnifiedSidebar, UnifiedTopBar } from './UnifiedChrome';
 import { BottomTabBar } from './BottomTabBar';
 import { CursorSpotlight } from './CursorSpotlight';
 import { Grain, AtmosphereBackdrop, Scanlines, ScanSweep } from '../atmosphere';
@@ -20,18 +19,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Grain />
       <CursorSpotlight />
       {/* Content sits above the ambient + atmosphere layers. */}
-      <div className="relative z-10 flex min-h-screen flex-col">
-        <TopBar />
-        <div className="flex flex-1">
-          <SideNav />
-          <main className="min-w-0 flex-1 pb-16 sm:pb-0">
-            <div className="mx-auto w-full max-w-[1280px] p-3 sm:p-4 lg:p-6">
-              {children}
-            </div>
-          </main>
-        </div>
-        <BottomTabBar />
+      <div className="relative z-10 flex w-full items-start gap-6 p-4 sm:p-6">
+        <UnifiedSidebar />
+        <main className="min-w-0 flex-1 pb-16 sm:pb-0">
+          <UnifiedTopBar />
+          <div className="mx-auto w-full max-w-[1280px]">{children}</div>
+        </main>
       </div>
+      <BottomTabBar />
     </div>
   );
 }

@@ -26,7 +26,7 @@ const ROUTES: Array<{
 }> = [
   {
     path: [[0.361, 0.577], [0.428, 0.628], [0.483, 0.599], [0.539, 0.491], [0.605, 0.504], [0.661, 0.383], [0.727, 0.402], [0.783, 0.354], [0.872, 0.37], [0.894, 0.383]],
-    color: '200,204,220', label: 'CHECKOUT \u2192 DATABASE', base: 96,
+    color: '132,138,160', label: 'CHECKOUT \u2192 DATABASE', base: 96,
   },
   {
     path: [[0.305, 0.478], [0.35, 0.456], [0.394, 0.475], [0.438, 0.434], [0.483, 0.491], [0.528, 0.424], [0.594, 0.37], [0.65, 0.296], [0.694, 0.322], [0.739, 0.233]],
@@ -38,7 +38,7 @@ const ROUTES: Array<{
   },
   {
     path: [[0.127, 0.59], [0.172, 0.58], [0.205, 0.599], [0.239, 0.577], [0.272, 0.539], [0.305, 0.593], [0.339, 0.65], [0.372, 0.654], [0.394, 0.67]],
-    color: '200,204,220', label: 'USER-SERVICE \u2192 CACHE', base: 63,
+    color: '132,138,160', label: 'USER-SERVICE \u2192 CACHE', base: 63,
   },
   {
     path: [[0.028, 0.743], [0.072, 0.736], [0.094, 0.692], [0.117, 0.711], [0.139, 0.701], [0.161, 0.717], [0.183, 0.708], [0.227, 0.736], [0.25, 0.698], [0.272, 0.676], [0.283, 0.67]],
@@ -168,7 +168,7 @@ export function TerrainNetwork({ className }: { className?: string }) {
         ctx.setLineDash([3 * (W / 800), 14 * (W / 800)]);
         ctx.lineDashOffset = -t * 26 * (1 + near * 3) - ri * 7;
         ctx.lineWidth = (1 + near * 2.6) * (W / 1400);
-        ctx.strokeStyle = `rgba(${color},${Math.min(1, 0.14 + near * 0.86 + hot * 0.05)})`;
+        ctx.strokeStyle = `rgba(${color},${Math.min(1, 0.07 + near * 0.8 + hot * 0.04)})`;
         ctx.stroke();
         if (near > 0.35) {
           // hot segment glow under the cursor
