@@ -262,9 +262,19 @@ function BrainScene({
     Array.from({ length: PULSE_COUNT }, (_, i) => ({ u: (i * 0.31) % 1, speed: 0.05 + (i % 3) * 0.02 })),
   );
   const [hovered, setHovered] = useState<number | null>(null);
+  const [shown, setShown] = useState<number | null>(null);
   useCursor(hovered != null);
+  // dwell: the tooltip appears only once the hover settles, so passing the
+  // cursor across the brain never flashes glitchy panels
+  useEffect(() => {
+    if (hovered == null) {
+      const t = window.setTimeout(() => setShown(null), 120);
+      return () => window.clearTimeout(t);
+    }
+    const t = window.setTimeout(() => setShown(hovered), 160);
+    return () => window.clearTimeout(t);
+  }, [hovered]);
   const touchLocal = useRef<THREE.Vector3 | null>(null);
-  const touchGlow = useRef<THREE.Sprite | null>(null);
   const boosted = useRef<number[]>([]);
   const tmpV = useRef(new THREE.Vector3());
 
@@ -328,60 +338,42 @@ function BrainScene({
     }
 
     // ── cursor touch: nearby neurons flare, then relax ──
-    const colAttr = graph.ambient.getAttribute('color') as THREE.BufferAttribute;
     const posAttr = graph.ambient.getAttribute('position') as THREE.BufferAttribute;
-    const colArr = colAttr.array as Float32Array;
     const posArr = posAttr.array as Float32Array;
     if (boosted.current.length) {
       for (const i of boosted.current) {
-        colArr[i * 3] = graph.baseColors[i * 3];
-        colArr[i * 3 + 1] = graph.baseColors[i * 3 + 1];
-        colArr[i * 3 + 2] = graph.baseColors[i * 3 + 2];
         posArr[i * 3] = graph.basePositions[i * 3];
         posArr[i * 3 + 1] = graph.basePositions[i * 3 + 1];
         posArr[i * 3 + 2] = graph.basePositions[i * 3 + 2];
       }
       boosted.current = [];
-      colAttr.needsUpdate = true;
       posAttr.needsUpdate = true;
     }
     const touch = touchLocal.current;
     if (touch) {
-      const R2 = 0.55 * 0.55;
+      const R2 = 0.7 * 0.7;
       for (let i = 0; i < posAttr.count; i++) {
         const dx = posAttr.getX(i) - touch.x;
         const dy = posAttr.getY(i) - touch.y;
         const dz = posAttr.getZ(i) - touch.z;
         const d2 = dx * dx + dy * dy + dz * dz;
         if (d2 < R2) {
-          const fall = 1 - Math.sqrt(d2) / 0.55;
-          const k = 1 + 2.4 * fall;
-          colArr[i * 3] = Math.min(1, graph.baseColors[i * 3] * k);
-          colArr[i * 3 + 1] = Math.min(1, graph.baseColors[i * 3 + 1] * k);
-          colArr[i * 3 + 2] = Math.min(1, graph.baseColors[i * 3 + 2] * k);
-          // physical reaction: the dots bulge outward and shiver under the cursor
+          const d = Math.sqrt(d2) || 0.001;
+          const fall = 1 - d / 0.7;
+          // physical reaction only: dots PART AWAY from the cursor and quiver,
+          // then spring back — no colour/light change
           const bx = graph.basePositions[i * 3];
           const by = graph.basePositions[i * 3 + 1];
           const bz = graph.basePositions[i * 3 + 2];
-          const len = Math.sqrt(bx * bx + by * by + bz * bz) || 1;
-          const lift = 0.16 * fall * fall;
-          const jig = 0.02 * fall;
-          posArr[i * 3] = bx + (bx / len) * lift + Math.sin(t * 31 + i) * jig;
-          posArr[i * 3 + 1] = by + (by / len) * lift + Math.cos(t * 27 + i * 1.3) * jig;
-          posArr[i * 3 + 2] = bz + (bz / len) * lift;
+          const push = 0.3 * fall * fall;
+          const jig = 0.014 * fall;
+          posArr[i * 3] = bx + (dx / d) * push + Math.sin(t * 29 + i) * jig;
+          posArr[i * 3 + 1] = by + (dy / d) * push + Math.cos(t * 24 + i * 1.3) * jig;
+          posArr[i * 3 + 2] = bz + (dz / d) * push;
           boosted.current.push(i);
         }
       }
-      colAttr.needsUpdate = true;
       posAttr.needsUpdate = true;
-      if (touchGlow.current) {
-        touchGlow.current.visible = true;
-        touchGlow.current.position.copy(touch);
-        touchGlow.current.scale.setScalar(0.5 + Math.sin(t * 6) * 0.06);
-        (touchGlow.current.material as THREE.SpriteMaterial).opacity = 0.5;
-      }
-    } else if (touchGlow.current) {
-      touchGlow.current.visible = false;
     }
     pulseState.current.forEach((p, i) => {
       const sp = pulseRefs.current[i];
@@ -396,9 +388,9 @@ function BrainScene({
     });
   });
 
-  const hoveredLearning = hovered != null ? memories[hovered] : null;
+  const hoveredLearning = shown != null ? memories[shown] : null;
   const hoveredPos =
-    hovered != null ? graph.memorySlots[hovered % graph.memorySlots.length] : null;
+    shown != null ? graph.memorySlots[shown % graph.memorySlots.length] : null;
 
   return (
     <>
@@ -474,17 +466,6 @@ function BrainScene({
           <sphereGeometry args={[1, 24, 24]} />
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>
-        {/* cursor touch glow riding the cortex */}
-        <sprite ref={touchGlow} visible={false} scale={0.5}>
-          <spriteMaterial
-            map={tex}
-            color="#FF8233"
-            transparent
-            opacity={0.5}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </sprite>
         {/* faint inner life — small, so the cortex silhouette stays crisp */}
         <sprite scale={1.1}>
           <spriteMaterial
@@ -528,7 +509,7 @@ function BrainScene({
                 depthWrite={false}
               />
             </sprite>
-            <Html position={hoveredPos} center distanceFactor={5.5} zIndexRange={[30, 0]}>
+            <Html position={hoveredPos} center zIndexRange={[30, 0]}>
               <div
                 className="pointer-events-none w-max max-w-[260px] -translate-y-10 rounded-lg border border-white/15 bg-black/85 px-3 py-2 backdrop-blur-sm"
                 style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}
