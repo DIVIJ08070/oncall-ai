@@ -1,11 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight, ChevronDown, Play, Sparkles } from 'lucide-react';
-import { GlowBackground, Magnet } from '../ui';
-import {
-  Parallax,
-  ScrollReveal,
-  ScrollWords,
-} from '../../../../components/motion/scroll';
+import { Magnet } from '../ui';
+import { ScrollReveal, ScrollWords } from '../../../../components/motion/scroll';
 
 const HERO_CSS = `
 @keyframes crb-scrollcue {
@@ -24,69 +20,7 @@ export function Hero() {
     <section className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 pb-28 pt-32 sm:px-6">
       <style>{HERO_CSS}</style>
 
-      {/* Layered depth — base glow, parallax blobs, grid, vignette */}
-      <GlowBackground />
-
-      <Parallax
-        speed={0.18}
-        className="pointer-events-none absolute -left-40 -top-24 z-0 h-[560px] w-[560px]"
-      >
-        <div
-          className="h-full w-full rounded-full"
-          style={{
-            background:
-              'radial-gradient(closest-side, rgba(241,101,36,0.28), transparent 70%)',
-            filter: 'blur(90px)',
-          }}
-        />
-      </Parallax>
-
-      <Parallax
-        speed={0.28}
-        className="pointer-events-none absolute -right-32 top-1/3 z-0 h-[520px] w-[520px]"
-      >
-        <div
-          className="h-full w-full rounded-full"
-          style={{
-            background:
-              'radial-gradient(closest-side, rgba(187,204,215,0.20), transparent 70%)',
-            filter: 'blur(100px)',
-          }}
-        />
-      </Parallax>
-
-      <Parallax
-        speed={0.12}
-        className="pointer-events-none absolute bottom-[-120px] left-1/2 z-0 h-[360px] w-[720px] -translate-x-1/2"
-      >
-        <div
-          className="h-full w-full rounded-full"
-          style={{
-            background:
-              'radial-gradient(closest-side, rgba(255,130,51,0.16), transparent 70%)',
-            filter: 'blur(110px)',
-          }}
-        />
-      </Parallax>
-
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px)',
-          backgroundSize: '64px 64px',
-          maskImage:
-            'radial-gradient(ellipse 72% 60% at 50% 42%, black, transparent 78%)',
-          WebkitMaskImage:
-            'radial-gradient(ellipse 72% 60% at 50% 42%, black, transparent 78%)',
-        }}
-      />
-
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-40 bg-gradient-to-b from-transparent to-[#0C0C0C]"
-      />
+      {/* background: the page-level black + particles only */}
 
       {/* Content */}
       <div className="relative z-10 mx-auto flex max-w-5xl flex-col items-center text-center">

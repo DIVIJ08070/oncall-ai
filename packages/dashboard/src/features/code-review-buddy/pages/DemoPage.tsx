@@ -1,13 +1,8 @@
 import { useState } from 'react';
 import { Navbar } from '../components/layout/Navbar';
 import { Button, ErrorMessage, ReviewScanner } from '../components/ui';
-import {
-  AtmosphereBackdrop,
-  Grain,
-  HudCorners,
-  MonoTag,
-  Scanlines,
-} from '../../../components/atmosphere';
+import { HudCorners, MonoTag } from '../../../components/atmosphere';
+import { Particles } from '../../../components/atmosphere/Particles';
 import { DiffInput } from '../features/review/components/DiffInput';
 import { ReviewResult } from '../features/review/components/ReviewResult';
 import { FileReviewList } from '../features/repo-review/components/FileReviewList';
@@ -50,14 +45,23 @@ export function DemoPage() {
 
   return (
     <div
-      className="relative min-h-screen bg-[#0C0C0C] text-white"
+      className="relative min-h-screen bg-[#050505] text-white"
       style={{ fontFamily: "'Kanit', sans-serif" }}
     >
-      {/* Atmosphere: full-bleed aurora + HUD grid behind everything, plus a
-          fixed film-grain overlay across the viewport. Purely decorative. */}
-      <AtmosphereBackdrop />
-      <Grain />
-      <Scanlines />
+      {/* pure black + drifting particle dust — matches the console */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0">
+        <Particles
+          particleCount={260}
+          particleSpread={11}
+          speed={0.06}
+          particleColors={['#ffffff']}
+          alphaParticles
+          particleBaseSize={110}
+          sizeRandomness={1}
+          pixelRatio={1.5}
+          className="absolute inset-0"
+        />
+      </div>
 
       <div className="relative z-10">
         <Navbar variant="app" />
