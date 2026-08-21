@@ -336,7 +336,7 @@ function RepoBrain({ repo }: { repo: string }) {
   return (
     <>
       {/* 3-column command-center grid (stacks below xl) */}
-      <div className="flex flex-col gap-5 xl:grid xl:grid-cols-[230px_minmax(0,1fr)_300px] xl:items-start">
+      <div className="flex flex-col gap-5 xl:grid xl:grid-cols-[230px_minmax(0,1fr)_300px]">
         {/* LEFT — sparkline stat rail (2×2 grid when stacked) */}
         <StaggerGroup className="grid grid-cols-2 gap-3 xl:grid-cols-1">
           <StaggerItem>
@@ -399,7 +399,7 @@ function RepoBrain({ repo }: { repo: string }) {
 
         {/* CENTER — the brain + analyzing bar */}
         <div className="flex min-w-0 flex-col gap-4">
-          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
+          <div className="relative flex-1 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
             <div className="pointer-events-none absolute left-4 top-3 z-10">
               <span
                 className="text-[10px] uppercase tracking-[0.2em] text-white/40"
@@ -420,7 +420,7 @@ function RepoBrain({ repo }: { repo: string }) {
               learnings={learnings}
               level={level.index}
               onSelect={setSelected}
-              className="h-[420px] w-full sm:h-[500px] xl:h-[560px]"
+              className="h-[420px] w-full sm:h-[500px] xl:h-full xl:min-h-[560px]"
             />
             <FloatingTags tags={masteryTags} />
             {newborn && (
