@@ -104,13 +104,39 @@ const SERVICE_CHIPS: {
   dur: number;
   delay: number;
   lgOnly?: boolean;
+  detail: [string, string][]; // hover tooltip rows: [label, value]
+  note: string;
 }[] = [
-  { name: 'Auth Service', status: 'healthy', icon: Shield, top: '13%', right: '26%', dur: 7, delay: 0 },
-  { name: 'Payment Gateway', status: 'warning', icon: CreditCard, top: '38%', right: '7%', dur: 8.2, delay: 1.4 },
-  { name: 'User Service', status: 'healthy', icon: Users, top: '24%', right: '5%', dur: 6.4, delay: 2.2, lgOnly: true },
-  { name: 'Database', status: 'healthy', icon: Database, top: '70%', right: '33%', dur: 9, delay: 0.8, lgOnly: true },
-  { name: 'Cache Layer', status: 'critical', icon: Layers, top: '62%', right: '18%', dur: 6, delay: 1.8 },
-  { name: 'API Gateway', status: 'warning', icon: Globe, top: '82%', right: '8%', dur: 8.6, delay: 2.8, lgOnly: true },
+  {
+    name: 'Auth Service', status: 'healthy', icon: Shield, top: '13%', right: '26%', dur: 7, delay: 0,
+    detail: [['p95 latency', '41ms'], ['error rate', '0.00%'], ['req/min', '2.4k']],
+    note: 'No incidents in 30 days.',
+  },
+  {
+    name: 'Payment Gateway', status: 'warning', icon: CreditCard, top: '38%', right: '7%', dur: 8.2, delay: 1.4,
+    detail: [['p95 latency', '380ms ↑'], ['error rate', '2.1%'], ['req/min', '860']],
+    note: 'Latency rising — AI is watching.',
+  },
+  {
+    name: 'User Service', status: 'healthy', icon: Users, top: '24%', right: '5%', dur: 6.4, delay: 2.2, lgOnly: true,
+    detail: [['p95 latency', '62ms'], ['error rate', '0.01%'], ['req/min', '1.1k']],
+    note: 'Steady all week.',
+  },
+  {
+    name: 'Database', status: 'healthy', icon: Database, top: '70%', right: '33%', dur: 9, delay: 0.8, lgOnly: true,
+    detail: [['p95 query', '12ms'], ['connections', '42 / 100'], ['replication lag', '0.3s']],
+    note: 'Pool healthy, no slow queries.',
+  },
+  {
+    name: 'Cache Layer', status: 'critical', icon: Layers, top: '62%', right: '18%', dur: 6, delay: 1.8,
+    detail: [['hit rate', '61% ↓'], ['evictions/min', '4.2k ↑'], ['memory', '97%']],
+    note: 'Incident open — AI investigating a fix.',
+  },
+  {
+    name: 'API Gateway', status: 'warning', icon: Globe, top: '82%', right: '8%', dur: 8.6, delay: 2.8, lgOnly: true,
+    detail: [['5xx rate', '1.8% ↑'], ['p95 latency', '210ms'], ['req/min', '5.9k']],
+    note: 'Correlated with deploy v2.14.3.',
+  },
 ];
 
 function Hero() {
@@ -119,13 +145,13 @@ function Hero() {
       <TerrainNetwork className="absolute inset-0" />
 
       {/* floating service chips — decorative, cursor passes through to the terrain */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 z-10">
-        {SERVICE_CHIPS.map(({ name, status, icon: Icon, top, right, dur, delay, lgOnly }) => {
+      <div className="pointer-events-none absolute inset-0 z-10">
+        {SERVICE_CHIPS.map(({ name, status, icon: Icon, top, right, dur, delay, lgOnly, detail, note }) => {
           const meta = CHIP_STATUS[status];
           return (
             <div
               key={name}
-              className={`fh-bob absolute items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.05] py-2 pl-2 pr-3 backdrop-blur-md ${
+              className={`fh-bob group pointer-events-auto absolute cursor-default items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.05] py-2 pl-2 pr-3 backdrop-blur-md transition-transform duration-200 hover:scale-[1.05] hover:border-white/25 ${
                 lgOnly ? 'hidden lg:flex' : 'flex'
               }`}
               style={{ top, right, animationDuration: `${dur}s`, animationDelay: `${delay}s` }}
@@ -149,6 +175,31 @@ function Hero() {
                 className="ml-1 h-1.5 w-1.5 rounded-full"
                 style={{ backgroundColor: meta.color, boxShadow: `0 0 8px ${meta.color}` }}
               />
+
+              {/* hover detail card */}
+              <div className="pointer-events-none invisible absolute right-0 top-[calc(100%+8px)] z-30 w-[230px] translate-y-1 rounded-xl border border-white/15 bg-black/90 p-3 opacity-0 shadow-2xl backdrop-blur-md transition-all duration-200 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+                <p
+                  className="text-[9px] uppercase tracking-[0.2em]"
+                  style={{ fontFamily: MONO, color: meta.color }}
+                >
+                  {name} · {meta.label}
+                </p>
+                <dl className="mt-2 space-y-1">
+                  {detail.map(([k, v]) => (
+                    <div key={k} className="flex items-center justify-between">
+                      <dt className="text-[10px] text-white/45" style={{ fontFamily: MONO }}>
+                        {k}
+                      </dt>
+                      <dd className="text-[10px] tabular-nums text-white/85" style={{ fontFamily: MONO }}>
+                        {v}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="mt-2 border-t border-white/10 pt-1.5 text-[10px] leading-snug text-white/55">
+                  {note}
+                </p>
+              </div>
             </div>
           );
         })}
