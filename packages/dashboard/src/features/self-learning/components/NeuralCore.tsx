@@ -246,11 +246,13 @@ function BrainScene({
   level,
   onSelect,
   reduced,
+  zoomEnabled,
 }: {
   learnings: Learning[];
   level: number;
   onSelect?: (l: Learning | null) => void;
   reduced: boolean;
+  zoomEnabled: boolean;
 }) {
   const { raycaster } = useThree();
   const graph = useMemo(() => buildBrain(level), [level]);
@@ -263,6 +265,7 @@ function BrainScene({
   );
   const [hovered, setHovered] = useState<number | null>(null);
   const [shown, setShown] = useState<number | null>(null);
+  const frozenPrev = useRef(false);
   useCursor(hovered != null);
   // dwell: the tooltip appears only once the hover settles, so passing the
   // cursor across the brain never flashes glitchy panels
@@ -348,7 +351,15 @@ function BrainScene({
   useFrame((state) => {
     if (reduced) return;
     const t = state.clock.elapsedTime;
-    if (group.current) {
+    // while a memory tooltip is up, the brain holds perfectly still so the
+    // info stays readable — everything resumes when the cursor moves off
+    const frozen = hovered != null || shown != null;
+    if (controls.current) {
+      if (frozen) controls.current.autoRotate = false;
+      else if (!controls.current.autoRotate && frozenPrev.current) controls.current.autoRotate = true;
+    }
+    frozenPrev.current = frozen;
+    if (group.current && !frozen) {
       const breathe = 1 + Math.sin(t * 0.9) * 0.012;
       group.current.scale.setScalar(breathe);
       // the brain leans subtly toward the cursor
@@ -665,6 +676,7 @@ function BrainScene({
       <OrbitControls
         ref={controls}
         enablePan={false}
+        enableZoom={zoomEnabled}
         minDistance={3.2}
         maxDistance={8.5}
         autoRotate={!reduced}
@@ -688,8 +700,33 @@ export function NeuralCore({ learnings, level, onSelect, className }: NeuralCore
   const [reduced] = useState(
     () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
+  // Scroll must scroll the PAGE by default — zoom only after the brain is
+  // clicked; clicking anywhere outside (or Escape) hands scroll back.
+  const [zoomEnabled, setZoomEnabled] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!zoomEnabled) return;
+    const onDown = (e: PointerEvent): void => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setZoomEnabled(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setZoomEnabled(false);
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [zoomEnabled]);
   return (
-    <div className={className}>
+    <div
+      ref={wrapRef}
+      className={`relative ${className ?? ''}`}
+      onPointerDown={() => setZoomEnabled(true)}
+    >
       <Canvas
         dpr={[1, 1.75]}
         frameloop={reduced ? 'demand' : 'always'}
@@ -703,8 +740,17 @@ export function NeuralCore({ learnings, level, onSelect, className }: NeuralCore
           level={level}
           onSelect={onSelect}
           reduced={reduced}
+          zoomEnabled={zoomEnabled}
         />
       </Canvas>
+      <p
+        className={`pointer-events-none absolute bottom-2 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap text-[9px] uppercase tracking-[0.22em] transition-colors ${
+          zoomEnabled ? 'text-[#FF8233]/80' : 'text-white/25'
+        }`}
+        style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}
+      >
+        {zoomEnabled ? 'scroll zooms · click outside to release' : 'click brain to zoom'}
+      </p>
     </div>
   );
 }
