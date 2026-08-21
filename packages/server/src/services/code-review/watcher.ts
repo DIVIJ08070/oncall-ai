@@ -2,6 +2,8 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import type { Config } from '../../config.js';
+import type { Daos } from '../../db/dao/index.js';
+import { buildLearnedContext } from '../learning/context.js';
 import { ghFetch, parseRepoUrl, upstreamStatusError } from './github.js';
 import { reviewDiff } from './gemini.js';
 import {
@@ -263,10 +265,50 @@ async function tryPostComment(
   }
 }
 
+/** Truncation guard for learning fields derived from model output. */
+const MAX_LEARNING_CHARS = 300;
+
+function clipLearning(text: string): string {
+  const t = text.replace(/\s+/g, ' ').trim();
+  return t.length > MAX_LEARNING_CHARS ? `${t.slice(0, MAX_LEARNING_CHARS - 1)}…` : t;
+}
+
+/**
+ * Self-learning auto-signal: one learning per HIGH/CRITICAL finding of a
+ * completed review (source "review", rating +1, dedup-confirmed via
+ * `confirmOrCreate`). Strictly best-effort — any failure is logged and
+ * swallowed so the watch cycle never breaks.
+ */
+function recordReviewLearnings(daos: Daos, review: AutoReview): void {
+  try {
+    const repo = `${review.owner}/${review.repo}`;
+    for (const category of review.categories) {
+      if (category.severity !== 'high' && category.severity !== 'critical') continue;
+      const findings =
+        category.findings.length > 0 ? category.findings : [category.summary];
+      for (const finding of findings) {
+        if (typeof finding !== 'string' || finding.trim() === '') continue;
+        daos.repoLearnings.confirmOrCreate({
+          repo,
+          error_class: category.name,
+          root_cause: clipLearning(finding),
+          source: 'review',
+          rating: 1,
+          pr_number: review.prNumber,
+        });
+      }
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(`[pr-watch] recording review learnings failed — ${errMsg(err)}`);
+  }
+}
+
 async function reviewOnePr(
   config: Config,
   watch: WatchedRepo,
   pr: OpenPr,
+  daos?: Daos,
 ): Promise<AutoReview> {
   const diffRes = await ghFetch(
     config,
@@ -281,11 +323,18 @@ async function reviewOnePr(
     throw new CodeReviewError(502, 'upstream_error', 'GitHub returned an empty diff');
   }
 
+  // Self-learning: inject this repo's learned context into the review prompt
+  // (buildLearnedContext never throws; '' when the repo has no learnings yet).
+  const learnedContext = daos
+    ? buildLearnedContext(daos, `${watch.owner}/${watch.repo}`)
+    : '';
+
   // Existing Gemini diff reviewer; the prompt layer keeps only enabled rules.
   const result = await reviewDiff(config, {
     diff,
     prTitle: pr.title,
     ...(watch.rules.length > 0 ? { customRules: watch.rules } : {}),
+    ...(learnedContext !== '' ? { learnedContext } : {}),
   });
 
   const commented = await tryPostComment(config, watch, pr, result.markdownComment);
@@ -308,7 +357,7 @@ async function reviewOnePr(
   };
 }
 
-async function runWatchCycle(config: Config): Promise<void> {
+async function runWatchCycle(config: Config, daos?: Daos): Promise<void> {
   const s = loadStore(config);
   if (s.state.watches.length === 0) return;
   if (!config.codeReview.geminiApiKey) {
@@ -343,12 +392,14 @@ async function runWatchCycle(config: Config): Promise<void> {
       if (seen) continue;
       budget--;
       try {
-        const review = await reviewOnePr(config, watch, pr);
+        const review = await reviewOnePr(config, watch, pr, daos);
         s.state.reviews.unshift(review);
         if (s.state.reviews.length > MAX_REVIEWS_STORED) {
           s.state.reviews.length = MAX_REVIEWS_STORED;
         }
         persist(s);
+        // Self-learning auto-signal (guarded inside; never breaks the cycle).
+        if (daos) recordReviewLearnings(daos, review);
         // eslint-disable-next-line no-console
         console.log(
           `[pr-watch] reviewed ${watch.owner}/${watch.repo}#${pr.number} @ ${pr.headSha.slice(0, 7)} ` +
@@ -370,18 +421,28 @@ export interface CodeReviewWatcher {
   runCycle(): Promise<void>;
 }
 
+/** Optional wiring for the watcher (self-learning needs the DAO set). */
+export interface CodeReviewWatcherDeps {
+  /** When present: learned context is injected into review prompts and
+   *  HIGH/CRITICAL findings are recorded as per-repo learnings. */
+  daos?: Daos;
+}
+
 /**
  * Start the PR-Watch poller: an immediate first cycle, then every
  * `CODE_REVIEW_WATCH_INTERVAL_MS` (default 60 s). Overlapping runs are
  * skipped; the timer is `unref()`'d like the other background loops.
  */
-export function startCodeReviewWatcher(config: Config): CodeReviewWatcher {
+export function startCodeReviewWatcher(
+  config: Config,
+  deps: CodeReviewWatcherDeps = {},
+): CodeReviewWatcher {
   let running = false;
   const cycle = async (): Promise<void> => {
     if (running) return;
     running = true;
     try {
-      await runWatchCycle(config);
+      await runWatchCycle(config, deps.daos);
     } catch (err) {
       // eslint-disable-next-line no-console
       console.warn(`[pr-watch] cycle failed — ${errMsg(err)}`);

@@ -11,6 +11,7 @@ import { DeploysDao } from './deploys.js';
 import { PullRequestsDao } from './pull-requests.js';
 import { ChatMessagesDao } from './chat-messages.js';
 import { NotificationsDao } from './notifications.js';
+import { RepoLearningsDao } from './repo-learnings.js';
 
 export * from './customers.js';
 export * from './users.js';
@@ -24,8 +25,9 @@ export * from './deploys.js';
 export * from './pull-requests.js';
 export * from './chat-messages.js';
 export * from './notifications.js';
+export * from './repo-learnings.js';
 
-/** All 12 typed DAOs, one per table (SPEC §8). */
+/** All 13 typed DAOs, one per table (SPEC §8 + self-learning). */
 export interface Daos {
   customers: CustomersDao;
   users: UsersDao;
@@ -39,6 +41,7 @@ export interface Daos {
   pullRequests: PullRequestsDao;
   chatMessages: ChatMessagesDao;
   notifications: NotificationsDao;
+  repoLearnings: RepoLearningsDao;
 }
 
 /** Construct the DAO set bound to a single connection. */
@@ -56,5 +59,6 @@ export function createDaos(db: BetterSqlite3.Database): Daos {
     pullRequests: new PullRequestsDao(db),
     chatMessages: new ChatMessagesDao(db),
     notifications: new NotificationsDao(db),
+    repoLearnings: new RepoLearningsDao(db),
   };
 }

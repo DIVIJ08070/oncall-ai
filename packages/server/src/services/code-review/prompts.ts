@@ -34,6 +34,16 @@ export const FILE_REVIEWER_INSTRUCTION =
   'summary, findings: string[] }] }. ' +
   CATEGORY_RULES;
 
+/**
+ * Self-learning: the per-repo learned-context block (built by
+ * `services/learning/context.js` `buildLearnedContext`, which includes its own
+ * heading). Prepended verbatim when non-empty; otherwise invisible.
+ */
+function formatLearnedContext(learnedContext: string | undefined): string {
+  const block = learnedContext?.trim();
+  return block ? `${block}\n\n` : '';
+}
+
 /** Only ENABLED rules reach the model; disabled ones are invisible to it. */
 function formatCustomRules(rules: CustomRule[] | undefined): string {
   const enabled = (rules ?? []).filter((r) => r.enabled);
@@ -48,9 +58,11 @@ export function buildDiffPrompt(input: {
   diff: string;
   prTitle?: string;
   customRules?: CustomRule[];
+  learnedContext?: string;
 }): string {
   const title = input.prTitle ? `\n\nPull request title: ${input.prTitle}` : '';
   return (
+    formatLearnedContext(input.learnedContext) +
     `${DIFF_REVIEWER_INSTRUCTION}${title}${formatCustomRules(input.customRules)}` +
     `\n\nUnified diff to review:\n${input.diff}`
   );
@@ -60,8 +72,10 @@ export function buildFilePrompt(input: {
   filePath: string;
   content: string;
   customRules?: CustomRule[];
+  learnedContext?: string;
 }): string {
   return (
+    formatLearnedContext(input.learnedContext) +
     `${FILE_REVIEWER_INSTRUCTION} Findings should reference approximate line ` +
     `numbers in the file (e.g. "~line 42: ...").` +
     formatCustomRules(input.customRules) +

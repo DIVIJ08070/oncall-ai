@@ -17,6 +17,7 @@ import type { Config } from '../config.js';
 import type { OncallDb } from '../db/index.js';
 import { markInvestigating } from '../detection/lifecycle.js';
 import type { InvestigationEnqueuer } from '../detection/seams.js';
+import { buildLearnedContext } from '../services/learning/context.js';
 import { feedTopic, type Broker } from '../sse/broker.js';
 
 /**
@@ -161,6 +162,18 @@ export class InvestigationService {
       },
     };
 
+    // Self-learning: assemble the per-repo learned context for the kickoff
+    // prompt. Best-effort — a failure here must never block an investigation.
+    let learnedContext = '';
+    try {
+      learnedContext = buildLearnedContext(
+        this.db.dao,
+        `${this.config.github.owner}/${this.config.github.repo}`,
+      );
+    } catch (err) {
+      this.log('[investigation] learned-context assembly failed (ignored)', err);
+    }
+
     let done: Promise<SessionResult | null>;
     try {
       const engine = this.engineFactory({
@@ -169,6 +182,7 @@ export class InvestigationService {
         config: this.config as AgentEngineConfig,
         sessions,
         steps: this.db.dao.steps,
+        ...(learnedContext !== '' ? { learnedContext } : {}),
       });
       // Call synchronously so the engine's session `create` runs now (captures id).
       done = engine.investigate(fresh, sink).catch((err) => {

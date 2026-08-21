@@ -70,6 +70,27 @@ export interface NotificationRow {
   created_at: number;
 }
 
+/* ── repo_learnings ─────────────────────────────────────────────────────── */
+/** Where a learning signal came from (explicit rating vs. PR lifecycle). */
+export type LearningSource = 'rating' | 'merge' | 'closed' | 'review';
+export interface RepoLearningRow {
+  id: string;
+  /** GitHub repo as `owner/name`. */
+  repo: string;
+  error_class: string;
+  root_cause: string;
+  fix_approach: string | null;
+  source: LearningSource;
+  /** Net feedback signal: negative = downvoted, positive = upvoted. */
+  rating: number;
+  note: string | null;
+  /** How many times the same repo+error_class+root_cause was re-confirmed. */
+  confirmations: number;
+  pr_number: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
 /* ── codecs (JSON columns + SQLite 0/1 booleans) ────────────────────────── */
 
 /** Serialize a value for a JSON TEXT column (`null`/`undefined` → SQL NULL). */

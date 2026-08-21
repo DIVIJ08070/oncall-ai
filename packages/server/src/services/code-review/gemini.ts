@@ -230,7 +230,13 @@ function asRecord(v: unknown): Record<string, unknown> {
 
 export async function reviewDiff(
   config: Config,
-  input: { diff: string; prTitle?: string; customRules?: CustomRule[] },
+  input: {
+    diff: string;
+    prTitle?: string;
+    customRules?: CustomRule[];
+    /** Self-learning: per-repo learned-context block, prepended to the prompt. */
+    learnedContext?: string;
+  },
 ): Promise<ReviewResult> {
   const { raw: rawJson, engine } = await generateReviewJson(config, buildDiffPrompt(input));
   const raw = asRecord(rawJson);
@@ -246,7 +252,13 @@ export async function reviewDiff(
 
 export async function reviewFile(
   config: Config,
-  input: { filePath: string; content: string; customRules?: CustomRule[] },
+  input: {
+    filePath: string;
+    content: string;
+    customRules?: CustomRule[];
+    /** Self-learning: per-repo learned-context block, prepended to the prompt. */
+    learnedContext?: string;
+  },
 ): Promise<{ score: number; categories: ReviewCategory[]; engine: ReviewEngine }> {
   const { raw: rawJson, engine } = await generateReviewJson(config, buildFilePrompt(input));
   const raw = asRecord(rawJson);

@@ -46,8 +46,15 @@ export const AGENT_SYSTEM_PROMPT = [
   '  • You must finish with submit_findings. Do not stop without it.',
 ].join('\n');
 
-/** Per-incident kickoff message (the `prompt` passed to query()). */
-export function buildIncidentPrompt(incident: Incident): string {
+/**
+ * Per-incident kickoff message (the `prompt` passed to query()).
+ *
+ * `learnedContext` is an optional server-assembled per-repo self-learning
+ * block (lessons from past incident outcomes). When non-empty it is PREPENDED
+ * to the kickoff message under its own heading; the incident prompt itself is
+ * unchanged.
+ */
+export function buildIncidentPrompt(incident: Incident, learnedContext?: string): string {
   const lines = [
     `A new incident has been opened. Investigate it and reach a conclusion.`,
     ``,
@@ -71,5 +78,7 @@ export function buildIncidentPrompt(incident: Incident): string {
     ``,
     `Start by confirming the breach with get_metrics for "${incident.service}", then trace it to a root cause.`,
   );
-  return lines.join('\n');
+  const body = lines.join('\n');
+  const learned = learnedContext?.trim();
+  return learned ? `${learned}\n\n${body}` : body;
 }

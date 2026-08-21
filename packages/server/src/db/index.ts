@@ -8,7 +8,7 @@ import { createDaos, type Daos } from './dao/index.js';
  * SQLite data layer entry point (SPEC §8). `openDatabase()` opens a
  * better-sqlite3 connection in **WAL** mode with **foreign keys ON**, ensures
  * the parent directory exists, runs the idempotent migration, and wires up the
- * 12 typed DAOs.
+ * 13 typed DAOs.
  */
 
 export * from './ids.js';
@@ -31,7 +31,7 @@ export interface OpenDbOptions {
 export interface OncallDb {
   /** The underlying better-sqlite3 connection. */
   raw: Database.Database;
-  /** The 12 typed DAOs (SPEC §8). */
+  /** The 13 typed DAOs (SPEC §8 + self-learning). */
   dao: Daos;
   /** The resolved path (or `:memory:`). */
   path: string;

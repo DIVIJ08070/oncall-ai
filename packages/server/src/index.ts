@@ -117,7 +117,8 @@ export async function main(): Promise<void> {
 
   // Code Review Buddy — PR Watch poller (auto-reviews open PRs of watched
   // repos every CODE_REVIEW_WATCH_INTERVAL_MS; no-ops until a repo is watched).
-  const watcher = startCodeReviewWatcher(config);
+  // The DAO set enables self-learning (learned-context prompts + review signals).
+  const watcher = startCodeReviewWatcher(config, { daos: db.dao });
 
   // Graceful shutdown: stop the background loops (their timers are already
   // `unref()`'d, so this is deterministic-teardown tidiness, not a leak fix)

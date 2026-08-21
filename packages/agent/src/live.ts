@@ -92,6 +92,7 @@ export class LiveClaudeEngine implements InvestigationEngine {
   private readonly mcpFactory: McpFactory;
   private readonly usingRealSdk: boolean;
   private readonly now: () => number;
+  private readonly learnedContext: string | undefined;
 
   constructor(deps: LiveEngineDeps) {
     this.db = deps.db;
@@ -99,6 +100,7 @@ export class LiveClaudeEngine implements InvestigationEngine {
     this.config = deps.config;
     this.sessions = deps.sessions;
     this.steps = deps.steps;
+    this.learnedContext = deps.learnedContext;
     this.usingRealSdk = !deps.queryFn;
     this.queryFn = deps.queryFn ?? defaultQueryFn;
     this.mcpFactory = deps.mcpFactory ?? createInvestigationMcpServer;
@@ -197,7 +199,8 @@ export class LiveClaudeEngine implements InvestigationEngine {
       };
 
       const stream = this.queryFn({
-        prompt: buildIncidentPrompt(incident),
+        // Self-learning: prepend the per-repo learned context (when present).
+        prompt: buildIncidentPrompt(incident, this.learnedContext),
         options,
         ctx,
       });

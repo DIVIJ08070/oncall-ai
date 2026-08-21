@@ -258,6 +258,9 @@ export class MergePoller {
     if (data.state === 'closed' && !data.merged) {
       // PR closed without merging → record closed; leave incident for humans.
       this.db.dao.pullRequests.update(pr.id, { state: 'closed' });
+      // Self-learning auto-signal: humans rejected this AI fix (source
+      // "closed", rating −1). Guarded — never breaks the poller.
+      this.recordOutcomeLearning(customerId, inc, pr, 'closed');
       return;
     }
     if (!data.merged) return; // still open — nothing to do yet.
@@ -271,6 +274,10 @@ export class MergePoller {
       merged_at: Number.isNaN(mergedAt) ? now : mergedAt,
       head_sha: mergeSha,
     });
+
+    // Self-learning auto-signal: humans merged this AI fix (source "merge",
+    // rating +1). Guarded — never breaks the poller.
+    this.recordOutcomeLearning(customerId, inc, pr, 'merge');
 
     // Simulate the customer redeploy of the fixed code on the local victim.
     await this.healer.heal();
@@ -287,6 +294,48 @@ export class MergePoller {
         pr: pr.github_pr_number,
         sha: mergeSha.slice(0, 7),
       });
+    }
+  }
+
+  /**
+   * Self-learning auto-signal (best-effort): record the human outcome of an AI
+   * fix PR as a per-repo learning via `confirmOrCreate` — source "merge" (+1)
+   * when the fix was merged, source "closed" (−1) when it was closed unmerged.
+   * repo comes from the customer row (falling back to the platform config),
+   * error_class from the incident detector, root_cause from the investigation's
+   * conclusion (falling back to the incident title), fix_approach from the PR
+   * title. Everything is try/caught: learning failures NEVER break the poller.
+   */
+  private recordOutcomeLearning(
+    customerId: string,
+    inc: Incident,
+    pr: PullRequestRec,
+    outcome: 'merge' | 'closed',
+  ): void {
+    try {
+      const customer = this.db.dao.customers.getById(customerId);
+      const owner = customer?.github_owner ?? this.config.github.owner;
+      const name = customer?.github_repo ?? this.config.github.repo;
+      const clip = (text: string, max: number): string => {
+        const t = text.replace(/\s+/g, ' ').trim();
+        return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+      };
+      this.db.dao.repoLearnings.confirmOrCreate({
+        repo: `${owner}/${name}`,
+        error_class: inc.detector,
+        root_cause: clip(inc.root_cause ?? inc.title, 400),
+        fix_approach: clip(pr.title, 300),
+        source: outcome,
+        rating: outcome === 'merge' ? 1 : -1,
+        pr_number: pr.github_pr_number,
+      });
+      this.log('[merge-poller] learning recorded', {
+        incident: inc.id,
+        pr: pr.github_pr_number,
+        outcome,
+      });
+    } catch (err) {
+      this.log('[merge-poller] learning record failed (ignored)', err);
     }
   }
 

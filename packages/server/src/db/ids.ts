@@ -32,6 +32,7 @@ export const ID_PREFIX = {
   pull_request: 'pr',
   chat_message: 'msg',
   notification: 'ntf',
+  repo_learning: 'lrn',
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIX)[keyof typeof ID_PREFIX];
@@ -68,3 +69,5 @@ export const newChatMessageId = (t?: number): string =>
   newId(ID_PREFIX.chat_message, t);
 export const newNotificationId = (t?: number): string =>
   newId(ID_PREFIX.notification, t);
+export const newRepoLearningId = (t?: number): string =>
+  newId(ID_PREFIX.repo_learning, t);

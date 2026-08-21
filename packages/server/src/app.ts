@@ -15,6 +15,7 @@ import { registerLogsRoutes } from './routes/logs.js';
 import { registerIncidentRoutes } from './routes/incidents.js';
 import { registerDemoRoutes } from './routes/demo.js';
 import { registerCodeReviewRoutes } from './routes/code-review.js';
+import { registerLearningsRoutes } from './routes/learnings.js';
 import { createGithubGateway, type GithubGateway } from './github/gateway.js';
 import {
   createInvestigationService,
@@ -108,6 +109,10 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   // Code Review Buddy mini-app — Gemini-backed diff/repo reviews (no session
   // auth, same openness as the demo routes).
   registerCodeReviewRoutes(app, ctx);
+
+  // Per-repo self-learning — feedback on AI-generated PRs stored as learnings
+  // and injected into future investigation/code-review prompts.
+  registerLearningsRoutes(app, ctx);
 
   return app;
 }

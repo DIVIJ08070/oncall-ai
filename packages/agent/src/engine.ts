@@ -119,6 +119,12 @@ export interface LiveEngineDeps {
   config: AgentEngineConfig;
   sessions: EngineSessionsDao;
   steps: EngineStepsDao;
+  /**
+   * Optional per-repo learned-context block (server-assembled from past
+   * incident outcomes, self-learning). When non-empty the live engine prepends
+   * it to the kickoff prompt via `buildIncidentPrompt`.
+   */
+  learnedContext?: string;
   /** Injected in tests; defaults to the real Agent SDK `query`. */
   queryFn?: SdkQueryFn;
   /** Injected in tests; defaults to the real in-process MCP server builder. */

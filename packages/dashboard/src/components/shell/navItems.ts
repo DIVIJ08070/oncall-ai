@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Plug, FlaskConical } from 'lucide-react';
+import { Activity, AlertTriangle, Brain, Plug, FlaskConical } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 /** Primary routes (DESIGN_SPEC §4 SideNav). Icons from the canonical set (§3). */
@@ -22,6 +22,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Incidents',
     icon: AlertTriangle,
     match: (p) => p.startsWith('/incidents'),
+  },
+  {
+    to: '/learning',
+    label: 'Self-Learning',
+    icon: Brain,
+    match: (p) => p.startsWith('/learning'),
   },
   {
     to: '/onboarding',

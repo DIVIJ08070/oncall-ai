@@ -4,7 +4,7 @@ import type BetterSqlite3 from 'better-sqlite3';
  * Idempotent schema migration for the OnCall AI platform DB (SPEC §8).
  *
  * Every statement is `CREATE ... IF NOT EXISTS`, so `migrate()` is safe to run
- * on every boot and on an already-migrated file. All 12 tables + their indexes
+ * on every boot and on an already-migrated file. All 13 tables + their indexes
  * are created exactly per §8 (types, nullability, PK, UNIQUE, FK, indexes).
  *
  * Note the intentional cyclic FK: `incidents.pr_id → pull_requests.id` and
@@ -16,7 +16,7 @@ import type BetterSqlite3 from 'better-sqlite3';
 
 export const SCHEMA_VERSION = 1;
 
-/** The 12 tables of the data model (SPEC §8), in creation order. */
+/** The 13 tables of the data model (SPEC §8 + self-learning), in creation order. */
 export const TABLES = [
   'customers',
   'users',
@@ -30,6 +30,7 @@ export const TABLES = [
   'pull_requests',
   'chat_messages',
   'notifications',
+  'repo_learnings',
 ] as const;
 
 export type TableName = (typeof TABLES)[number];
@@ -230,6 +231,23 @@ CREATE TABLE IF NOT EXISTS notifications (
   payload      TEXT NOT NULL,
   created_at   INTEGER NOT NULL
 );
+
+-- ── repo_learnings (per-repo self-learning feedback) ────────────────────────
+CREATE TABLE IF NOT EXISTS repo_learnings (
+  id             TEXT PRIMARY KEY,
+  repo           TEXT NOT NULL,
+  error_class    TEXT NOT NULL,
+  root_cause     TEXT NOT NULL,
+  fix_approach   TEXT,
+  source         TEXT NOT NULL CHECK (source IN ('rating','merge','closed','review')),
+  rating         INTEGER NOT NULL DEFAULT 0,
+  note           TEXT,
+  confirmations  INTEGER NOT NULL DEFAULT 1,
+  pr_number      INTEGER,
+  created_at     INTEGER NOT NULL,
+  updated_at     INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_repo_learnings_repo ON repo_learnings(repo);
 `;
 
 /**
