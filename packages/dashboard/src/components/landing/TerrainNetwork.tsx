@@ -26,27 +26,27 @@ const ROUTES: Array<{
 }> = [
   {
     path: [[0.361, 0.577], [0.428, 0.628], [0.483, 0.599], [0.539, 0.491], [0.605, 0.504], [0.661, 0.383], [0.727, 0.402], [0.783, 0.354], [0.872, 0.37], [0.894, 0.383]],
-    color: '132,138,160', label: 'CHECKOUT \u2192 DATABASE', base: 96,
+    color: '132,138,160', label: 'USER SERVICE \u2192 DATABASE', base: 96,
   },
   {
     path: [[0.305, 0.478], [0.35, 0.456], [0.394, 0.475], [0.438, 0.434], [0.483, 0.491], [0.528, 0.424], [0.594, 0.37], [0.65, 0.296], [0.694, 0.322], [0.739, 0.233]],
-    color: '255,138,90', label: 'AUTH \u2192 PAYMENT', base: 142,
+    color: '255,138,90', label: 'AUTH \u2192 PAYMENT GATEWAY', base: 142,
   },
   {
     path: [[0.183, 0.823], [0.217, 0.778], [0.25, 0.854], [0.283, 0.886], [0.328, 0.918], [0.361, 0.937], [0.394, 0.915], [0.428, 0.88], [0.461, 0.816], [0.494, 0.749]],
-    color: '176,123,255', label: 'INGEST STREAM', base: 421,
+    color: '176,123,255', label: 'API GATEWAY \u2192 DATABASE', base: 421,
   },
   {
     path: [[0.127, 0.59], [0.172, 0.58], [0.205, 0.599], [0.239, 0.577], [0.272, 0.539], [0.305, 0.593], [0.339, 0.65], [0.372, 0.654], [0.394, 0.67]],
-    color: '132,138,160', label: 'USER-SERVICE \u2192 CACHE', base: 63,
+    color: '132,138,160', label: 'AUTH \u2192 USER SERVICE', base: 63,
   },
   {
     path: [[0.028, 0.743], [0.072, 0.736], [0.094, 0.692], [0.117, 0.711], [0.139, 0.701], [0.161, 0.717], [0.183, 0.708], [0.227, 0.736], [0.25, 0.698], [0.272, 0.676], [0.283, 0.67]],
-    color: '176,123,255', label: 'NOTIFICATIONS', base: 18,
+    color: '176,123,255', label: 'INGEST \u2192 AUTH', base: 18,
   },
   {
     path: [[0.75, 0.634], [0.772, 0.657], [0.805, 0.603], [0.839, 0.663], [0.872, 0.701], [0.894, 0.695], [0.916, 0.647], [0.938, 0.574], [0.961, 0.564], [0.983, 0.529]],
-    color: '239,110,80', label: 'PAYMENT-GATEWAY \u00b7 DEGRADED', base: 87,
+    color: '239,110,80', label: 'PAYMENT GATEWAY \u2192 CACHE LAYER \u00b7 DEGRADED', base: 87,
   },
 ];
 const RIDGES = ROUTES.map((r) => r.path);
@@ -58,6 +58,16 @@ const GLOWS = [
   { x: 0.46, y: 0.53, r: 0.05, color: '150,95,255', hot: false },
   { x: 0.86, y: 0.4, r: 0.045, color: '170,110,255', hot: false },
 ];
+
+/** Which routes belong to which pinned service (chip-hover highlight). */
+const CHIP_ROUTES: Record<string, number[]> = {
+  'Auth Service': [1, 3, 4],
+  'Payment Gateway': [1, 5],
+  'User Service': [0, 3],
+  Database: [0, 2],
+  'Cache Layer': [5],
+  'API Gateway': [2],
+};
 
 const MOTES = Array.from({ length: 8 }, (_, i) => ({
   ridge: i % RIDGES.length,
@@ -93,6 +103,12 @@ export function TerrainNetwork({ className }: { className?: string }) {
     /* The mountain itself stays STILL — only the circuit lines react. */
     let px = -1e4; // pointer in canvas fractions
     let py = -1e4;
+    let chipRoutes: number[] = [];
+    const onChipHover = (e: Event): void => {
+      const name = (e as CustomEvent<string | null>).detail;
+      chipRoutes = name ? (CHIP_ROUTES[name] ?? []) : [];
+    };
+    window.addEventListener('oncall:chip-hover', onChipHover);
     const onMove = (e: PointerEvent): void => {
       const r = wrap.getBoundingClientRect();
       px = (e.clientX - r.left) / r.width;
@@ -152,7 +168,7 @@ export function TerrainNetwork({ className }: { className?: string }) {
         const ridge = RIDGES[ri];
         const color = ROUTES[ri].color;
         // proximity of the pointer to this ridge (nearest sample point)
-        let near = 0;
+        let near = chipRoutes.includes(ri) ? 0.85 : 0;
         if (px > -100) {
           for (let k = 0; k <= 10; k++) {
             const [fx, fy] = pointOn(ridge, k / 10);
@@ -245,6 +261,7 @@ export function TerrainNetwork({ className }: { className?: string }) {
       document.removeEventListener('visibilitychange', onVisibility);
       wrap.removeEventListener('pointermove', onMove);
       wrap.removeEventListener('pointerleave', onLeave);
+      window.removeEventListener('oncall:chip-hover', onChipHover);
     };
   }, []);
 

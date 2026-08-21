@@ -106,36 +106,51 @@ const SERVICE_CHIPS: {
   lgOnly?: boolean;
   detail: [string, string][]; // hover tooltip rows: [label, value]
   note: string;
+  /** where this service LIVES on the mountain (panel fractions) */
+  ax: number;
+  ay: number;
 }[] = [
   {
     name: 'Auth Service', status: 'healthy', icon: Shield, top: '13%', right: '26%', dur: 7, delay: 0,
     detail: [['p95 latency', '41ms'], ['error rate', '0.00%'], ['req/min', '2.4k']],
     note: 'No incidents in 30 days.',
+    ax: 0.42,
+    ay: 0.47,
   },
   {
     name: 'Payment Gateway', status: 'warning', icon: CreditCard, top: '38%', right: '7%', dur: 8.2, delay: 1.4,
     detail: [['p95 latency', '380ms ↑'], ['error rate', '2.1%'], ['req/min', '860']],
     note: 'Latency rising — AI is watching.',
+    ax: 0.74,
+    ay: 0.33,
   },
   {
     name: 'User Service', status: 'healthy', icon: Users, top: '24%', right: '5%', dur: 6.4, delay: 2.2, lgOnly: true,
     detail: [['p95 latency', '62ms'], ['error rate', '0.01%'], ['req/min', '1.1k']],
     note: 'Steady all week.',
+    ax: 0.6,
+    ay: 0.38,
   },
   {
     name: 'Database', status: 'healthy', icon: Database, top: '70%', right: '33%', dur: 9, delay: 0.8, lgOnly: true,
     detail: [['p95 query', '12ms'], ['connections', '42 / 100'], ['replication lag', '0.3s']],
     note: 'Pool healthy, no slow queries.',
+    ax: 0.55,
+    ay: 0.63,
   },
   {
     name: 'Cache Layer', status: 'critical', icon: Layers, top: '62%', right: '18%', dur: 6, delay: 1.8,
     detail: [['hit rate', '61% ↓'], ['evictions/min', '4.2k ↑'], ['memory', '97%']],
     note: 'Incident open — AI investigating a fix.',
+    ax: 0.8,
+    ay: 0.46,
   },
   {
     name: 'API Gateway', status: 'warning', icon: Globe, top: '82%', right: '8%', dur: 8.6, delay: 2.8, lgOnly: true,
     detail: [['5xx rate', '1.8% ↑'], ['p95 latency', '210ms'], ['req/min', '5.9k']],
     note: 'Correlated with deploy v2.14.3.',
+    ax: 0.88,
+    ay: 0.62,
   },
 ];
 
@@ -145,6 +160,59 @@ function Hero() {
       <TerrainNetwork className="absolute inset-0" />
 
       {/* floating service chips — decorative, cursor passes through to the terrain */}
+      {/* leader lines: every chip is PINNED to its territory on the mountain —
+          the glowing routes below are the dependencies between those pins */}
+      <svg
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-[9] hidden h-full w-full lg:block"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+      >
+        {SERVICE_CHIPS.map(({ name, status, top, right, ax, ay }) => {
+          const meta = CHIP_STATUS[status];
+          const cx = 100 - parseFloat(right) - 7; // approx chip bottom-centre
+          const cy = parseFloat(top) + 6;
+          return (
+            <g key={name}>
+              <line
+                x1={cx}
+                y1={cy}
+                x2={ax * 100}
+                y2={ay * 100}
+                stroke={meta.color}
+                strokeOpacity={0.45}
+                strokeDasharray="1.6 1.8"
+                vectorEffect="non-scaling-stroke"
+                strokeWidth={1}
+              />
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* anchor nodes — where each service lives on the mountain */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 z-[9] hidden lg:block">
+        {SERVICE_CHIPS.map(({ name, status, ax, ay }) => {
+          const meta = CHIP_STATUS[status];
+          return (
+            <span
+              key={name}
+              className="absolute -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${ax * 100}%`, top: `${ay * 100}%` }}
+            >
+              <span
+                className="fh-anchor block h-2 w-2 rounded-full"
+                style={{ backgroundColor: meta.color, boxShadow: `0 0 10px ${meta.color}` }}
+              />
+              <span
+                className="fh-anchor-ring absolute left-1/2 top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border"
+                style={{ borderColor: meta.color }}
+              />
+            </span>
+          );
+        })}
+      </div>
+
       <div className="pointer-events-none absolute inset-0 z-10">
         {SERVICE_CHIPS.map(({ name, status, icon: Icon, top, right, dur, delay, lgOnly, detail, note }) => {
           const meta = CHIP_STATUS[status];
@@ -155,6 +223,12 @@ function Hero() {
                 lgOnly ? 'hidden lg:flex' : 'flex'
               }`}
               style={{ top, right, animationDuration: `${dur}s`, animationDelay: `${delay}s` }}
+              onMouseEnter={() =>
+                window.dispatchEvent(new CustomEvent('oncall:chip-hover', { detail: name }))
+              }
+              onMouseLeave={() =>
+                window.dispatchEvent(new CustomEvent('oncall:chip-hover', { detail: null }))
+              }
             >
               <span
                 className="flex h-7 w-7 items-center justify-center rounded-lg"
