@@ -1,16 +1,13 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Learning } from '../../../api/learnings';
 
 /**
- * KnowledgeMap — a 2D canvas constellation of what the AI knows about a repo.
- * Learnings cluster by errorClass: each class is a hub star (palette rotates
- * orange → green → violet → silver) with its learnings as tiny satellite dots
- * wired to the hub by thin lines. Layout is deterministic (seeded by the class
- * names) so the map is stable across renders; the whole field drifts and
- * twinkles gently via one rAF loop that pauses while the document is hidden
- * and goes fully static under prefers-reduced-motion. Hovering a hub
- * highlights its cluster and draws a canvas tooltip ("ERRORCLASS · N
- * learnings"). Zero React re-renders per frame — everything lives in refs.
+ * KnowledgeMap — the AI's understanding as a field of radial constellations
+ * (mockup look): each error class is a glowing hub with satellites on clean
+ * spokes, hubs interlinked by faint threads, ambient filler clusters keeping
+ * the field dense while real knowledge is young. Satellites orbit slowly,
+ * dots twinkle, hubs breathe. Hover a REAL cluster for its name + count.
+ * Canvas-only, DPR-aware, pauses when hidden, static under reduced motion.
  */
 
 export interface KnowledgeMapProps {
@@ -18,413 +15,261 @@ export interface KnowledgeMapProps {
   className?: string;
 }
 
-const TAU = Math.PI * 2;
-const GOLDEN = Math.PI * (3 - Math.sqrt(5));
-const MAX_SATS_PER_HUB = 26;
-const HUB_DRIFT_PX = 5;
-const SAT_DRIFT_PX = 1.7;
+const PALETTE = ['#8B5CF6', '#52D273', '#3b82f6', '#F16524', '#ef4444', '#22d3ee'];
 
-/** Palette rotation for hubs: orange / green / violet / silver. */
-const HUB_COLORS: ReadonlyArray<readonly [number, number, number]> = [
-  [241, 101, 36], // #F16524
-  [82, 210, 115], // #52D273
-  [139, 92, 246], // #8B5CF6
-  [154, 160, 184], // #9aa0b8
-];
-
-/* ------------------------------------------------------------------ */
-/* deterministic layout                                                */
-/* ------------------------------------------------------------------ */
-
-function hashString(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
+interface Cluster {
+  x: number; // canvas fraction
+  y: number;
+  color: string;
+  label: string | null; // null = ambient filler
+  count: number;
+  sats: Array<{ r: number; a: number; size: number; bright: number; spoke: boolean }>;
+  phase: number;
+  spin: number;
 }
 
-/** Tiny seeded PRNG so the constellation is stable across renders. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
+function makeRand(seed: number): () => number {
+  let s = seed;
   return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
   };
 }
 
-interface SatNode {
-  angle: number;
-  dist: number;
-  r: number;
-  twinklePhase: number;
-  twinkleSpeed: number;
-  driftPhase: number;
-  driftSpeed: number;
-}
+function buildClusters(learnings: Learning[]): Cluster[] {
+  const rand = makeRand(424242);
+  const byClass = new Map<string, Learning[]>();
+  learnings.forEach((l) => {
+    const k = l.errorClass.toLowerCase();
+    const arr = byClass.get(k);
+    if (arr) arr.push(l);
+    else byClass.set(k, [l]);
+  });
+  const real = [...byClass.entries()].slice(0, 6);
+  const total = Math.max(6, Math.min(7, real.length + 3));
 
-interface HubNode {
-  label: string;
-  count: number;
-  /** Constant color strings — no per-frame string churn. */
-  col: string;
-  glowIn: string;
-  glowOut: string;
-  nx: number;
-  ny: number;
-  r: number;
-  driftPhase: number;
-  driftSpeed: number;
-  dim: boolean;
-  sats: SatNode[];
-  /** Screen position, refreshed every frame (scratch — avoids allocation). */
-  sx: number;
-  sy: number;
-}
+  // spread slots on a jittered 2-row layout (mockup composition)
+  const slots: Array<[number, number]> = [];
+  const cols = Math.ceil(total / 2);
+  for (let i = 0; i < total; i++) {
+    const row = i % 2;
+    const col = Math.floor(i / 2);
+    slots.push([
+      0.12 + (col + 0.5) / cols * 0.76 + (rand() - 0.5) * 0.07,
+      0.28 + row * 0.42 + (rand() - 0.5) * 0.14,
+    ]);
+  }
+  // shuffle slots deterministically
+  for (let i = slots.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [slots[i], slots[j]] = [slots[j], slots[i]];
+  }
 
-function makeSats(rng: () => number, count: number, hubR: number): SatNode[] {
-  const sats: SatNode[] = [];
-  for (let j = 0; j < count; j++) {
-    sats.push({
-      angle: j * GOLDEN + (rng() - 0.5) * 0.9,
-      dist: hubR + 13 + Math.sqrt(j) * 10 + rng() * 6,
-      r: 1.2 + rng() * 1.1,
-      twinklePhase: rng() * TAU,
-      twinkleSpeed: 0.6 + rng() * 1.4,
-      driftPhase: rng() * TAU,
-      driftSpeed: 0.3 + rng() * 0.5,
+  const clusters: Cluster[] = [];
+  for (let i = 0; i < total; i++) {
+    const entry = real[i];
+    const confirms = entry
+      ? entry[1].reduce((a, l) => a + l.confirmations, 0)
+      : 0;
+    const satCount = entry
+      ? Math.min(26, 10 + confirms * 3)
+      : 7 + Math.floor(rand() * 6);
+    const sats: Cluster['sats'] = [];
+    for (let k = 0; k < satCount; k++) {
+      sats.push({
+        r: 16 + rand() * 34,
+        a: (k / satCount) * Math.PI * 2 + rand() * 0.5,
+        size: 1.2 + rand() * 1.6,
+        bright: 0.35 + rand() * 0.65,
+        spoke: rand() < 0.7,
+      });
+    }
+    clusters.push({
+      x: slots[i][0],
+      y: slots[i][1],
+      color: PALETTE[i % PALETTE.length],
+      label: entry ? entry[0] : null,
+      count: entry ? entry[1].length : 0,
+      sats,
+      phase: rand() * Math.PI * 2,
+      spin: (rand() < 0.5 ? 1 : -1) * (0.05 + rand() * 0.07),
     });
   }
-  return sats;
+  return clusters;
 }
 
-function makeHub(
-  label: string,
-  count: number,
-  colorIndex: number,
-  nx: number,
-  ny: number,
-  rng: () => number,
-  dim: boolean,
-): HubNode {
-  const [r, g, b] = HUB_COLORS[colorIndex % HUB_COLORS.length];
-  const hubR = dim ? 5 : 5 + 1.1 * Math.min(9, count);
-  return {
-    label,
-    count,
-    col: `rgb(${r},${g},${b})`,
-    glowIn: `rgba(${r},${g},${b},0.32)`,
-    glowOut: `rgba(${r},${g},${b},0)`,
-    nx: Math.min(0.9, Math.max(0.1, nx)),
-    ny: Math.min(0.84, Math.max(0.16, ny)),
-    r: hubR,
-    driftPhase: rng() * TAU,
-    driftSpeed: 0.25 + rng() * 0.35,
-    dim,
-    sats: makeSats(rng, dim ? 4 : Math.min(MAX_SATS_PER_HUB, count), hubR),
-    sx: 0,
-    sy: 0,
-  };
+function hexRgb(hex: string): string {
+  const int = parseInt(hex.slice(1), 16);
+  return `${(int >> 16) & 255},${(int >> 8) & 255},${int & 255}`;
 }
-
-/** Group learnings into hubs and place them on a seeded phyllotaxis spiral. */
-function buildModel(learnings: Learning[]): HubNode[] {
-  if (learnings.length === 0) {
-    // Empty state: three dim placeholder hubs waiting for the first signal.
-    const rng = mulberry32(0x5eed);
-    return [
-      makeHub('', 0, 0, 0.27, 0.42, rng, true),
-      makeHub('', 0, 3, 0.52, 0.64, rng, true),
-      makeHub('', 0, 3, 0.75, 0.34, rng, true),
-    ];
-  }
-
-  const groups = new Map<string, { label: string; count: number }>();
-  for (const l of learnings) {
-    const key = l.errorClass.toLowerCase();
-    const found = groups.get(key);
-    if (found) found.count += 1;
-    else groups.set(key, { label: l.errorClass, count: 1 });
-  }
-  const clusters = [...groups.values()].sort(
-    (a, b) => b.count - a.count || a.label.localeCompare(b.label),
-  );
-
-  const seed = hashString(clusters.map((c) => c.label).join('|'));
-  const rot = ((seed % 1000) / 1000) * TAU;
-  const n = clusters.length;
-
-  return clusters.map((c, i) => {
-    const rng = mulberry32(hashString(c.label) ^ seed);
-    const rr = n === 1 ? 0 : Math.sqrt((i + 0.5) / n);
-    const ang = i * GOLDEN + rot;
-    const nx = 0.5 + Math.cos(ang) * rr * 0.4 + (rng() - 0.5) * 0.07;
-    const ny = 0.5 + Math.sin(ang) * rr * 0.34 + (rng() - 0.5) * 0.07;
-    return makeHub(c.label, c.count, i, nx, ny, rng, false);
-  });
-}
-
-/* ------------------------------------------------------------------ */
-/* frame rendering (pure canvas — never touches React)                 */
-/* ------------------------------------------------------------------ */
-
-const MONO_FONT = '10px "JetBrains Mono", ui-monospace, SFMono-Regular, monospace';
-
-function roundRectPath(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-): void {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
-}
-
-function drawFrame(
-  ctx: CanvasRenderingContext2D,
-  hubs: HubNode[],
-  w: number,
-  h: number,
-  t: number,
-  mouse: { x: number; y: number } | null,
-): void {
-  ctx.clearRect(0, 0, w, h);
-
-  // Pass 1 — screen positions + hover hit-test.
-  let hovered = -1;
-  for (let i = 0; i < hubs.length; i++) {
-    const hub = hubs[i];
-    hub.sx = hub.nx * w + Math.sin(t * hub.driftSpeed + hub.driftPhase) * HUB_DRIFT_PX;
-    hub.sy = hub.ny * h + Math.cos(t * hub.driftSpeed * 0.8 + hub.driftPhase) * HUB_DRIFT_PX;
-    if (!hub.dim && mouse !== null && hovered === -1) {
-      const dx = mouse.x - hub.sx;
-      const dy = mouse.y - hub.sy;
-      if (dx * dx + dy * dy <= (hub.r + 9) * (hub.r + 9)) hovered = i;
-    }
-  }
-
-  // Pass 2 — clusters (lines, satellites, hub core + glow).
-  for (let i = 0; i < hubs.length; i++) {
-    const hub = hubs[i];
-    const hot = hovered === i;
-    // Hovering one cluster gently dims the others so it reads as "selected".
-    const ca = (hub.dim ? 0.35 : 1) * (hovered !== -1 && !hot ? 0.35 : 1);
-
-    ctx.strokeStyle = hub.col;
-    ctx.fillStyle = hub.col;
-    ctx.lineWidth = 1;
-    for (const s of hub.sats) {
-      const dx = Math.sin(t * s.driftSpeed + s.driftPhase) * SAT_DRIFT_PX;
-      const dy = Math.cos(t * s.driftSpeed * 0.9 + s.driftPhase) * SAT_DRIFT_PX;
-      const sx = hub.sx + Math.cos(s.angle) * s.dist + dx;
-      const sy = hub.sy + Math.sin(s.angle) * s.dist * 0.85 + dy;
-
-      ctx.globalAlpha = (hot ? 0.55 : 0.25) * ca;
-      ctx.beginPath();
-      ctx.moveTo(hub.sx, hub.sy);
-      ctx.lineTo(sx, sy);
-      ctx.stroke();
-
-      const twinkle = 0.45 + 0.35 * Math.sin(t * s.twinkleSpeed + s.twinklePhase);
-      ctx.globalAlpha = Math.min(1, twinkle * ca + (hot ? 0.25 : 0));
-      ctx.beginPath();
-      ctx.arc(sx, sy, s.r, 0, TAU);
-      ctx.fill();
-    }
-
-    // Hub glow (radial gradient) + core + white-hot center.
-    const hubR = hub.r * (hot ? 1.18 : 1);
-    const glowR = hubR * (hot ? 4 : 3.2);
-    const grad = ctx.createRadialGradient(hub.sx, hub.sy, 0, hub.sx, hub.sy, glowR);
-    grad.addColorStop(0, hub.glowIn);
-    grad.addColorStop(1, hub.glowOut);
-    ctx.globalAlpha = ca * (hot ? 1.4 : 1);
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(hub.sx, hub.sy, glowR, 0, TAU);
-    ctx.fill();
-
-    ctx.globalAlpha = 0.95 * ca;
-    ctx.fillStyle = hub.col;
-    ctx.beginPath();
-    ctx.arc(hub.sx, hub.sy, hubR, 0, TAU);
-    ctx.fill();
-
-    ctx.globalAlpha = (hub.dim ? 0.3 : 0.85) * ca;
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(hub.sx, hub.sy, hubR * 0.35, 0, TAU);
-    ctx.fill();
-  }
-
-  // Pass 3 — tooltip, drawn last so it sits above everything.
-  if (hovered !== -1) {
-    const hub = hubs[hovered];
-    const label = `${hub.label.toUpperCase()} · ${hub.count} ${
-      hub.count === 1 ? 'LEARNING' : 'LEARNINGS'
-    }`;
-    ctx.font = MONO_FONT;
-    const tw = ctx.measureText(label).width;
-    const bw = tw + 30;
-    const bh = 24;
-    const bx = Math.min(w - bw - 6, Math.max(6, hub.sx - bw / 2));
-    let by = hub.sy - hub.r - bh - 12;
-    if (by < 6) by = hub.sy + hub.r + 12;
-
-    ctx.globalAlpha = 1;
-    roundRectPath(ctx, bx, by, bw, bh, 6);
-    ctx.fillStyle = 'rgba(10,7,4,0.92)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    ctx.fillStyle = hub.col;
-    ctx.beginPath();
-    ctx.arc(bx + 12, by + bh / 2, 2.5, 0, TAU);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(245,245,242,0.92)';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(label, bx + 20, by + bh / 2 + 0.5);
-  }
-
-  ctx.globalAlpha = 1;
-}
-
-/* ------------------------------------------------------------------ */
-/* component                                                           */
-/* ------------------------------------------------------------------ */
 
 export function KnowledgeMap({ learnings, className }: KnowledgeMapProps) {
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const model = useMemo(() => buildModel(learnings), [learnings]);
-  const modelRef = useRef<HubNode[]>(model);
-  const redrawRef = useRef<(() => void) | null>(null);
-
-  // New data → swap the model behind the loop's back and repaint once
-  // (the animated path would pick it up next frame anyway; this covers
-  // the static reduced-motion / hidden paths).
-  useEffect(() => {
-    modelRef.current = model;
-    redrawRef.current?.();
-  }, [model]);
+  const ref = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
-    const wrap = wrapRef.current;
-    const canvas = canvasRef.current;
-    if (!wrap || !canvas) return;
+    const canvas = ref.current;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const clusters = buildClusters(learnings);
+
+    let W = 0;
+    let H = 0;
+    let dpr = 1;
+    const resize = (): void => {
+      const r = canvas.getBoundingClientRect();
+      dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      W = Math.max(1, Math.round(r.width * dpr));
+      H = Math.max(1, Math.round(r.height * dpr));
+      canvas.width = W;
+      canvas.height = H;
+      draw(0);
+    };
+
+    let hoverIdx = -1;
+    const onMove = (e: PointerEvent): void => {
+      const r = canvas.getBoundingClientRect();
+      const mx = ((e.clientX - r.left) / r.width) * W;
+      const my = ((e.clientY - r.top) / r.height) * H;
+      hoverIdx = -1;
+      clusters.forEach((c, i) => {
+        if (c.label && Math.hypot(c.x * W - mx, c.y * H - my) < 40 * dpr) hoverIdx = i;
+      });
+      if (!running) draw(last);
+    };
+    const onLeave = (): void => {
+      hoverIdx = -1;
+    };
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerleave', onLeave);
+
+    const draw = (t: number): void => {
+      ctx.clearRect(0, 0, W, H);
+      const px = (f: number): number => f * W;
+      const py = (f: number): number => f * H;
+
+      // inter-hub threads (each hub → nearest 2)
+      ctx.globalCompositeOperation = 'source-over';
+      clusters.forEach((c, i) => {
+        const near = clusters
+          .map((o, j) => ({ j, d: Math.hypot(o.x - c.x, o.y - c.y) }))
+          .filter((e) => e.j !== i)
+          .sort((a, b) => a.d - b.d)
+          .slice(0, 2);
+        for (const e of near) {
+          if (e.j < i) continue;
+          const o = clusters[e.j];
+          ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+          ctx.lineWidth = dpr;
+          ctx.beginPath();
+          ctx.moveTo(px(c.x), py(c.y));
+          ctx.lineTo(px(o.x), py(o.y));
+          ctx.stroke();
+        }
+      });
+
+      ctx.globalCompositeOperation = 'lighter';
+      clusters.forEach((c, i) => {
+        const rgb = hexRgb(c.color);
+        const hx = px(c.x);
+        const hy = py(c.y);
+        const hot = i === hoverIdx ? 1.6 : 1;
+        const breathe = reduced ? 1 : 0.85 + 0.15 * Math.sin(t * 0.7 + c.phase);
+
+        // hub glow
+        const R = 34 * dpr * hot;
+        const grad = ctx.createRadialGradient(hx, hy, 0, hx, hy, R);
+        grad.addColorStop(0, `rgba(${rgb},${0.5 * breathe * hot})`);
+        grad.addColorStop(0.35, `rgba(${rgb},${0.14 * breathe})`);
+        grad.addColorStop(1, `rgba(${rgb},0)`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(hx - R, hy - R, R * 2, R * 2);
+        // hub core
+        ctx.fillStyle = `rgba(255,255,255,${0.85 * hot > 1 ? 1 : 0.85})`;
+        ctx.beginPath();
+        ctx.arc(hx, hy, 3 * dpr * hot, 0, Math.PI * 2);
+        ctx.fill();
+
+        // satellites on spokes
+        for (const s of c.sats) {
+          const a = s.a + (reduced ? 0 : t * c.spin);
+          const sx = hx + Math.cos(a) * s.r * dpr;
+          const sy = hy + Math.sin(a) * s.r * dpr * 0.82;
+          if (s.spoke) {
+            ctx.strokeStyle = `rgba(${rgb},${0.16 * hot})`;
+            ctx.lineWidth = dpr * 0.8;
+            ctx.beginPath();
+            ctx.moveTo(hx, hy);
+            ctx.lineTo(sx, sy);
+            ctx.stroke();
+          }
+          const tw = reduced ? 1 : 0.7 + 0.3 * Math.sin(t * 1.6 + s.a * 7 + c.phase);
+          ctx.fillStyle = `rgba(${rgb},${Math.min(1, s.bright * tw * hot)})`;
+          ctx.beginPath();
+          ctx.arc(sx, sy, s.size * dpr, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // label for real, hovered clusters
+        if (i === hoverIdx && c.label) {
+          ctx.globalCompositeOperation = 'source-over';
+          const text = `${c.label} · ${c.count} learning${c.count === 1 ? '' : 's'}`;
+          const fs = 11 * dpr;
+          ctx.font = `${fs}px "JetBrains Mono", ui-monospace, monospace`;
+          const tw2 = ctx.measureText(text).width;
+          const bx = Math.min(Math.max(hx - tw2 / 2, 6 * dpr), W - tw2 - 6 * dpr);
+          const by = Math.max(hy - 46 * dpr, fs + 8 * dpr);
+          ctx.fillStyle = 'rgba(4,4,6,0.9)';
+          ctx.fillRect(bx - 6 * dpr, by - fs - 4 * dpr, tw2 + 12 * dpr, fs + 10 * dpr);
+          ctx.strokeStyle = `rgba(${rgb},0.5)`;
+          ctx.lineWidth = dpr;
+          ctx.strokeRect(bx - 6 * dpr, by - fs - 4 * dpr, tw2 + 12 * dpr, fs + 10 * dpr);
+          ctx.fillStyle = `rgba(${rgb},0.95)`;
+          ctx.fillText(text, bx, by);
+          ctx.globalCompositeOperation = 'lighter';
+        }
+      });
+      ctx.globalCompositeOperation = 'source-over';
+    };
 
     let raf = 0;
     let running = false;
-    let width = 1;
-    let height = 1;
-    let mouse: { x: number; y: number } | null = null;
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    let reduced = mq.matches;
-
-    const draw = (tMs: number) => {
-      drawFrame(ctx, modelRef.current, width, height, reduced ? 0 : tMs / 1000, mouse);
+    let last = 0;
+    const loop = (now: number): void => {
+      last = now / 1000;
+      draw(last);
+      raf = requestAnimationFrame(loop);
     };
-    const tick = (tMs: number) => {
-      draw(tMs);
-      raf = requestAnimationFrame(tick);
-    };
-    const start = () => {
-      if (running || reduced || document.hidden) return;
+    const start = (): void => {
+      if (running || reduced || document.visibilityState === 'hidden') return;
       running = true;
-      raf = requestAnimationFrame(tick);
+      raf = requestAnimationFrame(loop);
     };
-    const stop = () => {
-      if (!running) return;
+    const stop = (): void => {
       running = false;
       cancelAnimationFrame(raf);
     };
-    /** One static frame — used whenever the loop is not running. */
-    const still = () => draw(0);
-
-    const resize = () => {
-      const rect = wrap.getBoundingClientRect();
-      width = Math.max(1, rect.width);
-      height = Math.max(1, rect.height);
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      canvas.width = Math.max(1, Math.round(width * dpr));
-      canvas.height = Math.max(1, Math.round(height * dpr));
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      if (!running) still();
-    };
-    const ro = new ResizeObserver(resize);
-    ro.observe(wrap);
-    resize();
-
-    const onVisibility = () => {
-      if (document.hidden) stop();
+    const onVisibility = (): void => {
+      if (document.visibilityState === 'hidden') stop();
       else start();
     };
     document.addEventListener('visibilitychange', onVisibility);
 
-    const onMotionPref = () => {
-      reduced = mq.matches;
-      if (reduced) {
-        stop();
-        still();
-      } else {
-        start();
-      }
-    };
-    mq.addEventListener('change', onMotionPref);
-
-    const onPointerMove = (ev: PointerEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      mouse = { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
-      if (!running) still();
-    };
-    const onPointerLeave = () => {
-      mouse = null;
-      if (!running) still();
-    };
-    canvas.addEventListener('pointermove', onPointerMove);
-    canvas.addEventListener('pointerleave', onPointerLeave);
-
-    redrawRef.current = () => {
-      if (!running) still();
-    };
-
-    start();
-    if (!running) still();
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
+    resize();
+    if (reduced) draw(0);
+    else start();
 
     return () => {
       stop();
       ro.disconnect();
       document.removeEventListener('visibilitychange', onVisibility);
-      mq.removeEventListener('change', onMotionPref);
-      canvas.removeEventListener('pointermove', onPointerMove);
-      canvas.removeEventListener('pointerleave', onPointerLeave);
-      redrawRef.current = null;
+      canvas.removeEventListener('pointermove', onMove);
+      canvas.removeEventListener('pointerleave', onLeave);
     };
-  }, []);
+  }, [learnings]);
 
-  return (
-    <div ref={wrapRef} className={`relative overflow-hidden ${className ?? ''}`}>
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 h-full w-full"
-        role="img"
-        aria-label="Knowledge map — learnings clustered by error class"
-      />
-    </div>
-  );
+  return <canvas ref={ref} aria-hidden={false} className={`block w-full ${className ?? ''}`} />;
 }
