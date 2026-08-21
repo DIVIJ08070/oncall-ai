@@ -3,6 +3,7 @@ import { UnifiedSidebar, UnifiedTopBar } from './UnifiedChrome';
 import { BottomTabBar } from './BottomTabBar';
 import { CursorSpotlight } from './CursorSpotlight';
 import { Grain, AtmosphereBackdrop, Scanlines, ScanSweep } from '../atmosphere';
+import { Particles } from '../atmosphere/Particles';
 
 /**
  * App shell (DESIGN_SPEC §4): TopBar (sticky 56px) + SideNav + Content. Content is
@@ -14,6 +15,21 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="relative flex min-h-screen flex-col bg-bg">
       {/* Igloo-inspired atmosphere: aurora depth + HUD grid behind everything, film grain on top. */}
       <AtmosphereBackdrop />
+      {/* ambient particle dust across every console page (home has its own world) */}
+      <div className="pointer-events-none fixed inset-0">
+        <Particles
+          particleCount={140}
+          particleSpread={11}
+          speed={0.06}
+          particleColors={['#F16524', '#8a857e', '#6d4aff', '#ffffff']}
+          alphaParticles
+          particleBaseSize={70}
+          sizeRandomness={1}
+          disableRotation={false}
+          pixelRatio={1.5}
+          className="absolute inset-0"
+        />
+      </div>
       <Scanlines />
       <ScanSweep />
       <Grain />
