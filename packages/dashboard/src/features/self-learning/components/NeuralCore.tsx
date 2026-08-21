@@ -276,7 +276,26 @@ function BrainScene({
   }, [hovered]);
   const touchLocal = useRef<THREE.Vector3 | null>(null);
   const boosted = useRef<number[]>([]);
+  const waved = useRef<number[]>([]);
   const tmpV = useRef(new THREE.Vector3());
+  const tipSprite = useRef<THREE.Sprite | null>(null);
+  const [caption, setCaption] = useState<{ pos: THREE.Vector3; text: string } | null>(null);
+  // autonomous learning-episode machine: idle → wave (region wakes) → link
+  // (a new pathway draws itself) → the pathway becomes permanent wiring
+  const episode = useRef({
+    state: 'idle' as 'idle' | 'wave' | 'link',
+    t0: 0,
+    nextAt: 2.5,
+    epi: new THREE.Vector3(),
+    tgt: new THREE.Vector3(),
+  });
+  const pathways = useRef({ geom: null as THREE.BufferGeometry | null, count: 0 });
+  if (!pathways.current.geom) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(60 * 6), 3));
+    g.setDrawRange(0, 0);
+    pathways.current.geom = g;
+  }
 
   useEffect(() => {
     raycaster.params.Points = { threshold: 0.09 };
@@ -375,11 +394,97 @@ function BrainScene({
       }
       posAttr.needsUpdate = true;
     }
+    // ── autonomous self-learning episodes ──
+    const colAttr = graph.ambient.getAttribute('color') as THREE.BufferAttribute;
+    const colArr = colAttr.array as Float32Array;
+    if (waved.current.length) {
+      for (const i of waved.current) {
+        colArr[i * 3] = graph.baseColors[i * 3];
+        colArr[i * 3 + 1] = graph.baseColors[i * 3 + 1];
+        colArr[i * 3 + 2] = graph.baseColors[i * 3 + 2];
+      }
+      waved.current = [];
+      colAttr.needsUpdate = true;
+    }
+    const ep = episode.current;
+    const pick = (v: THREE.Vector3): void => {
+      const i = Math.floor(Math.random() * (graph.basePositions.length / 3));
+      v.set(
+        graph.basePositions[i * 3],
+        graph.basePositions[i * 3 + 1],
+        graph.basePositions[i * 3 + 2],
+      );
+    };
+    if (ep.state === 'idle' && t > ep.nextAt) {
+      ep.state = 'wave';
+      ep.t0 = t;
+      pick(ep.epi);
+      pick(ep.tgt);
+    }
+    if (ep.state === 'wave' || ep.state === 'link') {
+      const wt = t - ep.t0;
+      // expanding wake: a ring of neurons brightens toward ember as it passes
+      const radius = Math.min(1.3, wt * 1.1);
+      const shell = 0.28;
+      for (let i = 0; i < posAttr.count; i++) {
+        const dx = graph.basePositions[i * 3] - ep.epi.x;
+        const dy = graph.basePositions[i * 3 + 1] - ep.epi.y;
+        const dz = graph.basePositions[i * 3 + 2] - ep.epi.z;
+        const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        const band = 1 - Math.min(1, Math.abs(d - radius) / shell);
+        if (band > 0.05) {
+          const k = 1 + 2.2 * band;
+          colArr[i * 3] = Math.min(1, graph.baseColors[i * 3] * k + 0.35 * band);
+          colArr[i * 3 + 1] = Math.min(1, graph.baseColors[i * 3 + 1] * k + 0.14 * band);
+          colArr[i * 3 + 2] = Math.min(1, graph.baseColors[i * 3 + 2] * k);
+          waved.current.push(i);
+        }
+      }
+      colAttr.needsUpdate = true;
+
+      if (ep.state === 'wave' && wt > 1.3) {
+        ep.state = 'link';
+        ep.t0 = t;
+        setCaption({
+          pos: ep.tgt.clone(),
+          text:
+            memories.length > 0
+              ? `pathway formed · ${memories[Math.floor(Math.random() * memories.length)].errorClass}`
+              : 'pathway formed',
+        });
+      } else if (ep.state === 'link') {
+        const lt = Math.min(1, wt / 1.1);
+        // the new pathway draws itself from epicentre to target
+        const pg = pathways.current.geom!;
+        const arr = (pg.getAttribute('position') as THREE.BufferAttribute).array as Float32Array;
+        const slot = pathways.current.count % 60;
+        const ex = ep.epi.x + (ep.tgt.x - ep.epi.x) * lt;
+        const ey = ep.epi.y + (ep.tgt.y - ep.epi.y) * lt;
+        const ez = ep.epi.z + (ep.tgt.z - ep.epi.z) * lt;
+        arr.set([ep.epi.x, ep.epi.y, ep.epi.z, ex, ey, ez], slot * 6);
+        pg.setDrawRange(0, Math.min(60, pathways.current.count + 1) * 2);
+        (pg.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+        if (tipSprite.current) {
+          tipSprite.current.visible = true;
+          tipSprite.current.position.set(ex, ey, ez);
+          (tipSprite.current.material as THREE.SpriteMaterial).opacity = 0.85 * (1 - lt * 0.4);
+        }
+        if (wt > 1.1) {
+          ep.state = 'idle';
+          ep.nextAt = t + 4.5 + Math.random() * 4;
+          pathways.current.count += 1;
+          if (tipSprite.current) tipSprite.current.visible = false;
+          window.setTimeout(() => setCaption(null), 1400);
+        }
+      }
+    }
+    const learningHot = ep.state !== 'idle' ? 1.9 : 1;
+
     pulseState.current.forEach((p, i) => {
       const sp = pulseRefs.current[i];
       const walk = graph.walks[i % graph.walks.length];
       if (!sp || !walk) return;
-      p.u = (p.u + p.speed * (touchLocal.current ? 1.8 : 1) * (1 / 60)) % 1;
+      p.u = (p.u + p.speed * (touchLocal.current ? 1.8 : 1) * learningHot * (1 / 60)) % 1;
       const ft = p.u * (walk.length - 1);
       const fi = Math.min(walk.length - 2, Math.floor(ft));
       const fr = ft - fi;
@@ -466,6 +571,36 @@ function BrainScene({
           <sphereGeometry args={[1, 24, 24]} />
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />
         </mesh>
+        {/* learned pathways — every episode leaves permanent wiring */}
+        <lineSegments geometry={pathways.current.geom!}>
+          <lineBasicMaterial
+            color="#F16524"
+            transparent
+            opacity={0.28}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </lineSegments>
+        {/* tip of the pathway currently being learned */}
+        <sprite ref={tipSprite} visible={false} scale={0.14}>
+          <spriteMaterial
+            map={tex}
+            color="#FF8233"
+            transparent
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </sprite>
+        {caption && (
+          <Html position={caption.pos} center zIndexRange={[20, 0]}>
+            <p
+              className="pointer-events-none w-max -translate-y-6 rounded border border-[#F16524]/40 bg-black/80 px-2 py-1 text-[9px] uppercase tracking-[0.2em] text-[#FF8233]"
+              style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}
+            >
+              {caption.text}
+            </p>
+          </Html>
+        )}
         {/* faint inner life — small, so the cortex silhouette stays crisp */}
         <sprite scale={1.1}>
           <spriteMaterial
