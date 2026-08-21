@@ -8,7 +8,7 @@ import type { Learning } from '../../../api/learnings';
 /**
  * NeuralCore — the self-learning brain, rendered as an actual BRAIN: two
  * cortical hemispheres split by a longitudinal fissure plus a cerebellum,
- * built from ~1500 neurons joined by a synapse web. It always reads as a
+ * built from ~3000 neurons joined by a synapse web. It always reads as a
  * brain — real learnings light up as bright orange MEMORY neurons on the
  * cortex (red when the lesson was a correction), wired together per error
  * class. Interactive: drag to rotate (auto-rotates when idle), scroll to
@@ -22,6 +22,7 @@ export interface NeuralCoreProps {
   className?: string;
 }
 
+const AMBIENT_COUNT = 3000;
 const MAX_MEMORIES = 64;
 const PULSE_COUNT = 10;
 
@@ -35,191 +36,189 @@ function makeRand(seed: number): () => number {
   };
 }
 
-/** Sinuous gyri/sulci field — streamlines follow its iso-contours. */
+/** Sinuous gyri/sulci field over the cortex — drives both relief and shade. */
 function wrinkle(px: number, py: number, pz: number): number {
   return (
-    Math.sin(px * 5.4 + 2.3 * Math.sin(py * 3.4 + pz * 1.8)) *
-    Math.cos(pz * 4.8 + 1.9 * Math.sin(px * 2.5 + py * 1.4)) +
-    0.45 * Math.sin(px * 9.5 + py * 7.2 + pz * 5.1)
+    Math.sin(px * 5.1 + 2.2 * Math.sin(py * 3.3 + pz * 1.7)) *
+    Math.cos(pz * 4.6 + 1.8 * Math.sin(px * 2.4 + py * 1.3))
   );
 }
 
-/** Anatomical radius shaping in unit-direction space. */
-const RADII = new THREE.Vector3(1.12, 0.95, 1.42);
-
-function surfacePoint(dir: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
-  const u = dir;
-  // temporal lobe bulges (sides, low, slightly forward)
-  const tl =
-    0.2 *
-    Math.exp(
-      -(
-        ((Math.abs(u.x) - 0.85) * (Math.abs(u.x) - 0.85)) / 0.06 +
-        ((u.y + 0.38) * (u.y + 0.38)) / 0.09 +
-        ((u.z - 0.18) * (u.z - 0.18)) / 0.35
-      ),
-    );
-  // frontal taper, occipital slight squash
-  const taper = u.z > 0.6 ? 1 - (u.z - 0.6) * 0.12 : 1;
-  let px = u.x * RADII.x * (1 + tl) * taper;
-  let py = u.y * RADII.y * (1 + tl * 0.25);
-  let pz = u.z * RADII.z;
-  // longitudinal fissure
+/**
+ * One point ON the cortex surface: ellipsoid + gyri relief + fissure + flat
+ * base. Returns the fold value (-1..1) so callers can shade ridges bright and
+ * sulci dark — that shading is what makes the folds READ.
+ */
+function corticalPoint(
+  rand: () => number,
+  out: THREE.Vector3,
+): { p: THREE.Vector3; band: number } {
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  let l = 0;
+  do {
+    x = rand() * 2 - 1;
+    y = rand() * 2 - 1;
+    z = rand() * 2 - 1;
+    l = x * x + y * y + z * z;
+  } while (l > 1 || l < 0.05);
+  l = Math.sqrt(l);
+  x /= l;
+  y /= l;
+  z /= l;
+  // ellipsoid radii: wider than tall, longest front-back
+  let px = x * 1.15;
+  let py = y * 0.92;
+  let pz = z * 1.45;
+  const band = wrinkle(px, py, pz); // -1..1 across sinuous fold bands
+  const relief = 1 + 0.075 * band + 0.015 * (rand() - 0.5);
+  const shell = 0.985 + rand() * 0.035; // SURFACE only — no interior fuzz
+  px *= relief * shell;
+  py *= relief * shell;
+  pz *= relief * shell;
+  // longitudinal fissure between hemispheres
   const side = px >= 0 ? 1 : -1;
-  px = side * (Math.abs(px) * 0.94 + 0.06);
-  // flat underside
-  if (py < -0.5) py = -0.5 - (py + 0.5) * 0.25;
-  return out.set(px, py, pz);
+  px = side * (Math.abs(px) * 0.93 + 0.09);
+  // flatten the underside
+  if (py < -0.48) py = -0.48 - (py + 0.48) * 0.3;
+  // frontal + temporal taper
+  if (pz > 0.85) px *= 0.88;
+  return { p: out.set(px, py, pz), band };
 }
 
-/** Numeric gradient of the wrinkle field. */
-function wrinkleGrad(p: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
-  const e = 0.02;
+/** Cerebellum: small paired lobes tucked under the back. */
+function cerebellumPoint(rand: () => number, out: THREE.Vector3): THREE.Vector3 {
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  let l = 0;
+  do {
+    x = rand() * 2 - 1;
+    y = rand() * 2 - 1;
+    z = rand() * 2 - 1;
+    l = x * x + y * y + z * z;
+  } while (l > 1 || l === 0);
+  const folds = 1 + 0.09 * Math.sin(y * 14 + x * 6);
+  const side = x >= 0 ? 1 : -1;
   return out.set(
-    wrinkle(p.x + e, p.y, p.z) - wrinkle(p.x - e, p.y, p.z),
-    wrinkle(p.x, p.y + e, p.z) - wrinkle(p.x, p.y - e, p.z),
-    wrinkle(p.x, p.y, p.z + e) - wrinkle(p.x, p.y, p.z - e),
+    side * (Math.abs(x * 0.52 * folds) + 0.03),
+    y * 0.3 * folds - 0.58,
+    z * 0.42 * folds - 0.95,
   );
 }
 
 interface BrainGraph {
-  ambient: THREE.BufferGeometry; // sparkle nodes on the fold lines
-  synapses: THREE.BufferGeometry; // the fold streamlines (as segments)
-  walks: THREE.Vector3[][];
+  ambient: THREE.BufferGeometry;
+  synapses: THREE.BufferGeometry;
+  walks: THREE.Vector3[][]; // pulse paths
   memorySlots: THREE.Vector3[];
 }
 
-/**
- * The brain is DRAWN, hologram-style: ~230 serpentine streamlines march along
- * iso-contours of the fold field across an anatomically shaped surface
- * (hemispheres + fissure + temporal lobes), the cerebellum gets its classic
- * parallel striations, and a small brainstem drops from the base. Sparkle
- * nodes + memories + pulses ride the same lines.
- */
 function buildBrain(level: number): BrainGraph {
   const rand = makeRand(20260821);
-  const silver = new THREE.Color('#c9cde0');
-  const violet = new THREE.Color('#a78bfa');
+  const pts: THREE.Vector3[] = [];
+  const bands: number[] = [];
+  const v = new THREE.Vector3();
+  for (let i = 0; i < AMBIENT_COUNT; i++) {
+    if (i % 8 === 7) {
+      cerebellumPoint(rand, v);
+      bands.push(Math.sin(v.y * 26) * 0.6); // fine cerebellar striations
+    } else {
+      bands.push(corticalPoint(rand, v).band);
+    }
+    pts.push(v.clone());
+  }
+
+  // colors: silver base, violet minority, faint ember sprinkle — brighter with level
+  const positions = new Float32Array(AMBIENT_COUNT * 3);
+  const colors = new Float32Array(AMBIENT_COUNT * 3);
+  const silver = new THREE.Color('#9aa0b8');
+  const violet = new THREE.Color('#8B5CF6');
   const ember = new THREE.Color('#F16524');
   const tmp = new THREE.Color();
-  const levelBoost = 0.78 + Math.min(level, 5) * 0.05;
-
-  const segPos: number[] = [];
-  const segCol: number[] = [];
-  const nodePos: number[] = [];
-  const nodeCol: number[] = [];
-  const walks: THREE.Vector3[][] = [];
-
-  const dir = new THREE.Vector3();
-  const p = new THREE.Vector3();
-  const g = new THREE.Vector3();
-  const n = new THREE.Vector3();
-  const t = new THREE.Vector3();
-
-  const pushStream = (path: THREE.Vector3[], color: THREE.Color, bright: number): void => {
-    for (let i = 1; i < path.length; i++) {
-      const a = path[i - 1];
-      const b = path[i];
-      segPos.push(a.x, a.y, a.z, b.x, b.y, b.z);
-      for (const q of [a, b]) {
-        const fissure = Math.abs(q.x) < 0.14 ? 0.4 : 1;
-        tmp.copy(color).multiplyScalar(bright * fissure * levelBoost);
-        segCol.push(tmp.r, tmp.g, tmp.b);
-      }
-      if (i % 4 === 0 && rand() < 0.65) {
-        nodePos.push(b.x, b.y, b.z);
-        tmp.copy(color).multiplyScalar(Math.min(1.5, bright * 1.7));
-        nodeCol.push(tmp.r, tmp.g, tmp.b);
-      }
-    }
-  };
-
-  // ── cortical streamlines: march along fold iso-contours ────────────────
-  const STREAMS = 230;
-  for (let sIdx = 0; sIdx < STREAMS; sIdx++) {
-    // stratified seed direction, biased to upper cortex
-    dir
-      .set(rand() * 2 - 1, rand() * 1.7 - 0.55, rand() * 2 - 1)
-      .normalize();
-    surfacePoint(dir, p);
-    const path: THREE.Vector3[] = [p.clone()];
-    const flip = rand() < 0.5 ? -1 : 1;
-    for (let step = 0; step < 64; step++) {
-      wrinkleGrad(p, g);
-      n.set(p.x / (RADII.x * RADII.x), p.y / (RADII.y * RADII.y), p.z / (RADII.z * RADII.z)).normalize();
-      t.crossVectors(n, g);
-      if (t.lengthSq() < 1e-6) break;
-      t.normalize().multiplyScalar(0.045 * flip);
-      // wiggle so lines stay organic
-      t.addScaledVector(n, 0);
-      p.add(t);
-      // re-project to the anatomical surface
-      dir.set(p.x / RADII.x, p.y / RADII.y, p.z / RADII.z).normalize();
-      surfacePoint(dir, p);
-      if (p.y < -0.62) break; // stop at the base
-      path.push(p.clone());
-    }
-    if (path.length < 8) continue;
-    const w = wrinkle(path[0].x, path[0].y, path[0].z);
-    const ridge = Math.max(0, (w + 1.45) / 2.9); // ridge streams brighter
+  const levelBoost = 0.8 + Math.min(level, 5) * 0.05;
+  for (let i = 0; i < AMBIENT_COUNT; i++) {
+    positions.set([pts[i].x, pts[i].y, pts[i].z], i * 3);
     const roll = rand();
-    const col = roll < 0.12 ? violet : roll < 0.16 ? ember : silver;
-    pushStream(path, col, 0.22 + 0.7 * ridge ** 1.3);
-    if (walks.length < PULSE_COUNT && path.length > 20 && rand() < 0.5) walks.push(path);
+    tmp.copy(roll < 0.1 ? violet : roll < 0.15 ? ember : silver);
+    // gyri catch the light, sulci fall into shadow — this sells the folds
+    const shade = 0.28 + 0.72 * Math.max(0, (bands[i] + 1) / 2) ** 1.2;
+    // the midline fissure stays dark
+    const fissure = Math.abs(pts[i].x) < 0.17 ? 0.35 : 1;
+    tmp.multiplyScalar(shade * fissure * levelBoost * (0.75 + rand() * 0.35));
+    colors.set([tmp.r, tmp.g, tmp.b], i * 3);
   }
-
-  // ── cerebellum: classic parallel striations ────────────────────────────
-  const CB = { x: 0, y: -0.52, z: -0.98, rx: 0.52, ry: 0.3, rz: 0.4 };
-  for (let row = 0; row < 14; row++) {
-    const v = -1 + (2 * (row + 0.5)) / 14;
-    const path: THREE.Vector3[] = [];
-    for (let a = -1; a <= 1.001; a += 0.08) {
-      const ang = a * Math.PI * 0.5;
-      const rr = Math.sqrt(Math.max(0.03, 1 - v * v));
-      const wob = 1 + 0.06 * Math.sin(a * 9 + row);
-      path.push(
-        new THREE.Vector3(
-          CB.x + Math.sin(ang) * CB.rx * rr * wob,
-          CB.y + v * CB.ry,
-          CB.z + Math.cos(ang) * CB.rz * rr * wob * -1,
-        ),
-      );
-    }
-    pushStream(path, silver, 0.3 + 0.25 * Math.abs(Math.sin(row * 2.1)));
-  }
-
-  // ── brainstem: short tapered stalk ─────────────────────────────────────
-  for (let k = 0; k < 7; k++) {
-    const ang = (k / 7) * Math.PI * 2;
-    const path: THREE.Vector3[] = [];
-    for (let u = 0; u <= 1.001; u += 0.14) {
-      const r = 0.14 * (1 - u * 0.45);
-      path.push(
-        new THREE.Vector3(
-          Math.cos(ang) * r,
-          -0.52 - u * 0.42,
-          -0.55 + Math.sin(ang) * r - u * 0.12,
-        ),
-      );
-    }
-    pushStream(path, silver, 0.28);
-  }
-
-  const synapses = new THREE.BufferGeometry();
-  synapses.setAttribute('position', new THREE.Float32BufferAttribute(segPos, 3));
-  synapses.setAttribute('color', new THREE.Float32BufferAttribute(segCol, 3));
   const ambient = new THREE.BufferGeometry();
-  ambient.setAttribute('position', new THREE.Float32BufferAttribute(nodePos, 3));
-  ambient.setAttribute('color', new THREE.Float32BufferAttribute(nodeCol, 3));
+  ambient.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  ambient.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-  // memory slots on the upper cortex, well spread
+  // synapse web: each neuron links to its nearest same-hemisphere neighbour
+  // (spatial hash for speed)
+  const cell = 0.34;
+  const hash = new Map<string, number[]>();
+  const key = (p: THREE.Vector3): string =>
+    `${Math.floor(p.x / cell)},${Math.floor(p.y / cell)},${Math.floor(p.z / cell)}`;
+  pts.forEach((p, i) => {
+    const k = key(p);
+    const arr = hash.get(k);
+    if (arr) arr.push(i);
+    else hash.set(k, [i]);
+  });
+  const neighbourOf = (i: number): number => {
+    const p = pts[i];
+    let best = -1;
+    let bd = Infinity;
+    const cx = Math.floor(p.x / cell);
+    const cy = Math.floor(p.y / cell);
+    const cz = Math.floor(p.z / cell);
+    for (let dx = -1; dx <= 1; dx++)
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dz = -1; dz <= 1; dz++) {
+          const arr = hash.get(`${cx + dx},${cy + dy},${cz + dz}`);
+          if (!arr) continue;
+          for (const j of arr) {
+            if (j === i || pts[j].x * p.x < 0) continue; // stay in hemisphere
+            const d = p.distanceToSquared(pts[j]);
+            if (d < bd) {
+              bd = d;
+              best = j;
+            }
+          }
+        }
+    return best;
+  };
+  const segs: number[] = [];
+  const neighbours: number[] = [];
+  for (let i = 0; i < AMBIENT_COUNT; i++) {
+    const j = neighbourOf(i);
+    neighbours.push(j);
+    if (j >= 0 && j > i) {
+      segs.push(pts[i].x, pts[i].y, pts[i].z, pts[j].x, pts[j].y, pts[j].z);
+    }
+  }
+  const synapses = new THREE.BufferGeometry();
+  synapses.setAttribute('position', new THREE.Float32BufferAttribute(segs, 3));
+
+  // pulse walks: random neighbour-graph strolls across the cortex
+  const walks: THREE.Vector3[][] = [];
+  for (let w = 0; w < PULSE_COUNT; w++) {
+    let i = Math.floor(rand() * AMBIENT_COUNT);
+    const path: THREE.Vector3[] = [pts[i]];
+    for (let h = 0; h < 14; h++) {
+      const j = neighbours[i];
+      if (j < 0) break;
+      path.push(pts[j]);
+      i = (j + Math.floor(rand() * 7)) % AMBIENT_COUNT;
+    }
+    if (path.length > 3) walks.push(path);
+  }
+
+  // memory slots: well-spread surface points for real learnings to occupy
   const memorySlots: THREE.Vector3[] = [];
-  const mv = new THREE.Vector3();
   for (let i = 0; i < MAX_MEMORIES; i++) {
-    mv.set(rand() * 2 - 1, rand() * 1.4 - 0.25, rand() * 2 - 1).normalize();
-    const out = new THREE.Vector3();
-    surfacePoint(mv, out);
-    memorySlots.push(out.multiplyScalar(1.03));
+    corticalPoint(rand, v);
+    memorySlots.push(v.clone().multiplyScalar(1.05));
   }
 
   return { ambient, synapses, walks, memorySlots };
@@ -341,9 +340,9 @@ function BrainScene({
         {/* synapse web */}
         <lineSegments geometry={graph.synapses}>
           <lineBasicMaterial
-            vertexColors
+            color="#8f95ad"
             transparent
-            opacity={0.85}
+            opacity={0.1}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
@@ -352,11 +351,10 @@ function BrainScene({
         <points geometry={graph.ambient}>
           <pointsMaterial
             vertexColors
-            size={0.026}
+            size={0.032}
             sizeAttenuation
             transparent
-            opacity={0.9}
-            blending={THREE.AdditiveBlending}
+            opacity={0.95}
             depthWrite={false}
           />
         </points>
