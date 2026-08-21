@@ -22,7 +22,7 @@ export interface NeuralCoreProps {
   className?: string;
 }
 
-const AMBIENT_COUNT = 1500;
+const AMBIENT_COUNT = 3000;
 const MAX_MEMORIES = 64;
 const PULSE_COUNT = 10;
 
@@ -36,9 +36,23 @@ function makeRand(seed: number): () => number {
   };
 }
 
-/** One point on/near the cortex: ellipsoid + folds + fissure + flat base. */
-function corticalPoint(rand: () => number, out: THREE.Vector3): THREE.Vector3 {
-  // random direction (rejection-sampled sphere)
+/** Sinuous gyri/sulci field over the cortex — drives both relief and shade. */
+function wrinkle(px: number, py: number, pz: number): number {
+  return (
+    Math.sin(px * 5.1 + 2.2 * Math.sin(py * 3.3 + pz * 1.7)) *
+    Math.cos(pz * 4.6 + 1.8 * Math.sin(px * 2.4 + py * 1.3))
+  );
+}
+
+/**
+ * One point ON the cortex surface: ellipsoid + gyri relief + fissure + flat
+ * base. Returns the fold value (-1..1) so callers can shade ridges bright and
+ * sulci dark — that shading is what makes the folds READ.
+ */
+function corticalPoint(
+  rand: () => number,
+  out: THREE.Vector3,
+): { p: THREE.Vector3; band: number } {
   let x = 0;
   let y = 0;
   let z = 0;
@@ -53,25 +67,24 @@ function corticalPoint(rand: () => number, out: THREE.Vector3): THREE.Vector3 {
   x /= l;
   y /= l;
   z /= l;
-  // cortical folds: bumpy radius, mostly surface (shell) with slight depth
-  const folds =
-    1 +
-    0.075 * Math.sin(z * 6.5 + Math.sin(y * 4.2) * 2.2) +
-    0.055 * Math.sin(y * 7.3 + x * 3.1) +
-    0.04 * (rand() - 0.5);
-  const shell = 0.86 + rand() * 0.14;
-  // ellipsoid radii: width, height, depth (front-back longest)
-  let px = x * 1.12 * folds * shell;
-  let py = y * 0.92 * folds * shell;
-  let pz = z * 1.5 * folds * shell;
+  // ellipsoid radii: wider than tall, longest front-back
+  let px = x * 1.15;
+  let py = y * 0.92;
+  let pz = z * 1.45;
+  const band = wrinkle(px, py, pz); // -1..1 across sinuous fold bands
+  const relief = 1 + 0.075 * band + 0.015 * (rand() - 0.5);
+  const shell = 0.985 + rand() * 0.035; // SURFACE only — no interior fuzz
+  px *= relief * shell;
+  py *= relief * shell;
+  pz *= relief * shell;
   // longitudinal fissure between hemispheres
   const side = px >= 0 ? 1 : -1;
-  px = side * (Math.abs(px) * 0.94 + 0.07);
-  // flatten the underside (brains sit on a base)
-  if (py < -0.5) py = -0.5 - (py + 0.5) * 0.35;
-  // slight frontal taper
-  if (pz > 0.9) px *= 0.9;
-  return out.set(px, py, pz);
+  px = side * (Math.abs(px) * 0.93 + 0.09);
+  // flatten the underside
+  if (py < -0.48) py = -0.48 - (py + 0.48) * 0.3;
+  // frontal + temporal taper
+  if (pz > 0.85) px *= 0.88;
+  return { p: out.set(px, py, pz), band };
 }
 
 /** Cerebellum: small paired lobes tucked under the back. */
@@ -105,10 +118,15 @@ interface BrainGraph {
 function buildBrain(level: number): BrainGraph {
   const rand = makeRand(20260821);
   const pts: THREE.Vector3[] = [];
+  const bands: number[] = [];
   const v = new THREE.Vector3();
   for (let i = 0; i < AMBIENT_COUNT; i++) {
-    if (i % 7 === 6) cerebellumPoint(rand, v);
-    else corticalPoint(rand, v);
+    if (i % 8 === 7) {
+      cerebellumPoint(rand, v);
+      bands.push(Math.sin(v.y * 26) * 0.6); // fine cerebellar striations
+    } else {
+      bands.push(corticalPoint(rand, v).band);
+    }
     pts.push(v.clone());
   }
 
@@ -119,12 +137,16 @@ function buildBrain(level: number): BrainGraph {
   const violet = new THREE.Color('#8B5CF6');
   const ember = new THREE.Color('#F16524');
   const tmp = new THREE.Color();
-  const levelBoost = 0.72 + Math.min(level, 5) * 0.05;
+  const levelBoost = 0.8 + Math.min(level, 5) * 0.05;
   for (let i = 0; i < AMBIENT_COUNT; i++) {
     positions.set([pts[i].x, pts[i].y, pts[i].z], i * 3);
     const roll = rand();
-    tmp.copy(roll < 0.14 ? violet : roll < 0.2 ? ember : silver);
-    tmp.multiplyScalar((0.35 + rand() * 0.65) * levelBoost);
+    tmp.copy(roll < 0.1 ? violet : roll < 0.15 ? ember : silver);
+    // gyri catch the light, sulci fall into shadow — this sells the folds
+    const shade = 0.28 + 0.72 * Math.max(0, (bands[i] + 1) / 2) ** 1.2;
+    // the midline fissure stays dark
+    const fissure = Math.abs(pts[i].x) < 0.17 ? 0.35 : 1;
+    tmp.multiplyScalar(shade * fissure * levelBoost * (0.75 + rand() * 0.35));
     colors.set([tmp.r, tmp.g, tmp.b], i * 3);
   }
   const ambient = new THREE.BufferGeometry();
@@ -171,7 +193,7 @@ function buildBrain(level: number): BrainGraph {
   for (let i = 0; i < AMBIENT_COUNT; i++) {
     const j = neighbourOf(i);
     neighbours.push(j);
-    if (j > i) {
+    if (j >= 0 && j > i) {
       segs.push(pts[i].x, pts[i].y, pts[i].z, pts[j].x, pts[j].y, pts[j].z);
     }
   }
@@ -196,7 +218,7 @@ function buildBrain(level: number): BrainGraph {
   const memorySlots: THREE.Vector3[] = [];
   for (let i = 0; i < MAX_MEMORIES; i++) {
     corticalPoint(rand, v);
-    memorySlots.push(v.clone().multiplyScalar(1.04));
+    memorySlots.push(v.clone().multiplyScalar(1.05));
   }
 
   return { ambient, synapses, walks, memorySlots };
@@ -314,13 +336,13 @@ function BrainScene({
 
   return (
     <>
-      <group ref={group}>
+      <group ref={group} rotation={[0.14, 0.55, 0]}>
         {/* synapse web */}
         <lineSegments geometry={graph.synapses}>
           <lineBasicMaterial
             color="#8f95ad"
             transparent
-            opacity={0.07}
+            opacity={0.1}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
@@ -329,10 +351,10 @@ function BrainScene({
         <points geometry={graph.ambient}>
           <pointsMaterial
             vertexColors
-            size={0.028}
+            size={0.032}
             sizeAttenuation
             transparent
-            opacity={0.85}
+            opacity={0.95}
             depthWrite={false}
           />
         </points>
@@ -370,23 +392,13 @@ function BrainScene({
             />
           </points>
         )}
-        {/* inner heart glow */}
-        <sprite scale={2.6}>
+        {/* faint inner life — small, so the cortex silhouette stays crisp */}
+        <sprite scale={1.1}>
           <spriteMaterial
             map={tex}
             color="#7a4be0"
             transparent
-            opacity={0.16}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </sprite>
-        <sprite scale={1.3} position={[0, -0.1, 0.2]}>
-          <spriteMaterial
-            map={tex}
-            color="#F16524"
-            transparent
-            opacity={0.14}
+            opacity={0.08}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
@@ -444,8 +456,8 @@ function BrainScene({
       <OrbitControls
         ref={controls}
         enablePan={false}
-        minDistance={2.6}
-        maxDistance={7}
+        minDistance={3.2}
+        maxDistance={8.5}
         autoRotate={!reduced}
         autoRotateSpeed={0.7}
         onStart={() => {
@@ -473,7 +485,7 @@ export function NeuralCore({ learnings, level, onSelect, className }: NeuralCore
         dpr={[1, 1.75]}
         frameloop={reduced ? 'demand' : 'always'}
         gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
-        camera={{ fov: 40, position: [0, 0.45, 4.4] }}
+        camera={{ fov: 40, position: [0, 0.4, 5.1] }}
         onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
         onPointerMissed={() => onSelect?.(null)}
       >
