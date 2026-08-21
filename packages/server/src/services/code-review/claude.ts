@@ -47,7 +47,16 @@ const REVIEW_SYSTEM_PROMPT =
 /** Hard wall-clock bound for one review turn. */
 const CLAUDE_TIMEOUT_MS = 180_000;
 
-export async function claudeGenerateText(config: Config, prompt: string): Promise<string> {
+/**
+ * Single-turn, tool-less Claude text generation via the subscription CLI.
+ * Defaults to the code-review system prompt; other features (e.g. the Momo
+ * assistant) pass their own `systemPrompt` to reuse the same auth + transport.
+ */
+export async function claudeGenerateText(
+  config: Config,
+  prompt: string,
+  systemPrompt: string = REVIEW_SYSTEM_PROMPT,
+): Promise<string> {
   const env = subscriptionEnv(config);
 
   const sdk = await import('@anthropic-ai/claude-agent-sdk');
@@ -66,7 +75,7 @@ export async function claudeGenerateText(config: Config, prompt: string): Promis
         // 3, not 1: with adaptive thinking a turn can end before the final
         // text lands; 1 made long-diff reviews die with error_max_turns.
         maxTurns: 3,
-        systemPrompt: REVIEW_SYSTEM_PROMPT,
+        systemPrompt,
         allowedTools: [],
         permissionMode: 'dontAsk',
         settingSources: [],

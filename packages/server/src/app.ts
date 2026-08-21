@@ -16,6 +16,7 @@ import { registerIncidentRoutes } from './routes/incidents.js';
 import { registerDemoRoutes } from './routes/demo.js';
 import { registerCodeReviewRoutes } from './routes/code-review.js';
 import { registerLearningsRoutes } from './routes/learnings.js';
+import { registerAssistantRoutes } from './routes/assistant.js';
 import { createGithubGateway, type GithubGateway } from './github/gateway.js';
 import {
   createInvestigationService,
@@ -113,6 +114,9 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   // Per-repo self-learning — feedback on AI-generated PRs stored as learnings
   // and injected into future investigation/code-review prompts.
   registerLearningsRoutes(app, ctx);
+
+  // Momo — the site mascot's AI assistant chat (Claude first, Gemini fallback).
+  registerAssistantRoutes(app, ctx);
 
   return app;
 }

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Entrance } from '../motion/primitives';
+import { MomoAssistantToggle } from '../assistant/MomoToggle';
 
 /**
  * UnifiedChrome — ONE sidebar + top bar shared by the marketing home and the
@@ -120,6 +121,8 @@ export function UnifiedSidebar() {
             <span className="block truncate text-[11px] text-white/40">Demo workspace</span>
           </span>
         </div>
+
+        <MomoAssistantToggle />
       </GlassCard>
     </Entrance>
   );

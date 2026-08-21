@@ -1,0 +1,270 @@
+{
+  "id": "adventuregirl",
+  "name": "Adventure Girl",
+  "version": "1.0.0",
+  "author": "OpenGameArt.org — CC0",
+  "license": "CC0-1.0",
+  "frameSize": {
+    "width": 128,
+    "height": 128
+  },
+  "anchor": {
+    "x": 64,
+    "y": 120
+  },
+  "climbable": false,
+  "frameDir": "frames",
+  "frameCount": 53,
+  "defaultFps": 12,
+  "persona": "You are Adventure Girl, a plucky explorer. Bold, curious, quick-witted. Keep replies short and adventurous. ≤3 sentences.",
+  "actions": {
+    "stand": {
+      "frames": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "fps": 8,
+      "loop": true
+    },
+    "walk": {
+      "frames": [
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18
+      ],
+      "fps": 14,
+      "loop": true
+    },
+    "climb": {
+      "frames": [
+        19,
+        20,
+        21,
+        22,
+        23,
+        24
+      ],
+      "fps": 10,
+      "loop": true
+    },
+    "sit": {
+      "frames": [
+        36,
+        40
+      ],
+      "fps": 2,
+      "loop": true
+    },
+    "fall": {
+      "frames": [
+        25,
+        26,
+        27,
+        28
+      ],
+      "fps": 9,
+      "loop": true
+    },
+    "drag": {
+      "frames": [
+        25,
+        26
+      ],
+      "fps": 6,
+      "loop": true
+    },
+    "grab": {
+      "frames": [
+        29,
+        30,
+        31
+      ],
+      "fps": 12,
+      "loop": false
+    },
+    "throw": {
+      "frames": [
+        32,
+        33,
+        34,
+        35
+      ],
+      "fps": 12,
+      "loop": false
+    },
+    "sleep": {
+      "frames": [
+        48,
+        49,
+        50
+      ],
+      "fps": 3,
+      "loop": true
+    },
+    "carry": {
+      "frames": [
+        29,
+        30
+      ],
+      "fps": 4,
+      "loop": true
+    },
+    "thinking": {
+      "frames": [
+        51,
+        52
+      ],
+      "fps": 5,
+      "loop": true,
+      "aiPose": true,
+      "fallback": "stand"
+    },
+    "analyzing": {
+      "frames": [
+        52,
+        53
+      ],
+      "fps": 6,
+      "loop": true,
+      "aiPose": true,
+      "fallback": "sit"
+    },
+    "talking": {
+      "frames": [
+        51,
+        52,
+        53
+      ],
+      "fps": 8,
+      "loop": true,
+      "aiPose": true,
+      "fallback": "stand"
+    },
+    "celebrating": {
+      "frames": [
+        19,
+        20,
+        21
+      ],
+      "fps": 12,
+      "loop": false,
+      "aiPose": true,
+      "fallback": "stand"
+    },
+    "angry": {
+      "frames": [
+        29,
+        30,
+        31
+      ],
+      "fps": 12,
+      "loop": false
+    },
+    "dizzy": {
+      "frames": [
+        25,
+        26
+      ],
+      "fps": 8,
+      "loop": true
+    },
+    "attack": {
+      "frames": [
+        32,
+        33,
+        34,
+        35
+      ],
+      "fps": 16,
+      "loop": false
+    },
+    "jump": {
+      "frames": [
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28
+      ],
+      "fps": 14,
+      "loop": false
+    },
+    "slide": {
+      "frames": [
+        36,
+        37,
+        38,
+        39,
+        40
+      ],
+      "fps": 14,
+      "loop": false
+    },
+    "shoot": {
+      "frames": [
+        51,
+        52,
+        53
+      ],
+      "fps": 12,
+      "loop": false
+    },
+    "playdead": {
+      "frames": [
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50
+      ],
+      "fps": 10,
+      "loop": false
+    }
+  },
+  "poses": [
+    {
+      "action": "attack",
+      "label": "Attack with knife"
+    },
+    {
+      "action": "jump",
+      "label": "Jump"
+    },
+    {
+      "action": "slide",
+      "label": "Slide"
+    },
+    {
+      "action": "shoot",
+      "label": "Shoot"
+    },
+    {
+      "action": "playdead",
+      "label": "Play dead"
+    }
+  ],
+  "throwStyle": "attack"
+}
