@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { NightShift } from '../experience/NightShift';
+import { SpotlightHero } from '../components/landing/SpotlightHero';
 
 /**
  * Public home page at `/` — the dark cursor-spotlight hero. The console lives
@@ -13,5 +13,5 @@ export function HomePage() {
     };
   }, []);
 
-  return <NightShift />;
+  return <SpotlightHero />;
 }
