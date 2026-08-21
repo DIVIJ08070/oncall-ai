@@ -14,18 +14,18 @@ import { useEffect, useRef } from 'react';
 
 /** Ridge polylines in image-fraction coordinates for the motes to follow. */
 const RIDGES: Array<Array<[number, number]>> = [
-  [[0.05, 0.55], [0.13, 0.4], [0.22, 0.25], [0.31, 0.08], [0.38, 0.16], [0.44, 0.3]],
-  [[0.5, 0.42], [0.56, 0.32], [0.62, 0.2], [0.68, 0.1], [0.74, 0.06]],
-  [[0.78, 0.28], [0.84, 0.2], [0.9, 0.28], [0.97, 0.22]],
-  [[0.1, 0.8], [0.3, 0.72], [0.5, 0.7], [0.7, 0.66], [0.9, 0.62]],
+  [[0.03, 0.72], [0.12, 0.62], [0.22, 0.57], [0.3, 0.62], [0.38, 0.58]],
+  [[0.3, 0.45], [0.4, 0.42], [0.5, 0.4], [0.6, 0.38], [0.68, 0.34]],
+  [[0.55, 0.3], [0.65, 0.22], [0.75, 0.15], [0.85, 0.12], [0.93, 0.1]],
+  [[0.7, 0.55], [0.78, 0.48], [0.86, 0.42], [0.95, 0.35]],
 ];
 
 /** Glow pockets (image fractions) matching the baked hot zones. */
 const GLOWS = [
-  { x: 0.7, y: 0.42, r: 0.17, color: '255,110,50', hot: true }, // ember flank
-  { x: 0.76, y: 0.3, r: 0.11, color: '239,68,58', hot: false },
-  { x: 0.55, y: 0.62, r: 0.07, color: '150,95,255', hot: false },
-  { x: 0.56, y: 0.36, r: 0.055, color: '170,110,255', hot: false },
+  { x: 0.8, y: 0.45, r: 0.13, color: '255,110,50', hot: true }, // ember flank
+  { x: 0.9, y: 0.55, r: 0.1, color: '239,68,58', hot: false },
+  { x: 0.46, y: 0.53, r: 0.05, color: '150,95,255', hot: false },
+  { x: 0.86, y: 0.4, r: 0.045, color: '170,110,255', hot: false },
 ];
 
 const MOTES = Array.from({ length: 8 }, (_, i) => ({
@@ -176,7 +176,7 @@ export function TerrainNetwork({ className }: { className?: string }) {
         src="/hero-terrain.jpg"
         alt=""
         draggable={false}
-        className="absolute inset-0 h-full w-full select-none object-cover object-[68%_30%]"
+        className="absolute inset-0 h-full w-full select-none object-cover object-[70%_45%]"
         style={{ transform: 'scale(1.06)' }}
       />
       <canvas
