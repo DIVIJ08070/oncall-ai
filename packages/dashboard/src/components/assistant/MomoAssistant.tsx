@@ -14,11 +14,84 @@ import { useMomoPref } from './momoPrefs';
  * loaded reloads the page (the engine has no teardown API).
  */
 
+interface MomoBotApi {
+  ready: (cb: () => void) => void;
+  say: (text: string, ms?: number) => void;
+  jumpTo: (sel: string | Element) => void;
+  tour: (steps: Array<{ selector?: string; text: string; ms?: number }>) => unknown;
+}
+
 declare global {
   interface Window {
     MOMO_BOT_BASE?: string;
     MOMO_BOT_API?: string;
+    MomoBot?: MomoBotApi;
   }
+}
+
+const TOUR_DONE_KEY = 'oncall:momo-tour-done';
+
+/**
+ * First-visit guided tour: Adventure Girl jumps to each part of the site and
+ * explains what it does (the engine's tour UI includes its own Skip button).
+ * Runs once ever — the flag is set the moment the tour starts.
+ */
+const TOUR_STEPS: Array<{ selector?: string; text: string; ms?: number }> = [
+  {
+    text: 'Hey, first time here? I\u2019m Adventure Girl \u{1F9ED} Let me give you the quick tour of OnCall AI!',
+    ms: 4200,
+  },
+  {
+    selector: 'a[href="/dashboard"]',
+    text: 'This is the Dashboard \u2014 live service health, error rate and latency. Your mission control.',
+    ms: 4600,
+  },
+  {
+    selector: 'a[href="/incidents"]',
+    text: 'Incidents land here. When something breaks, the AI investigates the root cause and opens a GitHub PR with a fix \u2014 you just review and merge.',
+    ms: 5600,
+  },
+  {
+    selector: 'a[href="/code-review"]',
+    text: 'Code Review Buddy: paste a diff, scan a repo, or watch a GitHub repo \u2014 AI reviews every pull request for you.',
+    ms: 5200,
+  },
+  {
+    selector: 'a[href="/learning"]',
+    text: 'Self-Learning \u2014 my favourite! A living brain that gets smarter with every incident and review it sees.',
+    ms: 5000,
+  },
+  {
+    selector: 'a[href="/demo"]',
+    text: 'Curious how it handles a real fire? Live Demo simulates an incident safely so you can watch the AI respond.',
+    ms: 5200,
+  },
+  {
+    selector: 'a[href="/onboarding"]',
+    text: 'Ready to hook up your own services? The Setup Wizard starts here.',
+    ms: 4400,
+  },
+  {
+    text: 'That\u2019s the tour! Click me anytime if you have questions \u2014 I know this place inside out \u2728',
+    ms: 4800,
+  },
+];
+
+function maybeRunTour(): void {
+  if (localStorage.getItem(TOUR_DONE_KEY)) return;
+  const bot = window.MomoBot;
+  if (!bot) return;
+  bot.ready(() => {
+    if (localStorage.getItem(TOUR_DONE_KEY)) return;
+    localStorage.setItem(TOUR_DONE_KEY, '1'); // once ever, even if skipped
+    // keep steps whose target actually exists and is visible right now
+    const steps = TOUR_STEPS.filter((st) => {
+      if (!st.selector) return true;
+      const el = document.querySelector<HTMLElement>(st.selector);
+      return !!el && el.offsetParent !== null;
+    });
+    window.setTimeout(() => bot.tour(steps), 1200);
+  });
 }
 
 const MONO = "'JetBrains Mono', ui-monospace, monospace";
@@ -34,6 +107,7 @@ function injectMascot(): void {
   script.src = '/momo-bot/momo-bot.js';
   script.defer = true;
   script.setAttribute('data-momo-bot', '1');
+  script.addEventListener('load', maybeRunTour);
   document.body.appendChild(script);
 }
 
