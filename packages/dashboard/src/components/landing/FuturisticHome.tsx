@@ -165,7 +165,7 @@ function Hero() {
       />
 
       <StaggerGroup
-        className="pointer-events-none relative z-20 flex min-h-[calc(100vh-150px)] flex-col justify-center gap-6 p-7 sm:p-10 lg:max-w-[58%] lg:justify-start lg:p-12 lg:pt-[13vh]"
+        className="pointer-events-none relative z-20 flex min-h-[calc(100vh-150px)] flex-col justify-center gap-6 p-7 sm:p-10 lg:max-w-[58%] lg:justify-start lg:p-12 lg:pt-[7vh]"
         delay={0.15}
       >
         <StaggerItem>
