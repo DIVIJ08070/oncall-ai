@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
-import { SpotlightHero } from '../components/landing/SpotlightHero';
+import { FuturisticHome } from '../components/landing/FuturisticHome';
 
 /**
- * Public home page at `/` — the dark cursor-spotlight hero. The console lives
- * under `/dashboard`; this screen sets the tone and routes people in.
+ * Public home page at `/` — the futuristic product-shell landing (glass sidebar,
+ * live terrain hero). The console lives under `/dashboard`; this screen sets the
+ * tone and routes people in. (`SpotlightHero` stays on disk as the revert path.)
  */
 export function HomePage() {
   useEffect(() => {
@@ -13,5 +14,5 @@ export function HomePage() {
     };
   }, []);
 
-  return <SpotlightHero />;
+  return <FuturisticHome />;
 }

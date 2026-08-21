@@ -500,3 +500,15 @@
   }
   .crbs-blip, .crbs-blip-ring { opacity: 1; }
 }
+
+/* ── FuturisticHome (product-shell landing) ───────────────────────────────── */
+/* Slow bob for the floating service chips over the terrain. Duration + delay
+   are staggered per chip via inline style. */
+@keyframes fh-bob {
+  0%, 100% { transform: translateY(6px); }
+  50% { transform: translateY(-6px); }
+}
+.fh-bob { animation: fh-bob 7s ease-in-out infinite; will-change: transform; }
+@media (prefers-reduced-motion: reduce) {
+  .fh-bob { animation: none !important; }
+}
