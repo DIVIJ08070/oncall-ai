@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@oncall/shared": "*",
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
     "axios": "^1.19.0",
     "framer-motion": "^13.1.0",
     "gsap": "^3.15.0",
@@ -22,6 +24,7 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.1",
     "recharts": "^2.12.7",
+    "three": "^0.169.0",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
