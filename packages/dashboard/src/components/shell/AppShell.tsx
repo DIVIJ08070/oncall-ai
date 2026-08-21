@@ -31,7 +31,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <UnifiedSidebar />
         <main className="min-w-0 flex-1 pb-16 sm:pb-0">
           <UnifiedTopBar />
-          <div className="mx-auto w-full max-w-[1280px]">{children}</div>
+          <div className="w-full">{children}</div>
         </main>
       </div>
       <BottomTabBar />

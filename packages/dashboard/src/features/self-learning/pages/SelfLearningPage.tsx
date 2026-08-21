@@ -432,6 +432,36 @@ function RepoBrain({ repo }: { repo: string }) {
             )}
           </div>
           <AnalyzingBar latest={latest} />
+
+          {/* timeline + knowledge map fill the space beside the tall right rail */}
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <TimelineCard
+            learnings={sortedDesc}
+            loading={loading}
+            error={error}
+            pendingId={pendingId}
+            onSelect={setSelected}
+            onRate={onRate}
+            onRetry={refetch}
+          />
+          <GlassCard className="flex min-w-0 flex-col p-4">
+            <span
+              className="text-[10px] uppercase tracking-[0.18em] text-white/40"
+              style={{ fontFamily: MONO }}
+            >
+              Knowledge Map
+            </span>
+            <div className="mt-3 overflow-hidden rounded-xl border border-white/5">
+              <KnowledgeMap learnings={learnings} className="h-[260px]" />
+            </div>
+            <p
+              className="mt-2.5 text-[9px] uppercase tracking-[0.16em] text-white/30"
+              style={{ fontFamily: MONO }}
+            >
+              AI understanding of your incidents · clustered by error class
+            </p>
+          </GlassCard>
+        </div>
         </div>
 
         {/* RIGHT — evolution ladder / growth / accuracy / learned today */}
@@ -441,36 +471,6 @@ function RepoBrain({ repo }: { repo: string }) {
           <AccuracyCard positive={stats.positive} negative={stats.negative} />
           <LearnedTodayCard learnings={sortedDesc} />
         </div>
-      </div>
-
-      {/* BOTTOM — timeline + knowledge map */}
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <TimelineCard
-          learnings={sortedDesc}
-          loading={loading}
-          error={error}
-          pendingId={pendingId}
-          onSelect={setSelected}
-          onRate={onRate}
-          onRetry={refetch}
-        />
-        <GlassCard className="flex min-w-0 flex-col p-4">
-          <span
-            className="text-[10px] uppercase tracking-[0.18em] text-white/40"
-            style={{ fontFamily: MONO }}
-          >
-            Knowledge Map
-          </span>
-          <div className="mt-3 overflow-hidden rounded-xl border border-white/5">
-            <KnowledgeMap learnings={learnings} className="h-[260px]" />
-          </div>
-          <p
-            className="mt-2.5 text-[9px] uppercase tracking-[0.16em] text-white/30"
-            style={{ fontFamily: MONO }}
-          >
-            AI understanding of your incidents · clustered by error class
-          </p>
-        </GlassCard>
       </div>
 
       {/* Selected-neuron detail panel */}

@@ -1,22 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Html, OrbitControls, useCursor } from '@react-three/drei';
-import { useReducedMotion } from 'motion/react';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+import * as THREE from 'three';
 import type { Learning } from '../../../api/learnings';
 
 /**
- * NeuralCore — the self-learning "living brain" (SPEC: per-repo learnings).
- * Every learning is a neuron floating in a black void; synapses wire neurons
- * that share an error_class (plus a few cross-links), light pulses travel the
- * wiring, and the whole web breathes with a slow heartbeat. Level drives the
- * anatomy: low levels are a sparse scatter, higher levels cluster neurons into
- * per-error-class lobes, and VETERAN/ORACLE grow slow orbital rings.
- *
- * Pure props-in: `learnings` + `level` (level index 0..5) draw the brain,
- * hover shows a tooltip, click reports through `onSelect`. Honors
- * prefers-reduced-motion (static layout, still interactive) and caps the
- * render at MAX_NEURONS with a "+N more" overlay.
+ * NeuralCore — the self-learning brain, rendered as an actual BRAIN: two
+ * cortical hemispheres split by a longitudinal fissure plus a cerebellum,
+ * built from ~1500 neurons joined by a synapse web. It always reads as a
+ * brain — real learnings light up as bright orange MEMORY neurons on the
+ * cortex (red when the lesson was a correction), wired together per error
+ * class. Interactive: drag to rotate (auto-rotates when idle), scroll to
+ * zoom, hover a memory for its lesson, click to open it (onSelect).
  */
 
 export interface NeuralCoreProps {
@@ -26,772 +22,497 @@ export interface NeuralCoreProps {
   className?: string;
 }
 
-const MAX_NEURONS = 150;
-const HEARTBEAT_HZ = 0.9;
-const TAU = Math.PI * 2;
-const DRIFT_AMP = 0.035;
+const AMBIENT_COUNT = 1500;
+const MAX_MEMORIES = 64;
+const PULSE_COUNT = 10;
 
-/* ------------------------------------------------------------------ */
-/* deterministic layout helpers                                        */
-/* ------------------------------------------------------------------ */
+/* ── deterministic brain-shaped point cloud ─────────────────────────────── */
 
-function hashString(s: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-/** Tiny seeded PRNG so the layout is stable across renders. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
+function makeRand(seed: number): () => number {
+  let s = seed;
   return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
   };
 }
 
-/** Double-thump (lub-dub) envelope in [0,1] at HEARTBEAT_HZ. */
-function heartbeat(t: number): number {
-  const p = t * HEARTBEAT_HZ * TAU;
-  const lub = Math.pow(Math.max(0, Math.sin(p)), 3);
-  const dub = 0.5 * Math.pow(Math.max(0, Math.sin(p - 1.15)), 6);
-  return Math.min(1, lub + dub);
+/** One point on/near the cortex: ellipsoid + folds + fissure + flat base. */
+function corticalPoint(rand: () => number, out: THREE.Vector3): THREE.Vector3 {
+  // random direction (rejection-sampled sphere)
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  let l = 0;
+  do {
+    x = rand() * 2 - 1;
+    y = rand() * 2 - 1;
+    z = rand() * 2 - 1;
+    l = x * x + y * y + z * z;
+  } while (l > 1 || l < 0.05);
+  l = Math.sqrt(l);
+  x /= l;
+  y /= l;
+  z /= l;
+  // cortical folds: bumpy radius, mostly surface (shell) with slight depth
+  const folds =
+    1 +
+    0.075 * Math.sin(z * 6.5 + Math.sin(y * 4.2) * 2.2) +
+    0.055 * Math.sin(y * 7.3 + x * 3.1) +
+    0.04 * (rand() - 0.5);
+  const shell = 0.86 + rand() * 0.14;
+  // ellipsoid radii: width, height, depth (front-back longest)
+  let px = x * 1.12 * folds * shell;
+  let py = y * 0.92 * folds * shell;
+  let pz = z * 1.5 * folds * shell;
+  // longitudinal fissure between hemispheres
+  const side = px >= 0 ? 1 : -1;
+  px = side * (Math.abs(px) * 0.94 + 0.07);
+  // flatten the underside (brains sit on a base)
+  if (py < -0.5) py = -0.5 - (py + 0.5) * 0.35;
+  // slight frontal taper
+  if (pz > 0.9) px *= 0.9;
+  return out.set(px, py, pz);
 }
 
-function neuronPalette(l: Learning | null): { core: string; glow: string } {
-  if (!l) return { core: '#6b3116', glow: '#8a3f1c' }; // newborn ember, dim
-  if (l.rating < 0) return { core: '#FF3B30', glow: '#FF5A45' }; // ember red
-  const c = l.confirmations;
-  if (c >= 5) return { core: '#FFB37A', glow: '#FFA45C' }; // white-hot veteran
-  if (c >= 3) return { core: '#FF8233', glow: '#FF8233' };
-  return { core: '#F16524', glow: '#F16524' };
-}
-
-interface NeuronDatum {
-  learning: Learning | null;
-  base: THREE.Vector3;
-  radius: number;
-  core: string;
-  glow: THREE.Color;
-  glowSize: number;
-  drift: { px: number; py: number; pz: number; sx: number; sy: number; sz: number };
-}
-
-interface NeuralGraph {
-  nodes: NeuronDatum[];
-  edges: Array<[number, number]>;
-  /** rgb per line vertex (2 per edge), brightness pre-multiplied. */
-  edgeColors: Float32Array;
-  overflow: number;
-  newborn: boolean;
-}
-
-/**
- * Positions + wiring. Level 0-1: one sparse cloud. Level 2+: error-class
- * lobes fly apart on a fibonacci sphere while intra-lobe scatter tightens
- * and intra-lobe wiring brightens.
- */
-function buildGraph(learnings: Learning[], level: number): NeuralGraph {
-  const lvl = Math.max(0, Math.min(5, Math.floor(level)));
-  const shown = learnings.slice(0, MAX_NEURONS);
-  const overflow = Math.max(0, learnings.length - shown.length);
-  const newborn = shown.length === 0;
-  const source: Array<Learning | null> = newborn
-    ? Array.from({ length: 6 }, () => null)
-    : shown;
-
-  const classNames: string[] = [];
-  const classOf = source.map((l) => {
-    const key = l ? l.errorClass.toLowerCase() : 'genesis';
-    const found = classNames.indexOf(key);
-    if (found !== -1) return found;
-    classNames.push(key);
-    return classNames.length - 1;
-  });
-
-  const spread = lvl <= 1 ? 0 : Math.min(1, (lvl - 1) / 3);
-  const lobeRadius = 1.45 * spread;
-  const scatter = newborn ? 0.5 : 1.7 - 1.0 * spread;
-
-  const centers = classNames.map((_, i) => {
-    if (lobeRadius === 0) return new THREE.Vector3();
-    const count = classNames.length;
-    const phi = Math.acos(1 - (2 * (i + 0.5)) / count);
-    const theta = Math.PI * (1 + Math.sqrt(5)) * i;
-    return new THREE.Vector3(
-      Math.sin(phi) * Math.cos(theta),
-      Math.cos(phi) * 0.7, // oblate — brain-ish
-      Math.sin(phi) * Math.sin(theta),
-    ).multiplyScalar(lobeRadius);
-  });
-
-  const nodes: NeuronDatum[] = source.map((l, i) => {
-    const rng = mulberry32(hashString(l ? l.id : `newborn-${i}`));
-    const g = () => (rng() + rng() + rng()) / 1.5 - 1; // ~gaussian [-1,1]
-    const center = centers[classOf[i]];
-    const base = newborn
-      ? new THREE.Vector3(
-          Math.cos((i / 6) * TAU) * 0.55 + g() * 0.12,
-          g() * 0.3,
-          Math.sin((i / 6) * TAU) * 0.55 + g() * 0.12,
-        )
-      : new THREE.Vector3(
-          center.x + g() * scatter,
-          center.y + g() * scatter * 0.8,
-          center.z + g() * scatter,
-        );
-    const conf = l ? Math.max(1, l.confirmations) : 1;
-    const radius = l ? 0.045 + 0.014 * Math.min(6, conf - 1) : 0.034;
-    const { core, glow } = neuronPalette(l);
-    return {
-      learning: l,
-      base,
-      radius,
-      core,
-      glow: new THREE.Color(glow),
-      glowSize: radius * (l ? 7 + 3 * Math.min(1, (conf - 1) / 5) : 6),
-      drift: {
-        px: rng() * TAU,
-        py: rng() * TAU,
-        pz: rng() * TAU,
-        sx: 0.25 + rng() * 0.5,
-        sy: 0.25 + rng() * 0.5,
-        sz: 0.25 + rng() * 0.5,
-      },
-    };
-  });
-
-  // --- wiring -----------------------------------------------------------
-  const list: Array<{ a: number; b: number; w: number }> = [];
-  const seen = new Set<string>();
-  const push = (a: number, b: number, w: number) => {
-    if (a === b) return;
-    const key = a < b ? `${a}-${b}` : `${b}-${a}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    list.push({ a, b, w });
-  };
-
-  const intraW = newborn ? 0.5 : 0.4 + 0.5 * spread;
-  const groups = new Map<number, number[]>();
-  classOf.forEach((c, i) => {
-    const arr = groups.get(c);
-    if (arr) arr.push(i);
-    else groups.set(c, [i]);
-  });
-  for (const group of groups.values()) {
-    if (group.length < 2) continue;
-    // nearest same-class neighbour…
-    for (const i of group) {
-      let best = -1;
-      let bestD = Infinity;
-      for (const j of group) {
-        if (j === i) continue;
-        const d = nodes[i].base.distanceToSquared(nodes[j].base);
-        if (d < bestD) {
-          bestD = d;
-          best = j;
-        }
-      }
-      if (best !== -1) push(i, best, intraW);
-    }
-    // …plus a chain so every lobe is one connected web
-    for (let k = 1; k < group.length; k++) push(group[k - 1], group[k], intraW * 0.8);
-  }
-  if (newborn) push(5, 0, intraW);
-
-  // a few cross-class links so lobes still talk to each other
-  if (!newborn && classNames.length > 1) {
-    const rng = mulberry32(0xc0ffee ^ Math.imul(source.length + lvl, 2654435761));
-    const wanted = Math.min(10, Math.max(1, Math.round(source.length / 9)));
-    const before = list.length;
-    for (let tries = 0; tries < wanted * 6 && list.length < before + wanted; tries++) {
-      const a = Math.floor(rng() * nodes.length);
-      const b = Math.floor(rng() * nodes.length);
-      if (classOf[a] !== classOf[b]) push(a, b, 0.18);
-    }
-  }
-
-  const edges: Array<[number, number]> = list.map(({ a, b }) => [a, b]);
-  const edgeColors = new Float32Array(edges.length * 6);
-  list.forEach(({ a, b, w }, k) => {
-    const ca = nodes[a].glow.clone().multiplyScalar(w);
-    const cb = nodes[b].glow.clone().multiplyScalar(w);
-    edgeColors.set([ca.r, ca.g, ca.b, cb.r, cb.g, cb.b], k * 6);
-  });
-
-  return { nodes, edges, edgeColors, overflow, newborn };
-}
-
-/* ------------------------------------------------------------------ */
-/* shaders (soft additive radial glow — no textures, one draw call)    */
-/* ------------------------------------------------------------------ */
-
-const GLOW_VERT = /* glsl */ `
-  attribute float aSize;
-  attribute vec3 aColor;
-  uniform float uPixelRatio;
-  uniform float uBeat;
-  varying vec3 vColor;
-  void main() {
-    vColor = aColor;
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = aSize * uPixelRatio * (300.0 / max(0.1, -mv.z)) * (1.0 + 0.22 * uBeat);
-    gl_Position = projectionMatrix * mv;
-  }
-`;
-
-const GLOW_FRAG = /* glsl */ `
-  uniform float uOpacity;
-  varying vec3 vColor;
-  void main() {
-    float d = length(gl_PointCoord - vec2(0.5));
-    if (d > 0.5) discard;
-    float a = smoothstep(0.5, 0.0, d);
-    gl_FragColor = vec4(vColor, a * a * uOpacity);
-  }
-`;
-
-const PULSE_VERT = /* glsl */ `
-  uniform float uPixelRatio;
-  uniform float uSize;
-  void main() {
-    vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = uSize * uPixelRatio * (300.0 / max(0.1, -mv.z));
-    gl_Position = projectionMatrix * mv;
-  }
-`;
-
-const PULSE_FRAG = /* glsl */ `
-  uniform vec3 uColor;
-  uniform float uOpacity;
-  void main() {
-    float d = length(gl_PointCoord - vec2(0.5));
-    if (d > 0.5) discard;
-    float a = smoothstep(0.5, 0.0, d);
-    gl_FragColor = vec4(uColor, a * a * uOpacity);
-  }
-`;
-
-const noRaycast: THREE.Mesh['raycast'] = () => undefined;
-
-/* ------------------------------------------------------------------ */
-/* scene                                                               */
-/* ------------------------------------------------------------------ */
-
-interface PulseState {
-  edge: number;
-  t: number;
-  speed: number;
-}
-
-function NeuralScene({
-  graph,
-  level,
-  reduced,
-  onSelect,
-}: {
-  graph: NeuralGraph;
-  level: number;
-  reduced: boolean;
-  onSelect?: (l: Learning | null) => void;
-}) {
-  const rootRef = useRef<THREE.Group>(null);
-  const ringsRef = useRef<THREE.Group>(null);
-  const meshRefs = useRef<Array<THREE.Mesh | null>>([]);
-  const [hovered, setHovered] = useState<number | null>(null);
-  const [idle, setIdle] = useState(true);
-  const idleTimer = useRef<number | null>(null);
-  const invalidate = useThree((s) => s.invalidate);
-  useCursor(hovered !== null);
-
-  // All per-frame GPU resources, allocated once per graph.
-  const res = useMemo(() => {
-    const n = graph.nodes.length;
-    // +1 point: a large dim halo at the origin — the brain's "soul".
-    const drifted = new Float32Array((n + 1) * 3);
-    const glowSizes = new Float32Array(n + 1);
-    const glowColors = new Float32Array((n + 1) * 3);
-    graph.nodes.forEach((node, i) => {
-      drifted.set([node.base.x, node.base.y, node.base.z], i * 3);
-      glowSizes[i] = node.glowSize;
-      glowColors.set([node.glow.r, node.glow.g, node.glow.b], i * 3);
-    });
-    glowSizes[n] = 1.5;
-    const soul = new THREE.Color('#F16524').multiplyScalar(graph.newborn ? 0.22 : 0.4);
-    glowColors.set([soul.r, soul.g, soul.b], n * 3);
-
-    const glowGeo = new THREE.BufferGeometry();
-    const posAttr = new THREE.BufferAttribute(drifted, 3);
-    posAttr.setUsage(THREE.DynamicDrawUsage);
-    glowGeo.setAttribute('position', posAttr);
-    glowGeo.setAttribute('aSize', new THREE.BufferAttribute(glowSizes, 1));
-    glowGeo.setAttribute('aColor', new THREE.BufferAttribute(glowColors, 3));
-    const glowMat = new THREE.ShaderMaterial({
-      vertexShader: GLOW_VERT,
-      fragmentShader: GLOW_FRAG,
-      uniforms: {
-        uPixelRatio: { value: 1 },
-        uBeat: { value: 0 },
-        uOpacity: { value: 0.7 },
-      },
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
-
-    const e = graph.edges.length;
-    const linePos = new Float32Array(Math.max(1, e) * 6);
-    graph.edges.forEach(([a, b], k) => {
-      linePos.set(drifted.subarray(a * 3, a * 3 + 3), k * 6);
-      linePos.set(drifted.subarray(b * 3, b * 3 + 3), k * 6 + 3);
-    });
-    const lineGeo = new THREE.BufferGeometry();
-    const lineAttr = new THREE.BufferAttribute(linePos, 3);
-    lineAttr.setUsage(THREE.DynamicDrawUsage);
-    lineGeo.setAttribute('position', lineAttr);
-    lineGeo.setAttribute('color', new THREE.BufferAttribute(graph.edgeColors, 3));
-    const lineMat = new THREE.LineBasicMaterial({
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.75,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-
-    const hiPos = new Float32Array(Math.max(1, e) * 6);
-    const hiGeo = new THREE.BufferGeometry();
-    const hiAttr = new THREE.BufferAttribute(hiPos, 3);
-    hiAttr.setUsage(THREE.DynamicDrawUsage);
-    hiGeo.setAttribute('position', hiAttr);
-    hiGeo.setDrawRange(0, 0);
-    const hiMat = new THREE.LineBasicMaterial({
-      color: '#FFC9A3',
-      transparent: true,
-      opacity: 0.95,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-
-    const pulseCount = e > 0 ? Math.min(56, Math.max(8, Math.round(e * 0.6))) : 0;
-    const pulsePos = new Float32Array(Math.max(1, pulseCount) * 3);
-    const pulses: PulseState[] = Array.from({ length: pulseCount }, () => ({
-      edge: Math.floor(Math.random() * Math.max(1, e)),
-      t: Math.random(),
-      speed: 0.3 + Math.random() * 0.45,
-    }));
-    const pulseGeo = new THREE.BufferGeometry();
-    const pulseAttr = new THREE.BufferAttribute(pulsePos, 3);
-    pulseAttr.setUsage(THREE.DynamicDrawUsage);
-    pulseGeo.setAttribute('position', pulseAttr);
-    const pulseMat = new THREE.ShaderMaterial({
-      vertexShader: PULSE_VERT,
-      fragmentShader: PULSE_FRAG,
-      uniforms: {
-        uPixelRatio: { value: 1 },
-        uSize: { value: 0.14 },
-        uColor: { value: new THREE.Color('#FFD9B4') },
-        uOpacity: { value: 0.8 },
-      },
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
-
-    const sphereGeo = new THREE.SphereGeometry(1, 20, 20);
-    const coreMats = new Map<string, THREE.MeshBasicMaterial>();
-    for (const node of graph.nodes) {
-      if (!coreMats.has(node.core)) {
-        coreMats.set(node.core, new THREE.MeshBasicMaterial({ color: node.core }));
-      }
-    }
-
-    return {
-      n,
-      drifted,
-      glowGeo,
-      glowMat,
-      glowSizes,
-      glowBaseSizes: glowSizes.slice(),
-      lineGeo,
-      lineMat,
-      linePos,
-      hiGeo,
-      hiMat,
-      hiPos,
-      pulseGeo,
-      pulseMat,
-      pulsePos,
-      pulses,
-      pulseCount,
-      sphereGeo,
-      coreMats,
-      dispose() {
-        glowGeo.dispose();
-        glowMat.dispose();
-        lineGeo.dispose();
-        lineMat.dispose();
-        hiGeo.dispose();
-        hiMat.dispose();
-        pulseGeo.dispose();
-        pulseMat.dispose();
-        sphereGeo.dispose();
-        for (const m of coreMats.values()) m.dispose();
-      },
-    };
-  }, [graph]);
-
-  useEffect(() => () => res.dispose(), [res]);
-
-  // New data — drop a stale hover index.
-  useEffect(() => {
-    setHovered(null);
-    meshRefs.current = [];
-  }, [graph]);
-
-  useEffect(
-    () => () => {
-      if (idleTimer.current !== null) window.clearTimeout(idleTimer.current);
-    },
-    [],
+/** Cerebellum: small paired lobes tucked under the back. */
+function cerebellumPoint(rand: () => number, out: THREE.Vector3): THREE.Vector3 {
+  let x = 0;
+  let y = 0;
+  let z = 0;
+  let l = 0;
+  do {
+    x = rand() * 2 - 1;
+    y = rand() * 2 - 1;
+    z = rand() * 2 - 1;
+    l = x * x + y * y + z * z;
+  } while (l > 1 || l === 0);
+  const folds = 1 + 0.09 * Math.sin(y * 14 + x * 6);
+  const side = x >= 0 ? 1 : -1;
+  return out.set(
+    side * (Math.abs(x * 0.52 * folds) + 0.03),
+    y * 0.3 * folds - 0.58,
+    z * 0.42 * folds - 0.95,
   );
+}
 
-  // Hovered neuron gets a hotter halo.
-  useEffect(() => {
-    res.glowSizes.set(res.glowBaseSizes);
-    if (hovered !== null && hovered < res.n) {
-      res.glowSizes[hovered] = res.glowBaseSizes[hovered] * 1.7;
+interface BrainGraph {
+  ambient: THREE.BufferGeometry;
+  synapses: THREE.BufferGeometry;
+  walks: THREE.Vector3[][]; // pulse paths
+  memorySlots: THREE.Vector3[];
+}
+
+function buildBrain(level: number): BrainGraph {
+  const rand = makeRand(20260821);
+  const pts: THREE.Vector3[] = [];
+  const v = new THREE.Vector3();
+  for (let i = 0; i < AMBIENT_COUNT; i++) {
+    if (i % 7 === 6) cerebellumPoint(rand, v);
+    else corticalPoint(rand, v);
+    pts.push(v.clone());
+  }
+
+  // colors: silver base, violet minority, faint ember sprinkle — brighter with level
+  const positions = new Float32Array(AMBIENT_COUNT * 3);
+  const colors = new Float32Array(AMBIENT_COUNT * 3);
+  const silver = new THREE.Color('#9aa0b8');
+  const violet = new THREE.Color('#8B5CF6');
+  const ember = new THREE.Color('#F16524');
+  const tmp = new THREE.Color();
+  const levelBoost = 0.72 + Math.min(level, 5) * 0.05;
+  for (let i = 0; i < AMBIENT_COUNT; i++) {
+    positions.set([pts[i].x, pts[i].y, pts[i].z], i * 3);
+    const roll = rand();
+    tmp.copy(roll < 0.14 ? violet : roll < 0.2 ? ember : silver);
+    tmp.multiplyScalar((0.35 + rand() * 0.65) * levelBoost);
+    colors.set([tmp.r, tmp.g, tmp.b], i * 3);
+  }
+  const ambient = new THREE.BufferGeometry();
+  ambient.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  ambient.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+  // synapse web: each neuron links to its nearest same-hemisphere neighbour
+  // (spatial hash for speed)
+  const cell = 0.34;
+  const hash = new Map<string, number[]>();
+  const key = (p: THREE.Vector3): string =>
+    `${Math.floor(p.x / cell)},${Math.floor(p.y / cell)},${Math.floor(p.z / cell)}`;
+  pts.forEach((p, i) => {
+    const k = key(p);
+    const arr = hash.get(k);
+    if (arr) arr.push(i);
+    else hash.set(k, [i]);
+  });
+  const neighbourOf = (i: number): number => {
+    const p = pts[i];
+    let best = -1;
+    let bd = Infinity;
+    const cx = Math.floor(p.x / cell);
+    const cy = Math.floor(p.y / cell);
+    const cz = Math.floor(p.z / cell);
+    for (let dx = -1; dx <= 1; dx++)
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dz = -1; dz <= 1; dz++) {
+          const arr = hash.get(`${cx + dx},${cy + dy},${cz + dz}`);
+          if (!arr) continue;
+          for (const j of arr) {
+            if (j === i || pts[j].x * p.x < 0) continue; // stay in hemisphere
+            const d = p.distanceToSquared(pts[j]);
+            if (d < bd) {
+              bd = d;
+              best = j;
+            }
+          }
+        }
+    return best;
+  };
+  const segs: number[] = [];
+  const neighbours: number[] = [];
+  for (let i = 0; i < AMBIENT_COUNT; i++) {
+    const j = neighbourOf(i);
+    neighbours.push(j);
+    if (j > i) {
+      segs.push(pts[i].x, pts[i].y, pts[i].z, pts[j].x, pts[j].y, pts[j].z);
     }
-    (res.glowGeo.getAttribute('aSize') as THREE.BufferAttribute).needsUpdate = true;
-    invalidate();
-  }, [hovered, res, invalidate]);
+  }
+  const synapses = new THREE.BufferGeometry();
+  synapses.setAttribute('position', new THREE.Float32BufferAttribute(segs, 3));
 
-  useFrame((state, delta) => {
-    const t = state.clock.elapsedTime;
-    const beat = reduced ? 0 : heartbeat(t);
-    // Soft 0..1 wave for the hovered neuron's glow/scale pulse.
-    const hoverWave = reduced ? 0.5 : 0.5 + 0.5 * Math.sin(t * 5.2);
-    const { drifted } = res;
+  // pulse walks: random neighbour-graph strolls across the cortex
+  const walks: THREE.Vector3[][] = [];
+  for (let w = 0; w < PULSE_COUNT; w++) {
+    let i = Math.floor(rand() * AMBIENT_COUNT);
+    const path: THREE.Vector3[] = [pts[i]];
+    for (let h = 0; h < 14; h++) {
+      const j = neighbours[i];
+      if (j < 0) break;
+      path.push(pts[j]);
+      i = (j + Math.floor(rand() * 7)) % AMBIENT_COUNT;
+    }
+    if (path.length > 3) walks.push(path);
+  }
 
-    if (rootRef.current) rootRef.current.scale.setScalar(1 + 0.06 * beat);
+  // memory slots: well-spread surface points for real learnings to occupy
+  const memorySlots: THREE.Vector3[] = [];
+  for (let i = 0; i < MAX_MEMORIES; i++) {
+    corticalPoint(rand, v);
+    memorySlots.push(v.clone().multiplyScalar(1.04));
+  }
 
-    graph.nodes.forEach((node, i) => {
-      const d = node.drift;
-      const x = node.base.x + (reduced ? 0 : Math.sin(t * d.sx + d.px) * DRIFT_AMP);
-      const y = node.base.y + (reduced ? 0 : Math.sin(t * d.sy + d.py) * DRIFT_AMP);
-      const z = node.base.z + (reduced ? 0 : Math.sin(t * d.sz + d.pz) * DRIFT_AMP);
-      drifted[i * 3] = x;
-      drifted[i * 3 + 1] = y;
-      drifted[i * 3 + 2] = z;
-      const mesh = meshRefs.current[i];
-      if (mesh) {
-        mesh.position.set(x, y, z);
-        mesh.scale.setScalar(
-          node.radius *
-            (hovered === i ? 1.55 + 0.16 * hoverWave : 1) *
-            (1 + 0.05 * beat),
-        );
+  return { ambient, synapses, walks, memorySlots };
+}
+
+/* ── scene ──────────────────────────────────────────────────────────────── */
+
+function glowTexture(): THREE.Texture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.4, 'rgba(255,255,255,0.32)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+
+function BrainScene({
+  learnings,
+  level,
+  onSelect,
+  reduced,
+}: {
+  learnings: Learning[];
+  level: number;
+  onSelect?: (l: Learning | null) => void;
+  reduced: boolean;
+}) {
+  const { raycaster } = useThree();
+  const graph = useMemo(() => buildBrain(level), [level]);
+  const tex = useMemo(glowTexture, []);
+  const group = useRef<THREE.Group>(null);
+  const controls = useRef<OrbitControlsImpl | null>(null);
+  const pulseRefs = useRef<THREE.Sprite[]>([]);
+  const pulseState = useRef(
+    Array.from({ length: PULSE_COUNT }, (_, i) => ({ u: (i * 0.31) % 1, speed: 0.05 + (i % 3) * 0.02 })),
+  );
+  const [hovered, setHovered] = useState<number | null>(null);
+  useCursor(hovered != null);
+
+  useEffect(() => {
+    raycaster.params.Points = { threshold: 0.09 };
+  }, [raycaster]);
+
+  const memories = useMemo(
+    () => learnings.slice(0, MAX_MEMORIES),
+    [learnings],
+  );
+  const memoryGeom = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    const pos = new Float32Array(Math.max(memories.length, 1) * 3);
+    const col = new Float32Array(Math.max(memories.length, 1) * 3);
+    const good = new THREE.Color('#FF8233');
+    const bad = new THREE.Color('#FF3B30');
+    memories.forEach((m, i) => {
+      const p = graph.memorySlots[i % graph.memorySlots.length];
+      pos.set([p.x, p.y, p.z], i * 3);
+      const c = m.rating < 0 ? bad : good;
+      col.set([c.r, c.g, c.b], i * 3);
+    });
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.setDrawRange(0, memories.length);
+    return g;
+  }, [memories, graph]);
+
+  // memory-to-memory wiring per error class
+  const memoryLinks = useMemo(() => {
+    const byClass = new Map<string, number[]>();
+    memories.forEach((m, i) => {
+      const k = m.errorClass.toLowerCase();
+      const arr = byClass.get(k);
+      if (arr) arr.push(i);
+      else byClass.set(k, [i]);
+    });
+    const segs: number[] = [];
+    byClass.forEach((idxs) => {
+      for (let k = 1; k < idxs.length; k++) {
+        const a = graph.memorySlots[idxs[k - 1] % graph.memorySlots.length];
+        const b = graph.memorySlots[idxs[k] % graph.memorySlots.length];
+        segs.push(a.x, a.y, a.z, b.x, b.y, b.z);
       }
     });
-    (res.glowGeo.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(segs, 3));
+    return g;
+  }, [memories, graph]);
 
-    // Hovered neuron: halo breathes on its own, faster than the heartbeat.
-    if (!reduced && hovered !== null && hovered < res.n) {
-      res.glowSizes[hovered] = res.glowBaseSizes[hovered] * (1.55 + 0.4 * hoverWave);
-      (res.glowGeo.getAttribute('aSize') as THREE.BufferAttribute).needsUpdate = true;
+  useFrame((state) => {
+    if (reduced) return;
+    const t = state.clock.elapsedTime;
+    if (group.current) {
+      const breathe = 1 + Math.sin(t * 0.9) * 0.012;
+      group.current.scale.setScalar(breathe);
     }
-
-    graph.edges.forEach(([a, b], k) => {
-      res.linePos.set(drifted.subarray(a * 3, a * 3 + 3), k * 6);
-      res.linePos.set(drifted.subarray(b * 3, b * 3 + 3), k * 6 + 3);
+    pulseState.current.forEach((p, i) => {
+      const sp = pulseRefs.current[i];
+      const walk = graph.walks[i % graph.walks.length];
+      if (!sp || !walk) return;
+      p.u = (p.u + p.speed * (1 / 60)) % 1;
+      const ft = p.u * (walk.length - 1);
+      const fi = Math.min(walk.length - 2, Math.floor(ft));
+      const fr = ft - fi;
+      sp.position.lerpVectors(walk[fi], walk[fi + 1], fr);
+      (sp.material as THREE.SpriteMaterial).opacity = 0.55 + Math.sin(p.u * Math.PI) * 0.35;
     });
-    (res.lineGeo.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
-    res.lineMat.opacity = reduced ? 0.75 : 0.45 + 0.4 * beat;
-
-    if (hovered !== null) {
-      let w = 0;
-      graph.edges.forEach(([a, b]) => {
-        if (a !== hovered && b !== hovered) return;
-        res.hiPos.set(drifted.subarray(a * 3, a * 3 + 3), w);
-        res.hiPos.set(drifted.subarray(b * 3, b * 3 + 3), w + 3);
-        w += 6;
-      });
-      res.hiGeo.setDrawRange(0, w / 3);
-      (res.hiGeo.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
-      // Connected synapses shimmer in step with the hovered neuron's pulse.
-      res.hiMat.opacity = reduced ? 0.95 : 0.72 + 0.28 * hoverWave;
-    } else {
-      res.hiGeo.setDrawRange(0, 0);
-    }
-
-    if (!reduced && res.pulseCount > 0 && graph.edges.length > 0) {
-      res.pulses.forEach((p, k) => {
-        p.t += delta * p.speed;
-        if (p.t >= 1) {
-          p.t %= 1;
-          p.edge = Math.floor(Math.random() * graph.edges.length);
-          p.speed = 0.3 + Math.random() * 0.45;
-        }
-        const [a, b] = graph.edges[p.edge];
-        for (let c = 0; c < 3; c++) {
-          const pa = drifted[a * 3 + c];
-          res.pulsePos[k * 3 + c] = pa + (drifted[b * 3 + c] - pa) * p.t;
-        }
-      });
-      (res.pulseGeo.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
-    }
-
-    const dpr = state.gl.getPixelRatio();
-    res.glowMat.uniforms.uPixelRatio.value = dpr;
-    res.glowMat.uniforms.uBeat.value = beat;
-    res.glowMat.uniforms.uOpacity.value = reduced ? 0.7 : 0.5 + 0.4 * beat;
-    res.pulseMat.uniforms.uPixelRatio.value = dpr;
-    res.pulseMat.uniforms.uOpacity.value = 0.55 + 0.45 * beat;
-
-    if (ringsRef.current && !reduced) ringsRef.current.rotation.y += delta * 0.05;
   });
 
-  const handleStart = () => {
-    if (idleTimer.current !== null) window.clearTimeout(idleTimer.current);
-    setIdle(false);
-  };
-  const handleEnd = () => {
-    if (idleTimer.current !== null) window.clearTimeout(idleTimer.current);
-    idleTimer.current = window.setTimeout(() => setIdle(true), 4000);
-  };
-
-  const lvl = Math.max(0, Math.min(5, Math.floor(level)));
-  const ringCount = lvl >= 5 ? 2 : lvl >= 4 ? 1 : 0;
-  const hoveredNode =
-    hovered !== null && hovered < graph.nodes.length ? graph.nodes[hovered] : null;
+  const hoveredLearning = hovered != null ? memories[hovered] : null;
+  const hoveredPos =
+    hovered != null ? graph.memorySlots[hovered % graph.memorySlots.length] : null;
 
   return (
-    <group ref={rootRef}>
-      <points geometry={res.glowGeo} material={res.glowMat} frustumCulled={false} />
-      <lineSegments geometry={res.lineGeo} material={res.lineMat} frustumCulled={false} />
-      <lineSegments geometry={res.hiGeo} material={res.hiMat} frustumCulled={false} />
-      {!reduced && res.pulseCount > 0 && (
-        <points geometry={res.pulseGeo} material={res.pulseMat} frustumCulled={false} />
-      )}
-
-      {graph.nodes.map((node, i) => (
-        <mesh
-          key={node.learning ? node.learning.id : `newborn-${i}`}
-          geometry={res.sphereGeo}
-          material={res.coreMats.get(node.core)}
-          position={node.base}
-          scale={node.radius}
-          raycast={node.learning ? undefined : noRaycast}
-          onPointerOver={
-            node.learning
-              ? (ev) => {
-                  ev.stopPropagation();
-                  setHovered(i);
-                }
-              : undefined
-          }
-          onPointerOut={
-            node.learning ? () => setHovered((h) => (h === i ? null : h)) : undefined
-          }
-          onClick={
-            node.learning
-              ? (ev) => {
-                  ev.stopPropagation();
-                  onSelect?.(node.learning);
-                }
-              : undefined
-          }
-          ref={(m: THREE.Mesh | null) => {
-            meshRefs.current[i] = m;
-          }}
-        />
-      ))}
-
-      {ringCount > 0 && (
-        <group ref={ringsRef}>
-          <mesh rotation={[1.15, 0.2, 0]}>
-            <torusGeometry args={[2.15, 0.005, 8, 128]} />
-            <meshBasicMaterial
-              color="#F16524"
+    <>
+      <group ref={group}>
+        {/* synapse web */}
+        <lineSegments geometry={graph.synapses}>
+          <lineBasicMaterial
+            color="#8f95ad"
+            transparent
+            opacity={0.07}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </lineSegments>
+        {/* neurons */}
+        <points geometry={graph.ambient}>
+          <pointsMaterial
+            vertexColors
+            size={0.028}
+            sizeAttenuation
+            transparent
+            opacity={0.85}
+            depthWrite={false}
+          />
+        </points>
+        {/* memory wiring */}
+        <lineSegments geometry={memoryLinks}>
+          <lineBasicMaterial
+            color="#F16524"
+            transparent
+            opacity={0.3}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </lineSegments>
+        {/* memory neurons — the real learnings */}
+        {memories.length > 0 && (
+          <points
+            geometry={memoryGeom}
+            onPointerMove={(e) => {
+              e.stopPropagation();
+              if (e.index != null) setHovered(e.index);
+            }}
+            onPointerOut={() => setHovered(null)}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (e.index != null && memories[e.index]) onSelect?.(memories[e.index]);
+            }}
+          >
+            <pointsMaterial
+              vertexColors
+              size={0.085}
+              sizeAttenuation
               transparent
-              opacity={0.16}
-              blending={THREE.AdditiveBlending}
+              opacity={1}
               depthWrite={false}
             />
-          </mesh>
-          {ringCount > 1 && (
-            <mesh rotation={[-1.05, -0.5, 0.2]}>
-              <torusGeometry args={[2.55, 0.004, 8, 128]} />
-              <meshBasicMaterial
-                color="#FF8233"
+          </points>
+        )}
+        {/* inner heart glow */}
+        <sprite scale={2.6}>
+          <spriteMaterial
+            map={tex}
+            color="#7a4be0"
+            transparent
+            opacity={0.16}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </sprite>
+        <sprite scale={1.3} position={[0, -0.1, 0.2]}>
+          <spriteMaterial
+            map={tex}
+            color="#F16524"
+            transparent
+            opacity={0.14}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </sprite>
+        {/* thought pulses travelling the web */}
+        {!reduced &&
+          pulseState.current.map((_, i) => (
+            <sprite
+              key={i}
+              scale={0.09}
+              ref={(s) => {
+                if (s) pulseRefs.current[i] = s;
+              }}
+            >
+              <spriteMaterial
+                map={tex}
+                color={i % 3 === 0 ? '#ffffff' : '#FF8233'}
                 transparent
-                opacity={0.1}
                 blending={THREE.AdditiveBlending}
                 depthWrite={false}
               />
-            </mesh>
-          )}
-        </group>
-      )}
-
-      {hoveredNode?.learning && (
-        <Html
-          position={[
-            hoveredNode.base.x,
-            hoveredNode.base.y + hoveredNode.radius + 0.14,
-            hoveredNode.base.z,
-          ]}
-          center
-          zIndexRange={[40, 0]}
-          style={{ pointerEvents: 'none' }}
-        >
-          <div className="pointer-events-none w-64 -translate-y-1/2 rounded-lg border border-white/10 bg-[#0b0603]/95 p-3 shadow-[0_0_30px_rgba(241,101,36,0.2)]">
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#FF8233]">
-              {hoveredNode.learning.errorClass}
-            </div>
-            <div className="mt-1.5 text-xs leading-relaxed text-white/85 line-clamp-3">
-              {hoveredNode.learning.rootCause}
-            </div>
-            <div className="mt-2 flex items-center gap-2 font-mono text-[10px] text-white/45">
-              <span>
-                {hoveredNode.learning.confirmations > 1
-                  ? `confirmed ×${hoveredNode.learning.confirmations}`
-                  : 'observed once'}
-              </span>
-              <span
-                className={
-                  hoveredNode.learning.rating < 0 ? 'text-[#FF3B30]' : 'text-[#FF8233]'
-                }
+            </sprite>
+          ))}
+        {/* hovered memory: tooltip + halo */}
+        {hoveredLearning && hoveredPos && (
+          <>
+            <sprite position={hoveredPos} scale={0.32}>
+              <spriteMaterial
+                map={tex}
+                color={hoveredLearning.rating < 0 ? '#FF3B30' : '#FF8233'}
+                transparent
+                opacity={0.85}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+              />
+            </sprite>
+            <Html position={hoveredPos} center distanceFactor={5.5} zIndexRange={[30, 0]}>
+              <div
+                className="pointer-events-none w-max max-w-[260px] -translate-y-10 rounded-lg border border-white/15 bg-black/85 px-3 py-2 backdrop-blur-sm"
+                style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}
               >
-                {hoveredNode.learning.rating > 0
-                  ? '+1'
-                  : hoveredNode.learning.rating < 0
-                    ? '−1'
-                    : hoveredNode.learning.source}
-              </span>
-            </div>
-          </div>
-        </Html>
-      )}
-
+                <p className="text-[10px] uppercase tracking-[0.18em] text-[#FF8233]">
+                  {hoveredLearning.errorClass} · confirmed {hoveredLearning.confirmations}×
+                </p>
+                <p className="mt-1 text-[11px] leading-snug text-white/80">
+                  {hoveredLearning.rootCause.length > 90
+                    ? `${hoveredLearning.rootCause.slice(0, 90)}…`
+                    : hoveredLearning.rootCause}
+                </p>
+              </div>
+            </Html>
+          </>
+        )}
+      </group>
       <OrbitControls
-        makeDefault
+        ref={controls}
         enablePan={false}
-        enableDamping
-        dampingFactor={0.08}
-        minDistance={2.4}
-        maxDistance={9}
-        minPolarAngle={0.6}
-        maxPolarAngle={2.5}
-        autoRotate={!reduced && idle && hovered === null}
-        autoRotateSpeed={0.6}
-        onStart={handleStart}
-        onEnd={handleEnd}
+        minDistance={2.6}
+        maxDistance={7}
+        autoRotate={!reduced}
+        autoRotateSpeed={0.7}
+        onStart={() => {
+          if (controls.current) controls.current.autoRotate = false;
+        }}
+        onEnd={() => {
+          window.setTimeout(() => {
+            if (controls.current && !reduced) controls.current.autoRotate = true;
+          }, 2200);
+        }}
       />
-    </group>
+    </>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* public component                                                    */
-/* ------------------------------------------------------------------ */
+/* ── shell ──────────────────────────────────────────────────────────────── */
 
 export function NeuralCore({ learnings, level, onSelect, className }: NeuralCoreProps) {
-  const reduced = !!useReducedMotion();
-  const graph = useMemo(() => buildGraph(learnings, level), [learnings, level]);
-  const downPos = useRef<[number, number] | null>(null);
-
+  const [reduced] = useState(
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
   return (
-    <div
-      className={`relative h-full min-h-[320px] w-full overflow-hidden ${className ?? ''}`}
-      style={{
-        background:
-          'radial-gradient(120% 90% at 50% 42%, #120a05 0%, #050302 55%, #000 100%)',
-      }}
-    >
+    <div className={className}>
       <Canvas
-        dpr={[1, 2]}
-        flat
+        dpr={[1, 1.75]}
         frameloop={reduced ? 'demand' : 'always'}
-        camera={{ position: [0, 0.6, 5.4], fov: 42, near: 0.1, far: 60 }}
         gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
-        onPointerDown={(ev) => {
-          downPos.current = [ev.clientX, ev.clientY];
-        }}
-        onPointerMissed={(ev) => {
-          // Ignore the click generated by an orbit drag.
-          const d = downPos.current;
-          if (d && Math.hypot(ev.clientX - d[0], ev.clientY - d[1]) > 6) return;
-          onSelect?.(null);
-        }}
+        camera={{ fov: 40, position: [0, 0.45, 4.4] }}
+        onCreated={({ gl }) => gl.setClearColor(0x000000, 0)}
+        onPointerMissed={() => onSelect?.(null)}
       >
-        <fog attach="fog" args={['#000000', 7, 13]} />
-        <NeuralScene graph={graph} level={level} reduced={reduced} onSelect={onSelect} />
+        <BrainScene
+          learnings={learnings}
+          level={level}
+          onSelect={onSelect}
+          reduced={reduced}
+        />
       </Canvas>
-      {graph.overflow > 0 && (
-        <div className="pointer-events-none absolute bottom-3 right-4 font-mono text-[11px] tracking-wider text-white/40">
-          +{graph.overflow} more learnings
-        </div>
-      )}
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/* heartbeat audio                                                     */
-/* ------------------------------------------------------------------ */
-
-/**
- * Soft ~880Hz sine blip on each heartbeat. Default OFF; the AudioContext is
- * created lazily on the first enable (a user gesture, per autoplay rules) and
- * closed on unmount.
- */
+/** Soft heartbeat blip (~0.9Hz) while enabled; lazy AudioContext. */
 export function useNeuralPing(enabled: boolean): void {
   const ctxRef = useRef<AudioContext | null>(null);
-
   useEffect(() => {
     if (!enabled) return;
-    const Ctor: typeof AudioContext | undefined =
+    const Ctor =
       window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return;
     if (!ctxRef.current) ctxRef.current = new Ctor();
     const ctx = ctxRef.current;
     void ctx.resume();
-
-    const blip = () => {
-      const t0 = ctx.currentTime;
+    const id = window.setInterval(() => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = 'sine';
       osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.0001, t0);
-      gain.gain.exponentialRampToValueAtTime(0.04, t0 + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.22);
+      gain.gain.setValueAtTime(0.035, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
       osc.connect(gain).connect(ctx.destination);
-      osc.start(t0);
-      osc.stop(t0 + 0.25);
-    };
-
-    const id = window.setInterval(blip, Math.round(1000 / HEARTBEAT_HZ));
+      osc.start();
+      osc.stop(ctx.currentTime + 0.2);
+    }, 1100);
     return () => {
       window.clearInterval(id);
-      void ctx.suspend();
+      void ctxRef.current?.suspend();
     };
   }, [enabled]);
-
-  useEffect(
-    () => () => {
-      void ctxRef.current?.close();
-      ctxRef.current = null;
-    },
-    [],
-  );
 }
