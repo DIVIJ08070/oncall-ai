@@ -113,6 +113,8 @@ interface BrainGraph {
   synapses: THREE.BufferGeometry;
   walks: THREE.Vector3[][]; // pulse paths
   memorySlots: THREE.Vector3[];
+  baseColors: Float32Array; // pristine neuron colors (cursor boost restores from here)
+  basePositions: Float32Array; // pristine neuron positions (cursor ripple restores)
 }
 
 function buildBrain(level: number): BrainGraph {
@@ -221,7 +223,7 @@ function buildBrain(level: number): BrainGraph {
     memorySlots.push(v.clone().multiplyScalar(1.05));
   }
 
-  return { ambient, synapses, walks, memorySlots };
+  return { ambient, synapses, walks, memorySlots, baseColors: colors.slice(), basePositions: positions.slice() };
 }
 
 /* ── scene ──────────────────────────────────────────────────────────────── */
@@ -261,6 +263,10 @@ function BrainScene({
   );
   const [hovered, setHovered] = useState<number | null>(null);
   useCursor(hovered != null);
+  const touchLocal = useRef<THREE.Vector3 | null>(null);
+  const touchGlow = useRef<THREE.Sprite | null>(null);
+  const boosted = useRef<number[]>([]);
+  const tmpV = useRef(new THREE.Vector3());
 
   useEffect(() => {
     raycaster.params.Points = { threshold: 0.09 };
@@ -316,12 +322,72 @@ function BrainScene({
     if (group.current) {
       const breathe = 1 + Math.sin(t * 0.9) * 0.012;
       group.current.scale.setScalar(breathe);
+      // the brain leans subtly toward the cursor
+      group.current.rotation.y += (0.55 + state.pointer.x * 0.16 - group.current.rotation.y) * 0.06;
+      group.current.rotation.x += (0.14 - state.pointer.y * 0.1 - group.current.rotation.x) * 0.06;
+    }
+
+    // ── cursor touch: nearby neurons flare, then relax ──
+    const colAttr = graph.ambient.getAttribute('color') as THREE.BufferAttribute;
+    const posAttr = graph.ambient.getAttribute('position') as THREE.BufferAttribute;
+    const colArr = colAttr.array as Float32Array;
+    const posArr = posAttr.array as Float32Array;
+    if (boosted.current.length) {
+      for (const i of boosted.current) {
+        colArr[i * 3] = graph.baseColors[i * 3];
+        colArr[i * 3 + 1] = graph.baseColors[i * 3 + 1];
+        colArr[i * 3 + 2] = graph.baseColors[i * 3 + 2];
+        posArr[i * 3] = graph.basePositions[i * 3];
+        posArr[i * 3 + 1] = graph.basePositions[i * 3 + 1];
+        posArr[i * 3 + 2] = graph.basePositions[i * 3 + 2];
+      }
+      boosted.current = [];
+      colAttr.needsUpdate = true;
+      posAttr.needsUpdate = true;
+    }
+    const touch = touchLocal.current;
+    if (touch) {
+      const R2 = 0.55 * 0.55;
+      for (let i = 0; i < posAttr.count; i++) {
+        const dx = posAttr.getX(i) - touch.x;
+        const dy = posAttr.getY(i) - touch.y;
+        const dz = posAttr.getZ(i) - touch.z;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 < R2) {
+          const fall = 1 - Math.sqrt(d2) / 0.55;
+          const k = 1 + 2.4 * fall;
+          colArr[i * 3] = Math.min(1, graph.baseColors[i * 3] * k);
+          colArr[i * 3 + 1] = Math.min(1, graph.baseColors[i * 3 + 1] * k);
+          colArr[i * 3 + 2] = Math.min(1, graph.baseColors[i * 3 + 2] * k);
+          // physical reaction: the dots bulge outward and shiver under the cursor
+          const bx = graph.basePositions[i * 3];
+          const by = graph.basePositions[i * 3 + 1];
+          const bz = graph.basePositions[i * 3 + 2];
+          const len = Math.sqrt(bx * bx + by * by + bz * bz) || 1;
+          const lift = 0.16 * fall * fall;
+          const jig = 0.02 * fall;
+          posArr[i * 3] = bx + (bx / len) * lift + Math.sin(t * 31 + i) * jig;
+          posArr[i * 3 + 1] = by + (by / len) * lift + Math.cos(t * 27 + i * 1.3) * jig;
+          posArr[i * 3 + 2] = bz + (bz / len) * lift;
+          boosted.current.push(i);
+        }
+      }
+      colAttr.needsUpdate = true;
+      posAttr.needsUpdate = true;
+      if (touchGlow.current) {
+        touchGlow.current.visible = true;
+        touchGlow.current.position.copy(touch);
+        touchGlow.current.scale.setScalar(0.5 + Math.sin(t * 6) * 0.06);
+        (touchGlow.current.material as THREE.SpriteMaterial).opacity = 0.5;
+      }
+    } else if (touchGlow.current) {
+      touchGlow.current.visible = false;
     }
     pulseState.current.forEach((p, i) => {
       const sp = pulseRefs.current[i];
       const walk = graph.walks[i % graph.walks.length];
       if (!sp || !walk) return;
-      p.u = (p.u + p.speed * (1 / 60)) % 1;
+      p.u = (p.u + p.speed * (touchLocal.current ? 1.8 : 1) * (1 / 60)) % 1;
       const ft = p.u * (walk.length - 1);
       const fi = Math.min(walk.length - 2, Math.floor(ft));
       const fr = ft - fi;
@@ -392,6 +458,33 @@ function BrainScene({
             />
           </points>
         )}
+        {/* invisible touch surface: raycast target for cursor-on-cortex */}
+        <mesh
+          visible={false}
+          scale={[1.18, 0.96, 1.48]}
+          onPointerMove={(e) => {
+            if (group.current) {
+              touchLocal.current = group.current.worldToLocal(tmpV.current.copy(e.point));
+            }
+          }}
+          onPointerOut={() => {
+            touchLocal.current = null;
+          }}
+        >
+          <sphereGeometry args={[1, 24, 24]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
+        {/* cursor touch glow riding the cortex */}
+        <sprite ref={touchGlow} visible={false} scale={0.5}>
+          <spriteMaterial
+            map={tex}
+            color="#FF8233"
+            transparent
+            opacity={0.5}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </sprite>
         {/* faint inner life — small, so the cortex silhouette stays crisp */}
         <sprite scale={1.1}>
           <spriteMaterial
