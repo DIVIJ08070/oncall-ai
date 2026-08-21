@@ -13,17 +13,43 @@ import { useEffect, useRef } from 'react';
  */
 
 /** Ridge polylines in image-fraction coordinates for the motes to follow. */
-const RIDGES: Array<Array<[number, number]>> = [
-  [[0.03, 0.72], [0.12, 0.62], [0.22, 0.57], [0.3, 0.62], [0.38, 0.58]],
-  [[0.3, 0.45], [0.4, 0.42], [0.5, 0.4], [0.6, 0.38], [0.68, 0.34]],
-  [[0.55, 0.3], [0.65, 0.22], [0.75, 0.15], [0.85, 0.12], [0.93, 0.1]],
-  [[0.7, 0.55], [0.78, 0.48], [0.86, 0.42], [0.95, 0.35]],
-  [[0.15, 0.85], [0.3, 0.78], [0.45, 0.74], [0.62, 0.7], [0.8, 0.66], [0.95, 0.6]],
-  [[0.42, 0.62], [0.52, 0.56], [0.62, 0.5], [0.72, 0.44], [0.82, 0.36]],
+/**
+ * Ridge polylines TRACED FROM THE IMAGE ITSELF (offline bright-band chaining
+ * over hero-terrain.jpg columns), so the circuit lines ride the real mountain
+ * contours. Each is a service dependency route with a name + live rate.
+ */
+const ROUTES: Array<{
+  path: Array<[number, number]>;
+  color: string;
+  label: string;
+  base: number; // baseline req/s for the live rate readout
+}> = [
+  {
+    path: [[0.361, 0.577], [0.428, 0.628], [0.483, 0.599], [0.539, 0.491], [0.605, 0.504], [0.661, 0.383], [0.727, 0.402], [0.783, 0.354], [0.872, 0.37], [0.894, 0.383]],
+    color: '200,204,220', label: 'CHECKOUT \u2192 DATABASE', base: 96,
+  },
+  {
+    path: [[0.305, 0.478], [0.35, 0.456], [0.394, 0.475], [0.438, 0.434], [0.483, 0.491], [0.528, 0.424], [0.594, 0.37], [0.65, 0.296], [0.694, 0.322], [0.739, 0.233]],
+    color: '255,138,90', label: 'AUTH \u2192 PAYMENT', base: 142,
+  },
+  {
+    path: [[0.183, 0.823], [0.217, 0.778], [0.25, 0.854], [0.283, 0.886], [0.328, 0.918], [0.361, 0.937], [0.394, 0.915], [0.428, 0.88], [0.461, 0.816], [0.494, 0.749]],
+    color: '176,123,255', label: 'INGEST STREAM', base: 421,
+  },
+  {
+    path: [[0.127, 0.59], [0.172, 0.58], [0.205, 0.599], [0.239, 0.577], [0.272, 0.539], [0.305, 0.593], [0.339, 0.65], [0.372, 0.654], [0.394, 0.67]],
+    color: '200,204,220', label: 'USER-SERVICE \u2192 CACHE', base: 63,
+  },
+  {
+    path: [[0.028, 0.743], [0.072, 0.736], [0.094, 0.692], [0.117, 0.711], [0.139, 0.701], [0.161, 0.717], [0.183, 0.708], [0.227, 0.736], [0.25, 0.698], [0.272, 0.676], [0.283, 0.67]],
+    color: '176,123,255', label: 'NOTIFICATIONS', base: 18,
+  },
+  {
+    path: [[0.75, 0.634], [0.772, 0.657], [0.805, 0.603], [0.839, 0.663], [0.872, 0.701], [0.894, 0.695], [0.916, 0.647], [0.938, 0.574], [0.961, 0.564], [0.983, 0.529]],
+    color: '239,110,80', label: 'PAYMENT-GATEWAY \u00b7 DEGRADED', base: 87,
+  },
 ];
-
-/** Per-ridge stroke colors for the living circuit lines. */
-const RIDGE_COLORS = ['200,204,220', '255,138,90', '176,123,255', '239,110,80', '200,204,220', '255,138,90'];
+const RIDGES = ROUTES.map((r) => r.path);
 
 /** Glow pockets (image fractions) matching the baked hot zones. */
 const GLOWS = [
@@ -64,23 +90,15 @@ export function TerrainNetwork({ className }: { className?: string }) {
     if (!ctx) return;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    /* parallax: the image (and overlay) ease toward the cursor by ~1.5% */
-    let tx = 0;
-    let ty = 0;
-    let cx = 0;
-    let cy = 0;
+    /* The mountain itself stays STILL — only the circuit lines react. */
     let px = -1e4; // pointer in canvas fractions
     let py = -1e4;
     const onMove = (e: PointerEvent): void => {
       const r = wrap.getBoundingClientRect();
-      tx = ((e.clientX - r.left) / r.width - 0.5) * -2;
-      ty = ((e.clientY - r.top) / r.height - 0.5) * -2;
       px = (e.clientX - r.left) / r.width;
       py = (e.clientY - r.top) / r.height;
     };
     const onLeave = (): void => {
-      tx = 0;
-      ty = 0;
       px = -1e4;
       py = -1e4;
     };
@@ -109,13 +127,6 @@ export function TerrainNetwork({ className }: { className?: string }) {
     const frame = (): void => {
       const t = (performance.now() - t0) / 1000;
 
-      // eased parallax applied to both layers
-      cx += (tx - cx) * 0.05;
-      cy += (ty - cy) * 0.05;
-      const shift = `translate(${cx * 1.5}%, ${cy * 1.2}%) scale(1.06)`;
-      img.style.transform = shift;
-      canvas.style.transform = shift;
-
       ctx.clearRect(0, 0, W, H);
       ctx.globalCompositeOperation = 'lighter';
 
@@ -136,8 +147,10 @@ export function TerrainNetwork({ className }: { className?: string }) {
 
       // living circuit lines along the ridges — marching dashes that flow
       // continuously and BRIGHTEN near the cursor (interactive, alive)
-      RIDGES.forEach((ridge, ri) => {
-        const color = RIDGE_COLORS[ri % RIDGE_COLORS.length];
+      let hovered: { ri: number; near: number } | null = null;
+      for (let ri = 0; ri < RIDGES.length; ri++) {
+        const ridge = RIDGES[ri];
+        const color = ROUTES[ri].color;
         // proximity of the pointer to this ridge (nearest sample point)
         let near = 0;
         if (px > -100) {
@@ -165,7 +178,29 @@ export function TerrainNetwork({ className }: { className?: string }) {
           ctx.stroke();
         }
         ctx.setLineDash([]);
-      });
+        if (near > 0.45 && (hovered === null || near > hovered.near)) hovered = { ri, near };
+      }
+
+      // the hovered route explains itself: name + live rate near the cursor
+      if (hovered && px > -100) {
+        const route = ROUTES[hovered.ri];
+        const rate = Math.round(route.base * (1 + Math.sin(t * 1.3 + hovered.ri) * 0.12 + hot * 0.6));
+        const text = `${route.label} \u00b7 ${rate} req/s`;
+        const fs = Math.max(11, 12 * (W / 1400));
+        ctx.font = `${fs}px "JetBrains Mono", ui-monospace, monospace`;
+        const tw = ctx.measureText(text).width;
+        const bx = Math.min(Math.max(px * W - tw / 2, 8), W - tw - 8);
+        const by = Math.max(py * H - 26 * (W / 1400), fs + 6);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = 'rgba(5,5,7,0.78)';
+        ctx.fillRect(bx - 8, by - fs - 5, tw + 16, fs + 12);
+        ctx.strokeStyle = `rgba(${route.color},0.55)`;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(bx - 8, by - fs - 5, tw + 16, fs + 12);
+        ctx.fillStyle = `rgba(${route.color},1)`;
+        ctx.fillText(text, bx, by);
+        ctx.globalCompositeOperation = 'lighter';
+      }
 
       for (const m of motes) {
         m.u += m.speed * (1 + hot * 1.4) * (1 / 60);
@@ -221,12 +256,12 @@ export function TerrainNetwork({ className }: { className?: string }) {
         alt=""
         draggable={false}
         className="absolute inset-0 h-full w-full select-none object-cover object-[70%_45%]"
-        style={{ transform: 'scale(1.06)' }}
+        style={{ transform: 'scale(1.02)' }}
       />
       <canvas
         ref={canvasRef}
         className="absolute inset-0 h-full w-full"
-        style={{ transform: 'scale(1.06)' }}
+        style={{ transform: 'scale(1.02)' }}
       />
     </div>
   );
