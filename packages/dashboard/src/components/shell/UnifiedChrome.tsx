@@ -34,6 +34,7 @@ const TOP_TABS: { label: string; to: string; end?: boolean }[] = [
   { label: 'Home', to: '/', end: true },
   { label: 'Dashboard', to: '/dashboard' },
   { label: 'Incidents', to: '/incidents' },
+  { label: 'Self-Learning', to: '/learning' },
   { label: 'Integrations', to: '/onboarding' },
   { label: 'Live Demo', to: '/demo' },
 ];

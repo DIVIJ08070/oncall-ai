@@ -475,6 +475,8 @@ function NeuralScene({
   useFrame((state, delta) => {
     const t = state.clock.elapsedTime;
     const beat = reduced ? 0 : heartbeat(t);
+    // Soft 0..1 wave for the hovered neuron's glow/scale pulse.
+    const hoverWave = reduced ? 0.5 : 0.5 + 0.5 * Math.sin(t * 5.2);
     const { drifted } = res;
 
     if (rootRef.current) rootRef.current.scale.setScalar(1 + 0.06 * beat);
@@ -490,10 +492,20 @@ function NeuralScene({
       const mesh = meshRefs.current[i];
       if (mesh) {
         mesh.position.set(x, y, z);
-        mesh.scale.setScalar(node.radius * (hovered === i ? 1.6 : 1) * (1 + 0.05 * beat));
+        mesh.scale.setScalar(
+          node.radius *
+            (hovered === i ? 1.55 + 0.16 * hoverWave : 1) *
+            (1 + 0.05 * beat),
+        );
       }
     });
     (res.glowGeo.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+
+    // Hovered neuron: halo breathes on its own, faster than the heartbeat.
+    if (!reduced && hovered !== null && hovered < res.n) {
+      res.glowSizes[hovered] = res.glowBaseSizes[hovered] * (1.55 + 0.4 * hoverWave);
+      (res.glowGeo.getAttribute('aSize') as THREE.BufferAttribute).needsUpdate = true;
+    }
 
     graph.edges.forEach(([a, b], k) => {
       res.linePos.set(drifted.subarray(a * 3, a * 3 + 3), k * 6);
@@ -512,6 +524,8 @@ function NeuralScene({
       });
       res.hiGeo.setDrawRange(0, w / 3);
       (res.hiGeo.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+      // Connected synapses shimmer in step with the hovered neuron's pulse.
+      res.hiMat.opacity = reduced ? 0.95 : 0.72 + 0.28 * hoverWave;
     } else {
       res.hiGeo.setDrawRange(0, 0);
     }
