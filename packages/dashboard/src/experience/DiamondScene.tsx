@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { clamp01, type WorldState } from './worldState';
+import { NetworkWorldGroup, updateNetwork, type NetworkRefs } from './NetworkWorld';
 
 /**
  * DiamondScene — the Diamond Core as a real, procedural 3D object (brief §8/§20):
@@ -159,6 +160,8 @@ function makeParticles(): { home: Float32Array; positions: Float32Array; sizes: 
  */
 export class SceneDriver {
   world: WorldState | null = null;
+  pointer = { x: 0, y: 0 };
+  private lastPointerFrame = 0;
   private t = 0;
   private raf = 0;
   private last = 0;
@@ -179,6 +182,16 @@ export class SceneDriver {
   setWorld(w: WorldState): void {
     this.world = w;
     this.renderFn?.(w, this.t);
+  }
+
+  /** Cursor parallax (normalized -1..1). Throttled to ~30fps of GL frames. */
+  setPointer(x: number, y: number): void {
+    this.pointer.x = x;
+    this.pointer.y = y;
+    const now = Date.now();
+    if (now - this.lastPointerFrame < 33) return;
+    this.lastPointerFrame = now;
+    if (this.world) this.renderFn?.(this.world, this.t);
   }
 
   /** Ambient drift while the tab is actually visible (rAF alive). */
@@ -211,6 +224,7 @@ function SceneBridge({ driver }: { driver: SceneDriver }) {
   const pulseRing = useRef<THREE.Mesh>(null!);
   const streams = useRef<THREE.Group>(null!);
   const points = useRef<THREE.Points>(null!);
+  const net = useRef<NetworkRefs | null>(null);
   const particles = useRef(makeParticles());
   const glowTex = useRef<THREE.Texture>();
   if (!glowTex.current) glowTex.current = makeGlowTexture();
@@ -234,9 +248,9 @@ function SceneBridge({ driver }: { driver: SceneDriver }) {
       else twin.current.visible = false;
 
       const heartMat = heart.current.material as THREE.MeshBasicMaterial;
-      heartMat.color.copy(ORANGE_2).multiplyScalar(0.4 + pose.power * 1.1);
+      heartMat.color.copy(ORANGE_2).multiplyScalar(0.5 + pose.power * 1.7);
       const coreMat = core.current.material as THREE.MeshStandardMaterial;
-      coreMat.emissiveIntensity = 0.15 + pose.power * 1.6;
+      coreMat.emissiveIntensity = 0.08 + pose.power * 1.1;
       coreMat.opacity = 0.5 + pose.power * 0.5;
       const shellMat = shell.current.material as THREE.MeshBasicMaterial;
       shellMat.opacity = 0.05 + pose.power * 0.1;
@@ -303,6 +317,32 @@ function SceneBridge({ driver }: { driver: SceneDriver }) {
       (points.current.material as THREE.PointsMaterial).opacity =
         w.act === 8 ? 0.5 * (1 - w.ap) + 0.1 : 0.55;
 
+      // -- the production world reacts ------------------------------------
+      if (net.current) updateNetwork(net.current, w, t);
+
+      // -- cinematic camera: scroll moves the camera, not the content -------
+      const cam = camera as THREE.PerspectiveCamera;
+      let cz = 7;
+      let cxx = 0;
+      let camY = 0;
+      switch (w.act) {
+        case 0: cz = lerp(7.6, 6.2, ease(w.ap)); break;                 // dolly in
+        case 1: cz = 6.1; cxx = lerp(0, 0.8, ease(w.ap)); camY = -0.2; break; // toward the failure
+        case 2: cz = 5.6; cxx = pose.x * vw * 0.16; camY = -0.2; break;   // track the responder
+        case 3: cz = 6.8; camY = 0.15; break;
+        case 4: cz = 6.4; camY = 0.25; break;
+        case 5: cz = 7; break;
+        case 6: cz = 6.3; camY = 0.3; break;
+        case 7: cz = 6 - Math.sin(w.ap * Math.PI) * 0.4; cxx = Math.sin(w.ap * 4) * 0.25; break;
+        case 8: cz = lerp(6.8, 8.2, ease(w.ap)); break;                 // pull away to sleep
+      }
+      cam.position.set(
+        cxx + driver.pointer.x * 0.22,
+        camY - driver.pointer.y * 0.16,
+        cz,
+      );
+      cam.lookAt(0, camY * 0.4, 0);
+
       gl.render(scene, camera);
     };
     driver.bind(render);
@@ -324,11 +364,11 @@ function SceneBridge({ driver }: { driver: SceneDriver }) {
       <mesh ref={core} scale={[0.72, 1, 0.72]}>
         <octahedronGeometry args={[1, 0]} />
         <meshStandardMaterial
-          color="#1a0d06"
+          color="#0b0503"
           emissive={ORANGE}
-          emissiveIntensity={1}
-          roughness={0.25}
-          metalness={0.1}
+          emissiveIntensity={0.7}
+          roughness={0.16}
+          metalness={0.55}
           transparent
           flatShading
         />
@@ -403,6 +443,7 @@ function SceneBridge({ driver }: { driver: SceneDriver }) {
           </mesh>
         ))}
       </group>
+      <NetworkWorldGroup onReady={(r) => { net.current = r; }} />
       <points ref={points}>
         <bufferGeometry>
           <bufferAttribute

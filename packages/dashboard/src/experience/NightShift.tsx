@@ -62,10 +62,15 @@ export function NightShift() {
     if (staticMode) return;
     const root = rootRef.current;
     if (!root) return;
+    const AI_STATUS = [
+      'OBSERVING', 'DETECTING', 'INVESTIGATING', 'PROCESSING', 'VERIFYING',
+      'REPLAYING', 'REVIEWING', 'EVIDENCE', 'WATCHING',
+    ];
     const sections = Array.from(root.querySelectorAll<HTMLElement>('[data-ns-act]'));
     const num = root.querySelector<HTMLElement>('[data-ns-act-num]');
     const name = root.querySelector<HTMLElement>('[data-ns-act-name]');
     const bar = root.querySelector<HTMLElement>('[data-ns-act-bar]');
+    const aiStatus = root.querySelector<HTMLElement>('[data-ns-ai-status]');
     const nav = root.querySelector<HTMLElement>('[data-ns-nav]');
 
     const apply = (): void => {
@@ -79,17 +84,27 @@ export function NightShift() {
       });
       if (num) num.textContent = `${String(w.act + 1).padStart(2, '0')} / ${String(ACTS.length).padStart(2, '0')}`;
       if (name) name.textContent = ACTS[w.act].name;
+      if (aiStatus) aiStatus.textContent = AI_STATUS[w.act];
       if (bar) bar.style.width = `${Math.round(w.ap * 96)}px`;
       // the instrument panel matters at the very top, then recedes
       if (nav) nav.style.opacity = w.wp < 0.04 ? '1' : w.act >= ACTS.length - 1 ? '1' : '0.25';
     };
 
+    const onPointer = (e: MouseEvent): void => {
+      driver.setPointer(
+        (e.clientX / window.innerWidth) * 2 - 1,
+        (e.clientY / window.innerHeight) * 2 - 1,
+      );
+    };
+
     apply();
     window.addEventListener('scroll', apply, { passive: true });
     window.addEventListener('resize', apply);
+    window.addEventListener('mousemove', onPointer, { passive: true });
     return () => {
       window.removeEventListener('scroll', apply);
       window.removeEventListener('resize', apply);
+      window.removeEventListener('mousemove', onPointer);
     };
   }, [driver, staticMode]);
 

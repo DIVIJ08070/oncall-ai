@@ -51,6 +51,9 @@ export function ActIndicator() {
         <div data-ns-act-bar className="h-px w-0 bg-[#F16524] transition-[width] duration-200" />
       </div>
       <div data-ns-act-name className="text-white/60">THE NIGHT SHIFT</div>
+      <p className="mt-1.5 font-mono text-[9px] uppercase tracking-[0.3em] text-white/30">
+        AI STATUS · <span className="text-[#F16524]" data-ns-ai-status>OBSERVING</span>
+      </p>
     </div>
   );
 }
