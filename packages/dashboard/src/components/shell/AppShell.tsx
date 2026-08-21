@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react';
 import { UnifiedSidebar, UnifiedTopBar } from './UnifiedChrome';
 import { BottomTabBar } from './BottomTabBar';
-import { CursorSpotlight } from './CursorSpotlight';
-import { Grain, AtmosphereBackdrop, Scanlines, ScanSweep } from '../atmosphere';
 import { Particles } from '../atmosphere/Particles';
 
 /**
@@ -12,10 +10,8 @@ import { Particles } from '../atmosphere/Particles';
  */
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <div className="relative flex min-h-screen flex-col bg-bg">
-      {/* Igloo-inspired atmosphere: aurora depth + HUD grid behind everything, film grain on top. */}
-      <AtmosphereBackdrop />
-      {/* ambient particle dust across every console page (home has its own world) */}
+    <div className="relative flex min-h-screen flex-col bg-[#050505]">
+      {/* pure black + drifting particle dust — the only console background */}
       <div className="pointer-events-none fixed inset-0">
         <Particles
           particleCount={140}
@@ -30,11 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           className="absolute inset-0"
         />
       </div>
-      <Scanlines />
-      <ScanSweep />
-      <Grain />
-      <CursorSpotlight />
-      {/* Content sits above the ambient + atmosphere layers. */}
+      {/* Content sits above the particle layer. */}
       <div className="relative z-10 flex w-full items-start gap-6 p-4 sm:p-6">
         <UnifiedSidebar />
         <main className="min-w-0 flex-1 pb-16 sm:pb-0">
