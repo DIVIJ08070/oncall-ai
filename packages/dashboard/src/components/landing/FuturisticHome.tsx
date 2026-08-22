@@ -17,7 +17,9 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { IncidentSummary, Severity } from '@oncall/shared';
-import { getIncidents } from '../../api';
+import { getIncidents, getLogs, getServices } from '../../api';
+import { getRepoLearnings } from '../../api/learnings';
+import type { Learning } from '../../api/learnings';
 import { relativeTime } from '../../lib/format';
 import { Grain } from '../atmosphere';
 import { AnimatedNumber, Entrance, StaggerGroup, StaggerItem } from '../motion/primitives';
@@ -466,12 +468,93 @@ function StatTile({ stat }: { stat: (typeof STATS)[number] }) {
   );
 }
 
+/**
+ * Live numbers for the stat band — computed client-side from the real APIs.
+ * Each field is null until (and unless) its fetch succeeds, in which case the
+ * REAL value is shown (zeros included — the band tells the truth); on API
+ * failure the tile falls back to its demo target so the marketing page never
+ * breaks offline.
+ */
+interface RealStats {
+  incidentsToday: number | null;
+  mttrMin: number | null;
+  alerts: number | null;
+  services: number | null;
+  accuracy: number | null;
+  latest: Learning | null;
+}
+
+function useRealStats(): RealStats {
+  const [stats, setStats] = useState<RealStats>({
+    incidentsToday: null,
+    mttrMin: null,
+    alerts: null,
+    services: null,
+    accuracy: null,
+    latest: null,
+  });
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    const dayStart = midnight.getTime();
+
+    getIncidents({ limit: 100 }, ctrl.signal)
+      .then(({ incidents }) => {
+        const today = incidents.filter((i) => i.opened_at >= dayStart).length;
+        const resolved = incidents.filter((i) => i.resolved_at != null);
+        const mttr = resolved.length
+          ? resolved.reduce((a, i) => a + ((i.resolved_at ?? 0) - i.opened_at), 0) /
+            resolved.length /
+            60000
+          : null;
+        setStats((s) => ({ ...s, incidentsToday: today, mttrMin: mttr }));
+      })
+      .catch(() => undefined);
+    getLogs({ limit: 1000 }, ctrl.signal)
+      .then((res) => setStats((s) => ({ ...s, alerts: res.events.length })))
+      .catch(() => undefined);
+    getServices(ctrl.signal)
+      .then((res) => setStats((s) => ({ ...s, services: res.services.length })))
+      .catch(() => undefined);
+    getRepoLearnings('DIVIJ08070/oncall-ai-victim', ctrl.signal)
+      .then((res) => {
+        const rated = res.learnings.filter((l) => l.rating !== 0);
+        const correct = rated.filter((l) => l.rating > 0).length;
+        setStats((s) => ({
+          ...s,
+          accuracy: rated.length ? Math.round((correct / rated.length) * 100) : null,
+          latest: res.learnings[0] ?? null,
+        }));
+      })
+      .catch(() => undefined);
+    return () => ctrl.abort();
+  }, []);
+
+  return stats;
+}
+
 function StatsRow() {
+  const real = useRealStats();
+  const live: Array<{ target: number | null; delta?: string }> = [
+    { target: real.incidentsToday, delta: 'live · today' },
+    { target: real.mttrMin == null ? null : Math.max(1, Math.round(real.mttrMin)), delta: 'avg resolution' },
+    { target: real.alerts, delta: 'events ingested' },
+    { target: real.services, delta: real.services === 1 ? 'service connected' : 'services connected' },
+    { target: real.accuracy, delta: 'from rated learnings' },
+  ];
   return (
     <StaggerGroup className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-5" delay={0.35}>
-      {STATS.map((stat) => (
+      {STATS.map((stat, i) => (
         <StaggerItem key={stat.label}>
-          <StatTile stat={stat} />
+          <StatTile
+            stat={
+              live[i]?.target == null
+                ? stat
+                : { ...stat, target: live[i].target as number, delta: live[i].delta ?? stat.delta, deltaTone: 'muted' as const, trendUp: undefined }
+            }
+          />
         </StaggerItem>
       ))}
     </StaggerGroup>
@@ -590,6 +673,14 @@ function RecentIncidentsCard() {
 }
 
 function AiInsightsCard() {
+  const [latest, setLatest] = useState<Learning | null>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    getRepoLearnings('DIVIJ08070/oncall-ai-victim', ctrl.signal)
+      .then((res) => setLatest(res.learnings[0] ?? null))
+      .catch(() => undefined);
+    return () => ctrl.abort();
+  }, []);
   return (
     <GlassCard className="flex h-full flex-col p-5">
       <div className="flex items-center justify-between">
@@ -608,15 +699,33 @@ function AiInsightsCard() {
           <Brain style={{ width: 18, height: 18 }} />
         </span>
         <div className="min-w-0">
-          <p className="text-sm leading-relaxed text-white/90">
-            Spike in auth failures correlated with deployment{' '}
-            <span className="text-[#FF8233]" style={{ fontFamily: MONO }}>
-              v2.14.3
-            </span>
-          </p>
-          <p className="mt-2 text-[11px] text-white/40" style={{ fontFamily: MONO }}>
-            2m ago
-          </p>
+          {latest ? (
+            <>
+              <p className="text-sm leading-relaxed text-white/90">
+                {latest.rootCause.length > 140
+                  ? `${latest.rootCause.slice(0, 140)}…`
+                  : latest.rootCause}{' '}
+                <span className="text-[#FF8233]" style={{ fontFamily: MONO }}>
+                  {latest.errorClass}
+                </span>
+              </p>
+              <p className="mt-2 text-[11px] text-white/40" style={{ fontFamily: MONO }}>
+                {relativeTime(latest.createdAt)} · confirmed {latest.confirmations}×
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm leading-relaxed text-white/90">
+                Spike in auth failures correlated with deployment{' '}
+                <span className="text-[#FF8233]" style={{ fontFamily: MONO }}>
+                  v2.14.3
+                </span>
+              </p>
+              <p className="mt-2 text-[11px] text-white/40" style={{ fontFamily: MONO }}>
+                2m ago
+              </p>
+            </>
+          )}
         </div>
       </div>
     </GlassCard>
