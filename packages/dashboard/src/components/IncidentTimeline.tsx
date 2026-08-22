@@ -162,6 +162,7 @@ function IncidentRow({ inc }: { inc: IncidentSummary }) {
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <StatusPill token={st.token} label={st.label} />
+            {inc.pr ? <PrTag pr={inc.pr} /> : null}
             {live ? (
               <span className="inline-flex items-center gap-1 text-sm text-ink-muted-text">
                 <span
@@ -189,6 +190,27 @@ function IncidentRow({ inc }: { inc: IncidentSummary }) {
         </span>
       </Link>
     </li>
+  );
+}
+
+/** Tag flagging the incident's linked AI fix PR — merged (green), open, or closed. */
+function PrTag({ pr }: { pr: NonNullable<IncidentSummary['pr']> }) {
+  const merged = pr.state === 'merged';
+  const closed = pr.state === 'closed';
+  const cls = merged
+    ? 'border-[#52D273]/40 bg-[#52D273]/15 text-[#52D273]'
+    : closed
+      ? 'border-[#FF3B30]/40 bg-[#FF3B30]/10 text-[#FF6B61]'
+      : 'border-[#F16524]/40 bg-[#F16524]/15 text-[#FF8233]';
+  const label = merged ? 'PR merged' : closed ? 'PR closed' : 'PR open';
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${cls}`}
+      title={`Fix PR #${pr.number} — ${pr.state}`}
+    >
+      <Icon icon={GitMerge} size={11} />
+      {label} #{pr.number}
+    </span>
   );
 }
 

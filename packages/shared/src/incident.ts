@@ -71,6 +71,14 @@ export const IncidentSummarySchema = z.object({
   opened_at: z.number().int(),
   resolved_at: z.number().int().nullable(),
   active: z.boolean().optional(),
+  /** The linked AI fix PR, when one exists — lets the list flag a merged fix. */
+  pr: z
+    .object({
+      number: z.number().int(),
+      state: z.string(), // 'open' | 'merged' | 'closed'
+    })
+    .nullable()
+    .optional(),
 });
 export type IncidentSummary = z.infer<typeof IncidentSummarySchema>;
 

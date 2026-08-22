@@ -19,7 +19,10 @@ import type { OncallDb } from '../db/index.js';
  */
 
 /** Compact incident for `GET /incidents` (SPEC §7.3 `IncidentSummary`). */
-export function toIncidentSummary(inc: Incident): IncidentSummary {
+export function toIncidentSummary(
+  inc: Incident,
+  pr?: PullRequestRec | null,
+): IncidentSummary {
   return {
     id: inc.id,
     service: inc.service,
@@ -33,6 +36,7 @@ export function toIncidentSummary(inc: Incident): IncidentSummary {
     opened_at: inc.opened_at,
     resolved_at: inc.resolved_at,
     active: !TERMINAL_STATUSES.includes(inc.status),
+    pr: pr ? { number: pr.github_pr_number, state: pr.state } : null,
   };
 }
 

@@ -47,7 +47,12 @@ export function registerIncidentRoutes(app: FastifyInstance, ctx: AppContext): v
       status: status as IncidentStatus | undefined,
       limit,
     });
-    return reply.code(200).send({ incidents: incidents.map(toIncidentSummary) });
+    const summaries = await Promise.all(
+      incidents.map(async (inc) =>
+        toIncidentSummary(inc, await db.dao.pullRequests.getByIncident(inc.id)),
+      ),
+    );
+    return reply.code(200).send({ incidents: summaries });
   });
 
   /* ── GET /incidents/:id (full detail DTO) ──────────────────────────────── */
