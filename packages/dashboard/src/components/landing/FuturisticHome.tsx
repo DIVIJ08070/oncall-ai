@@ -19,6 +19,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { IncidentSummary, Severity } from '@oncall/shared';
 import { getIncidents, getLogs, getServices } from '../../api';
 import { getRepoLearnings } from '../../api/learnings';
+import { getSelectedRepo } from '../../api';
 import type { Learning } from '../../api/learnings';
 import { relativeTime } from '../../lib/format';
 import { Grain } from '../atmosphere';
@@ -484,6 +485,19 @@ interface RealStats {
   latest: Learning | null;
 }
 
+/** The connected repo slug — the per-page override (localStorage), else the
+ *  onboarding-selected repo, else the default. Home stats follow it. */
+async function resolveConnectedRepo(signal?: AbortSignal): Promise<string> {
+  try {
+    const stored = window.localStorage.getItem('oncall.selfLearning.repo');
+    if (stored && /^[\w.-]+\/[\w.-]+$/.test(stored.trim())) return stored.trim();
+  } catch {
+    /* ignore */
+  }
+  const sel = await getSelectedRepo(signal);
+  return sel ? `${sel.owner}/${sel.repo}` : 'DIVIJ08070/oncall-ai-victim';
+}
+
 function useRealStats(): RealStats {
   const [stats, setStats] = useState<RealStats>({
     incidentsToday: null,
@@ -503,7 +517,12 @@ function useRealStats(): RealStats {
     getIncidents({ limit: 100 }, ctrl.signal)
       .then(({ incidents }) => {
         const today = incidents.filter((i) => i.opened_at >= dayStart).length;
-        const resolved = incidents.filter((i) => i.resolved_at != null);
+        // MTTR over RECENT incidents only (last 7 days) so stale migrated
+        // incidents with multi-day spans don't skew the average.
+        const weekAgo = Date.now() - 7 * 86_400_000;
+        const resolved = incidents.filter(
+          (i) => i.resolved_at != null && i.opened_at >= weekAgo,
+        );
         const mttr = resolved.length
           ? resolved.reduce((a, i) => a + ((i.resolved_at ?? 0) - i.opened_at), 0) /
             resolved.length /
@@ -512,23 +531,25 @@ function useRealStats(): RealStats {
         setStats((s) => ({ ...s, incidentsToday: today, mttrMin: mttr }));
       })
       .catch(() => undefined);
-    getLogs({ limit: 1000 }, ctrl.signal)
+    getLogs({ limit: 500 }, ctrl.signal)
       .then((res) => setStats((s) => ({ ...s, alerts: res.events.length })))
       .catch(() => undefined);
     getServices(ctrl.signal)
       .then((res) => setStats((s) => ({ ...s, services: res.services.length })))
       .catch(() => undefined);
-    getRepoLearnings('DIVIJ08070/oncall-ai-victim', ctrl.signal)
-      .then((res) => {
-        const rated = res.learnings.filter((l) => l.rating !== 0);
-        const correct = rated.filter((l) => l.rating > 0).length;
-        setStats((s) => ({
-          ...s,
-          accuracy: rated.length ? Math.round((correct / rated.length) * 100) : null,
-          latest: res.learnings[0] ?? null,
-        }));
-      })
-      .catch(() => undefined);
+    void resolveConnectedRepo(ctrl.signal).then((repo) =>
+      getRepoLearnings(repo, ctrl.signal)
+        .then((res) => {
+          const rated = res.learnings.filter((l) => l.rating !== 0);
+          const correct = rated.filter((l) => l.rating > 0).length;
+          setStats((s) => ({
+            ...s,
+            accuracy: rated.length ? Math.round((correct / rated.length) * 100) : null,
+            latest: res.learnings[0] ?? null,
+          }));
+        })
+        .catch(() => undefined),
+    );
     return () => ctrl.abort();
   }, []);
 
@@ -676,9 +697,11 @@ function AiInsightsCard() {
   const [latest, setLatest] = useState<Learning | null>(null);
   useEffect(() => {
     const ctrl = new AbortController();
-    getRepoLearnings('DIVIJ08070/oncall-ai-victim', ctrl.signal)
-      .then((res) => setLatest(res.learnings[0] ?? null))
-      .catch(() => undefined);
+    void resolveConnectedRepo(ctrl.signal).then((repo) =>
+      getRepoLearnings(repo, ctrl.signal)
+        .then((res) => setLatest(res.learnings[0] ?? null))
+        .catch(() => undefined),
+    );
     return () => ctrl.abort();
   }, []);
   return (
