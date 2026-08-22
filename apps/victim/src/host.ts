@@ -105,7 +105,11 @@ export class HostSampler {
 
     const degrade = hostDegradeEffect(now);
     const cpu = degrade.cpuPct ?? cpuReal;
-    const dbPool = degrade.dbPoolPct; // null unless a dbpool degrade is active
+    // The customer app reports its OWN connection-pool utilization continuously
+    // (this is what a real SDK integration ships). The demo has no real DB, so
+    // we emit a healthy baseline (~35% with light jitter) that a `dbpool`
+    // degrade ramps upward toward the threshold.
+    const dbPool = degrade.dbPoolPct ?? this.baselineDbPoolPct();
 
     return {
       host: os.hostname(),
@@ -113,7 +117,7 @@ export class HostSampler {
       timestamp: now,
       cpu_pct: Math.round(cpu * 10) / 10,
       mem_pct: Math.round(memReal * 10) / 10,
-      db_pool_pct: dbPool == null ? null : Math.round(dbPool * 10) / 10,
+      db_pool_pct: Math.round(dbPool * 10) / 10,
       event_loop_lag_ms: lagMs == null ? null : Math.round(lagMs * 100) / 100,
     };
   }
@@ -135,6 +139,12 @@ export class HostSampler {
     const cpuMs = (userDeltaUs + sysDeltaUs) / 1000; // microseconds → ms
     const cores = Math.max(1, os.cpus()?.length ?? 1);
     return clampPct((cpuMs / (elapsedMs * cores)) * 100);
+  }
+
+  /** Healthy baseline DB connection-pool utilization (~35% ± a little), so the
+   *  customer app always reports a live pool signal a `dbpool` degrade can ramp. */
+  private baselineDbPoolPct(): number {
+    return clampPct(35 + (Math.random() - 0.5) * 3);
   }
 
   /** Real process memory% as `rss` against the simulated container ceiling. */

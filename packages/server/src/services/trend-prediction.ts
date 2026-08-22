@@ -20,6 +20,10 @@ const DEFAULT_WINDOW_MINUTES = 5;
 
 /** Horizon (minutes) over which imminence saturates to 1. */
 const IMMINENCE_HORIZON_MIN = 30;
+/** A rising metric stays NORMAL until it has climbed at least this fraction of
+ *  the baseline→threshold headroom — suppresses false alarms from noise while a
+ *  value sits far below its limit (e.g. a 37% pool against a 90% threshold). */
+const MIN_RISK_PROXIMITY = 0.15;
 
 export interface Point {
   /** Timestamp/ordinal of the sample (used only for ordering). */
@@ -177,6 +181,12 @@ function classify(
     if (slope < 0 && proximity >= 0.4) return 'RECOVERED';
     return 'NORMAL';
   }
+  // Proximity floor — don't cry wolf on noise. A metric that has barely moved
+  // off its baseline (still far below the threshold) is NORMAL no matter how
+  // the slope jitters; risk only begins once it has climbed a meaningful part
+  // of the baseline→threshold headroom. This kills false EARLY_RISK on steady
+  // low-level metrics while still catching a genuine early climb.
+  if (proximity < MIN_RISK_PROXIMITY) return 'NORMAL';
   if (probability >= 0.8 || proximity >= 0.9) return 'ESCALATED';
   if (probability >= 0.5 || proximity >= 0.65) return 'WARNING';
   if (probability >= 0.2) return 'EARLY_RISK';

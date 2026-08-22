@@ -1,9 +1,7 @@
-import os from 'node:os';
 import type { HostMetricName, RiskPrediction, RiskStatus } from '@oncall/shared';
 import type { Config } from '../config.js';
 import type { OncallDb } from '../db/index.js';
 import type {
-  CreateHostMetricSampleInput,
   HostMetricColumn,
   HostMetricPoint,
 } from '../db/dao/types.js';
@@ -26,12 +24,9 @@ import type { EscalationEngine } from '../services/escalation/policy.js';
  *
  * Every `HOST_WINDOW_SEC`, mirroring the performance ticker's structure, it:
  *
- *   1. **self-samples** the platform's OWN process — real CPU% (a
- *      `process.cpuUsage` delta over the tick), real memory% (`rss` / total),
- *      and real pg-pool utilization (`pool.totalCount/idleCount/waitingCount`) —
- *      and appends it as a `host_metric_samples` row (so the platform's DB-pool
- *      bar is always live);
- *   2. for every service with recent samples, and every metric in
+ *   1. for every MONITORED customer service that shipped host samples this
+ *      window (via the SDK / victim host sampler — the platform never samples
+ *      ITSELF), and every metric in
  *      [cpu, mem, db_pool], reads the trailing series, derives current +
  *      baseline, and predicts a breach against the metric's threshold via the
  *      SAME {@link predictBreach} trend engine the endpoint layer uses;
@@ -227,8 +222,6 @@ export class HostTicker {
   private isAggregating = false; // single-flight mutex (never overlap windows)
 
   // Rolling state for the platform self-CPU% delta.
-  private lastCpu?: NodeJS.CpuUsage;
-  private lastCpuAt?: number;
 
   constructor(opts: HostTickerOptions) {
     this.db = opts.db;
@@ -276,14 +269,10 @@ export class HostTicker {
   async aggregate(): Promise<HostTickResult> {
     const now = this.clock.now();
 
-    // 1) self-sample the platform's own process + pg pool (best-effort).
-    try {
-      await this.db.dao.hostMetricSamples.insertMany([this.sampleSelf(now)]);
-    } catch (err) {
-      this.log('[host] self-sample failed', err);
-    }
-
-    // 2) discover services that reported recently.
+    // The platform never monitors ITSELF — host metrics come only from the
+    // customer apps that ship them (the SDK / victim host sampler). We simply
+    // roll up whatever the monitored services reported this window.
+    // 1) discover services that reported recently.
     const lookback = this.config.host.windowSec * SERVICE_LOOKBACK_WINDOWS * 1000;
     const services = await this.db.dao.hostMetricSamples.listServicesInWindow(
       now - lookback,
@@ -339,9 +328,59 @@ export class HostTicker {
       series,
       def.threshold(this.config),
     );
-    if (!computed) return false;
 
     const key = hostRiskServiceKey(service);
+
+    // Metric went quiet (no recent samples) — e.g. a demo db_pool degrade was
+    // cleared and the service stopped reporting it. Don't freeze the alert at
+    // its last BREACHED state: walk any still-open risk row back toward NORMAL
+    // by feeding a synthetic healthy reading through the normal flap-protected
+    // recovery, then stop. A row already at NORMAL is simply left alone.
+    if (!computed) {
+      const stale = await this.db.dao.riskStates.get(key, def.name);
+      if (stale && normalizeStatus(stale.status) !== 'NORMAL') {
+        const healthy: RiskPrediction = {
+          status: 'NORMAL',
+          probability: 0,
+          minutesToBreach: null,
+          riskScore: 0,
+          detail: 'metric no longer reported — recovering',
+        };
+        const recovered = stepRiskState(stale, healthy, now);
+        await this.db.dao.riskStates.upsert({
+          service_name: key,
+          endpoint: def.name,
+          status: recovered.status,
+          first_detected_at: recovered.firstDetectedAt,
+          last_escalated_at: recovered.lastEscalatedAt,
+          consecutive_risk_windows: recovered.consecutiveRisk,
+          consecutive_healthy_windows: recovered.consecutiveHealthy,
+          current_risk_score: 0,
+          prediction_details: JSON.stringify(healthy),
+          updated_at: now,
+        });
+        if (this.escalation) {
+          await this.escalation.onRiskUpdate({
+            source: 'host',
+            service,
+            metric: def.name,
+            riskService: key,
+            riskEndpoint: def.name,
+            prevStatus: normalizeStatus(stale.status),
+            status: recovered.status,
+            current: 0,
+            threshold: def.threshold(this.config),
+            probability: 0,
+            minutesToBreach: null,
+            likelyCause: hostGuidance(def.name).likelyCause,
+            recommendedAction: hostGuidance(def.name).recommendedAction,
+            title: `${service} ${def.name} resource risk`,
+            now,
+          });
+        }
+      }
+      return false;
+    }
     const prev = await this.db.dao.riskStates.get(key, def.name);
     const next = stepRiskState(prev, computed.prediction, now);
     await this.db.dao.riskStates.upsert({
@@ -404,66 +443,6 @@ export class HostTicker {
     });
   }
 
-  /** Sample the platform's own process CPU/mem + pg-pool utilization. */
-  private sampleSelf(now: number): CreateHostMetricSampleInput {
-    return {
-      host: os.hostname(),
-      service: this.config.host.selfService,
-      timestamp: now,
-      cpu_pct: this.processCpuPct(now),
-      mem_pct: this.processMemPct(),
-      db_pool_pct: this.poolUtilizationPct(),
-      event_loop_lag_ms: null,
-    };
-  }
-
-  /** Real process CPU% as a `process.cpuUsage` delta over the tick interval,
-   *  normalized by core count (0 on the first tick — no prior baseline yet). */
-  private processCpuPct(now: number): number {
-    const usage = process.cpuUsage();
-    if (this.lastCpu === undefined || this.lastCpuAt === undefined) {
-      this.lastCpu = usage;
-      this.lastCpuAt = now;
-      return 0;
-    }
-    const elapsedMs = now - this.lastCpuAt;
-    const userDeltaUs = usage.user - this.lastCpu.user;
-    const sysDeltaUs = usage.system - this.lastCpu.system;
-    this.lastCpu = usage;
-    this.lastCpuAt = now;
-    if (elapsedMs <= 0) return 0;
-    const cpuMs = (userDeltaUs + sysDeltaUs) / 1000; // microseconds → ms
-    const cores = Math.max(1, os.cpus()?.length ?? 1);
-    return clamp((cpuMs / (elapsedMs * cores)) * 100, 0, 100);
-  }
-
-  /** Real process memory% as `rss` against total system memory. */
-  private processMemPct(): number {
-    const totalMem = os.totalmem();
-    if (totalMem <= 0) return 0;
-    const rss = process.memoryUsage().rss;
-    return clamp((rss / totalMem) * 100, 0, 100);
-  }
-
-  /**
-   * Real pg-pool utilization% from the shared pool's live counters: active
-   * clients (`totalCount − idleCount`) plus queued demand (`waitingCount`)
-   * against the pool ceiling (`options.max`). Clamped 0-100.
-   */
-  private poolUtilizationPct(): number {
-    const pool = this.db.pool as unknown as {
-      totalCount?: number;
-      idleCount?: number;
-      waitingCount?: number;
-      options?: { max?: number };
-    };
-    const max = Math.max(1, pool.options?.max ?? 10);
-    const total = pool.totalCount ?? 0;
-    const idle = pool.idleCount ?? 0;
-    const waiting = pool.waitingCount ?? 0;
-    const active = Math.max(0, total - idle);
-    return clamp(((active + waiting) / max) * 100, 0, 100);
-  }
 }
 
 /** Factory mirroring the detection-engine / performance-ticker convention. */
