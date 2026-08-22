@@ -230,7 +230,7 @@ function buildPrompt(digest: string): string {
 let claudeCooldownUntil = 0;
 const CLAUDE_COOLDOWN_MS = 90_000;
 
-async function generateHealthText(
+export async function generateHealthText(
   config: Config,
   prompt: string,
 ): Promise<{ text: string; engine: 'claude' | 'gemini' }> {
@@ -323,7 +323,7 @@ async function geminiGenerate(config: Config, prompt: string): Promise<string> {
 }
 
 /** JSON.parse with fallbacks: strip ```json fences, then leading/trailing prose. */
-function parseModelJson(raw: string): unknown {
+export function parseModelJson(raw: string): unknown {
   const attempts: string[] = [raw.trim()];
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fenced) attempts.push(fenced[1].trim());

@@ -10,6 +10,8 @@ import {
   latestDoneJobFor,
 } from '../services/health-report/jobs.js';
 import { runHealthReport } from '../services/health-report/report.js';
+import { analyzeEndpoint } from '../services/health-report/endpoint-analysis.js';
+import { CodeReviewError } from '../services/code-review/types.js';
 
 /**
  * Project Health (mini-app) — async repo health-report endpoints:
@@ -79,6 +81,34 @@ export function registerHealthReportRoutes(
   });
 
   // GET /api/v1/health-report/:id — poll a job.
+  // POST /api/v1/health-report/endpoint — analyze ONE endpoint's code for
+  // performance problems (missing index, N+1, no pagination…). On click in the
+  // Project Health APIs table.
+  app.post('/api/v1/health-report/endpoint', async (req, reply) => {
+    const Body = z.object({
+      repoUrl: z.string().min(1).max(500),
+      method: z.string().min(1).max(10),
+      path: z.string().min(1).max(300),
+      file: z.string().min(1).max(400),
+    });
+    const parsed = Body.safeParse(req.body);
+    if (!parsed.success) {
+      return sendError(reply, 400, 'validation_error', 'Invalid endpoint request', {
+        issues: parsed.error.issues,
+      });
+    }
+    try {
+      const analysis = await analyzeEndpoint(config, parsed.data);
+      return reply.code(200).send(analysis);
+    } catch (err) {
+      if (err instanceof CodeReviewError) {
+        return sendError(reply, err.status, err.code, err.message);
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      return sendError(reply, 502, 'upstream_error', msg);
+    }
+  });
+
   app.get('/api/v1/health-report/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
     const job = getJob(id);

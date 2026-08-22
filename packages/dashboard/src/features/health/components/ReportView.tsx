@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   BookOpen,
   Check,
@@ -8,7 +8,8 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { GlassCard, MONO } from '../../../components/shell/UnifiedChrome';
-import type { HealthIssue, HealthReport, IssueSeverity } from '../../../api/healthReport';
+import type { HealthIssue, HealthReport, IssueSeverity, EndpointAnalysis } from '../../../api/healthReport';
+import { analyzeEndpoint } from '../../../api/healthReport';
 import { ScoreRing, scoreColor } from './ScoreRing';
 import { HealthHelix } from './HealthHelix';
 
@@ -56,7 +57,7 @@ export function ReportView({
         <LanguagesCard report={report} />
         <FrameworksCard frameworks={report.frameworks} />
         <DatabasesCard databases={report.databases} />
-        <ApisCard apis={report.apis} />
+        <ApisCard apis={report.apis} repoUrl={repoUrl} />
         <QualityCard quality={report.quality} />
         <SecurityCard security={report.security} />
         <TestsDocsCard tests={report.tests} docs={report.docs} />
@@ -285,7 +286,28 @@ function DatabasesCard({ databases }: { databases: HealthReport['databases'] }) 
 
 /* ── APIs ────────────────────────────────────────────────────────────────── */
 
-function ApisCard({ apis }: { apis: HealthReport['apis'] }) {
+function ApisCard({ apis, repoUrl }: { apis: HealthReport['apis']; repoUrl: string }) {
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<Record<string, EndpointAnalysis | 'loading' | { error: string }>>({});
+
+  const analyze = (key: string, a: HealthReport['apis'][number]): void => {
+    if (openKey === key) {
+      setOpenKey(null);
+      return;
+    }
+    setOpenKey(key);
+    if (analysis[key] && analysis[key] !== 'loading') return; // cached
+    setAnalysis((m) => ({ ...m, [key]: 'loading' }));
+    analyzeEndpoint({ repoUrl, method: a.method, path: a.path, file: a.file })
+      .then((res) => setAnalysis((m) => ({ ...m, [key]: res })))
+      .catch((err: unknown) =>
+        setAnalysis((m) => ({
+          ...m,
+          [key]: { error: err instanceof Error ? err.message : 'Analysis failed' },
+        })),
+      );
+  };
+
   return (
     <GlassCard className="p-5 md:col-span-2 xl:col-span-3">
       <div className="flex items-center justify-between gap-3">
@@ -309,22 +331,38 @@ function ApisCard({ apis }: { apis: HealthReport['apis'] }) {
             <tbody>
               {apis.map((a, i) => {
                 const method = a.method.toUpperCase();
+                const key = `${method}-${a.path}-${i}`;
+                const open = openKey === key;
+                const state = analysis[key];
                 return (
-                  <tr
-                    key={`${method}-${a.path}-${i}`}
-                    className="border-t border-white/5 hover:bg-white/[0.03]"
-                  >
-                    <td className="whitespace-nowrap px-3 py-2">
-                      <span
-                        className="font-semibold"
-                        style={{ color: METHOD_COLOR[method] ?? 'rgba(255,255,255,0.6)' }}
-                      >
-                        {method}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-white/80">{a.path}</td>
-                    <td className="break-all px-3 py-2 text-white/40">{a.file}</td>
-                  </tr>
+                  <FragmentRow key={key}>
+                    <tr
+                      className={`cursor-pointer border-t border-white/5 transition-colors hover:bg-white/[0.05] ${open ? 'bg-white/[0.05]' : ''}`}
+                      onClick={() => analyze(key, a)}
+                      title="Click to analyze this endpoint's performance"
+                    >
+                      <td className="whitespace-nowrap px-3 py-2">
+                        <span
+                          className="font-semibold"
+                          style={{ color: METHOD_COLOR[method] ?? 'rgba(255,255,255,0.6)' }}
+                        >
+                          {method}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-white/80">
+                        <span className="mr-1.5 text-white/25">{open ? '▾' : '▸'}</span>
+                        {a.path}
+                      </td>
+                      <td className="break-all px-3 py-2 text-white/40">{a.file}</td>
+                    </tr>
+                    {open && (
+                      <tr className="border-t border-white/5 bg-black/30">
+                        <td colSpan={3} className="px-3 py-3">
+                          <EndpointAnalysisPanel state={state} />
+                        </td>
+                      </tr>
+                    )}
+                  </FragmentRow>
                 );
               })}
             </tbody>
@@ -336,6 +374,86 @@ function ApisCard({ apis }: { apis: HealthReport['apis'] }) {
 }
 
 /* ── code quality ────────────────────────────────────────────────────────── */
+
+
+/** Row wrapper that renders a fragment (a data row + optional expansion row). */
+function FragmentRow({ children }: { children: ReactNode }) {
+  return <>{children}</>;
+}
+
+const EP_SEV: Record<string, { dot: string; text: string; label: string }> = {
+  high: { dot: '#FF3B30', text: '#FF6B61', label: 'High' },
+  medium: { dot: '#FF8233', text: '#FF8233', label: 'Medium' },
+  low: { dot: '#4A9EFF', text: '#7CB8FF', label: 'Low' },
+};
+
+function EndpointAnalysisPanel({
+  state,
+}: {
+  state: EndpointAnalysis | 'loading' | { error: string } | undefined;
+}) {
+  if (state === 'loading' || state === undefined) {
+    return (
+      <div className="flex items-center gap-2 text-[11px] text-white/50" style={{ fontFamily: MONO }}>
+        <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-[#FF8233]" />
+        Analyzing this endpoint&rsquo;s performance…
+      </div>
+    );
+  }
+  if ('error' in state) {
+    return (
+      <p className="text-[11px] text-[#FF6B61]" style={{ fontFamily: MONO }}>
+        {state.error} — click again to retry.
+      </p>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-xs leading-relaxed text-white/70">{state.summary}</p>
+      {state.findings.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {state.findings.map((f, i) => {
+            const sev = EP_SEV[f.severity] ?? EP_SEV.medium;
+            return (
+              <div key={i} className="flex items-start gap-2">
+                <span
+                  className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full"
+                  style={{ backgroundColor: sev.dot }}
+                />
+                <div className="min-w-0">
+                  <span className="text-xs font-semibold" style={{ color: sev.text }}>
+                    {sev.label} · {f.title}
+                  </span>
+                  <p className="text-[11px] leading-snug text-white/55">{f.detail}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {state.suggestions.length > 0 && (
+        <div className="border-t border-white/10 pt-2">
+          <span className="text-[9px] uppercase tracking-[0.18em] text-white/35" style={{ fontFamily: MONO }}>
+            Suggestions
+          </span>
+          <ol className="mt-1.5 flex flex-col gap-1">
+            {state.suggestions.map((sug, i) => (
+              <li key={i} className="flex gap-2 text-[11px] leading-snug text-white/75">
+                <span className="text-[#52D273]">{i + 1}.</span>
+                {sug}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+      {state.findings.length === 0 && state.suggestions.length === 0 && (
+        <p className="text-[11px] text-[#52D273]" style={{ fontFamily: MONO }}>
+          ✓ No performance issues found for this endpoint.
+        </p>
+      )}
+    </div>
+  );
+}
 
 function QualityCard({ quality }: { quality: HealthReport['quality'] }) {
   const grouped = SEVERITY_ORDER.map((sev) => ({

@@ -86,3 +86,25 @@ export function getLatestHealthReport(repoUrl: string): Promise<HealthReportJob>
     `/health-report/latest?repoUrl=${encodeURIComponent(repoUrl)}`,
   );
 }
+
+export interface EndpointAnalysis {
+  method: string;
+  path: string;
+  file: string;
+  summary: string;
+  findings: Array<{ severity: 'high' | 'medium' | 'low'; title: string; detail: string }>;
+  suggestions: string[];
+  engine: string;
+}
+
+/** Analyze one endpoint's code for performance problems (Project Health). */
+export function analyzeEndpoint(
+  body: { repoUrl: string; method: string; path: string; file: string },
+  signal?: AbortSignal,
+): Promise<EndpointAnalysis> {
+  return apiFetch<EndpointAnalysis>('/health-report/endpoint', {
+    method: 'POST',
+    body,
+    signal,
+  });
+}
