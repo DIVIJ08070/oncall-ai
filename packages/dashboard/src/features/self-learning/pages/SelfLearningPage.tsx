@@ -194,9 +194,7 @@ export function SelfLearningPage() {
       {/* Header — title, subtitle, live badge; repo picker top-right */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-[26px] font-bold tracking-tight text-[#F5F5F2] sm:text-[30px]">
-            Self Learning
-          </h1>
+          <h1 className="font-playfair text-h1 italic text-ink">Self Learning</h1>
           <p className="mt-1 max-w-xl text-sm leading-relaxed text-white/50">
             The AI is analyzing your incidents and reviews, learning patterns and improving
             accuracy.
