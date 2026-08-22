@@ -1,11 +1,14 @@
 /**
  * OnCall AI demo victim — Express server (SPEC §12).
  *
- * A small "customer" app with three switchable failure modes that ships telemetry
- * to the OnCall AI platform via the vendored, fail-silent `telemetry.ts` (FR-02,
- * NFR-04). The in-memory failure switch is flipped through `/__control/*` (§7.7);
- * under load, flipping to a failing mode produces the error/latency signal the
- * platform's 15s detector needs.
+ * A realistic multi-service "customer" AI commerce platform. Every service in the
+ * registry (`src/services/index.ts`) mounts its OWN telemetry tagged with its own
+ * service name, so the platform — which groups events by (service, endpoint) —
+ * renders a rich dashboard with many services and endpoints (FR-02, NFR-04).
+ *
+ * The original three switchable failure modes are preserved verbatim under the
+ * "checkout-api" service: flipping the in-memory switch via `/__control/*` (§7.7)
+ * produces the error/latency signal the platform's 15s detector needs.
  */
 
 import express, {
@@ -16,40 +19,39 @@ import express, {
 import { config } from './config.js';
 import { oncall } from './telemetry.js';
 import { registerControl } from './control.js';
-import { checkoutRouter } from './routes/checkout.js';
-import { reportsRouter } from './routes/reports.js';
-import { pricingRouter } from './routes/pricing.js';
+import { SERVICES, mountService } from './services/index.js';
+import { startSelfTraffic } from './traffic.js';
 
 export function createApp(): express.Express {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json());
 
-  // Telemetry: one `info` per request + one `error` per failure (with stack).
-  const telemetry = oncall({
+  // Platform plane (health + demo control) — its own telemetry, tagged
+  // "platform-api", scoped to just these paths so no business request is
+  // double-counted. (No single global request-logger exists anymore.)
+  const platform = oncall({
     apiKey: config.apiKey,
-    service: config.service,
+    service: 'platform-api',
     ingestUrl: config.ingestUrl,
   });
-  app.use(telemetry);
 
   // Liveness (used by CI smoke + local checks).
-  app.get('/health', (_req, res) => {
+  app.get('/health', platform, (_req, res) => {
     res.status(200).json({ status: 'ok', service: config.service });
   });
 
-  // Demo control plane (§7.7).
+  // Demo control plane (§7.7) — telemetry scoped to /__control only.
+  app.use('/__control', platform);
   registerControl(app);
+  app.use('/__control', platform.errorHandler);
 
-  // Business routes — each is the target of one failure mode.
-  app.use('/api/checkout', checkoutRouter); // bad_deploy (null-ref)
-  app.use('/api/reports', reportsRouter); //   slow_db
-  app.use('/api/pricing', pricingRouter); //   config_error
+  // Business services — each mounts its own telemetry tagged with its own name.
+  // checkout/reports/pricing stay under "checkout-api" with unchanged behavior.
+  for (const def of SERVICES) mountService(app, def);
 
-  // Ship the error (with stack) BEFORE responding.
-  app.use(telemetry.errorHandler);
-
-  // Final error responder — normalized 500 body.
+  // Single global final error responder — normalized 500 body. (Per-service
+  // `tel.errorHandler` has already shipped the error with its stack.)
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     const message = err instanceof Error ? err.message : String(err);
     if (res.headersSent) return;
@@ -74,8 +76,17 @@ if (isMain()) {
   app.listen(config.port, () => {
     // eslint-disable-next-line no-console
     console.log(
-      `[victim] ${config.service} listening on http://localhost:${config.port} ` +
-        `→ shipping telemetry to ${config.ingestUrl}`,
+      `[victim] AI commerce platform listening on http://localhost:${config.port} ` +
+        `→ shipping telemetry to ${config.ingestUrl} ` +
+        `(${SERVICES.length} service mounts)`,
     );
+    // Optional built-in self-traffic generator (OFF by default). When enabled it
+    // drives a realistic multi-service request mix against this app's own
+    // endpoints so the platform dashboard stays alive during a demo.
+    if (process.env.VICTIM_SELF_TRAFFIC === '1') {
+      startSelfTraffic(config.port);
+      // eslint-disable-next-line no-console
+      console.log('[victim] self-traffic generator ON (~6–12 req/s across all services)');
+    }
   });
 }
