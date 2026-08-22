@@ -22,6 +22,7 @@ import type {
 } from '@oncall/shared';
 import type {
   ApiPerformanceSampleRow,
+  ApiRequestSampleRow,
   ChatMessageRow,
   ChatRole,
   CustomerRow,
@@ -555,6 +556,70 @@ export interface RiskStatesDao {
   listAll(): Promise<RiskStateRow[]>;
 }
 
+/* ── api_request_samples (AI Incident PREVENTION Phase 1) ────────────────── */
+
+/** Insert payload for one raw request sample (id is BIGSERIAL, DB-assigned). */
+export interface CreateApiRequestSampleInput {
+  service_name: string;
+  endpoint: string;
+  method?: string | null;
+  timestamp: number;
+  status_code?: number | null;
+  duration_ms?: number | null;
+  request_size?: number | null;
+  response_size?: number | null;
+}
+
+/** A distinct endpoint seen in a window (representative, most-recent `method`). */
+export interface ApiRequestEndpoint {
+  service_name: string;
+  endpoint: string;
+  method: string | null;
+}
+
+/**
+ * One endpoint's rolled-up window, computed in a single grouped query (Rule 2).
+ * `durations` is the raw latency array for JS-side percentile computation
+ * (mirrors the metric rollups); `count` sizes RPS; `errorCount`/`timeoutCount`
+ * feed the error/timeout rates.
+ */
+export interface ApiRequestWindowAgg {
+  count: number;
+  errorCount: number;
+  timeoutCount: number;
+  durations: number[];
+}
+
+export interface ApiRequestSamplesDao {
+  /** Batch insert raw request samples; returns the number of rows written. */
+  insertMany(rows: CreateApiRequestSampleInput[]): Promise<number>;
+  /**
+   * Roll one endpoint's `[fromTs, toTs]` window up in a single grouped query.
+   * A request counts as an error when `status_code >= 500`, and as a timeout
+   * when `status_code = 504` or `duration_ms > timeoutMs`.
+   */
+  aggregateWindow(
+    service: string,
+    endpoint: string,
+    fromTs: number,
+    toTs: number,
+    timeoutMs?: number,
+  ): Promise<ApiRequestWindowAgg>;
+  /** Distinct (service, endpoint) seen in the window, with a representative method. */
+  listEndpointsInWindow(
+    fromTs: number,
+    toTs: number,
+  ): Promise<ApiRequestEndpoint[]>;
+  /**
+   * Delete rows older than `cutoffTs` in bounded batches (default 500) until the
+   * tail is drained. Returns the total number of rows deleted.
+   */
+  pruneOlderThanInBatches(
+    cutoffTs: number,
+    batchSize?: number,
+  ): Promise<number>;
+}
+
 /* ── the full DAO set ───────────────────────────────────────────────────── */
 
 /** All typed DAOs, one per table (SPEC §8 + self-learning + prevention). */
@@ -574,4 +639,5 @@ export interface Daos {
   repoLearnings: RepoLearningsDao;
   apiPerformance: ApiPerformanceDao;
   riskStates: RiskStatesDao;
+  apiRequestSamples: ApiRequestSamplesDao;
 }

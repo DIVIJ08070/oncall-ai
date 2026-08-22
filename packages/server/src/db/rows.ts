@@ -118,6 +118,24 @@ export interface ApiPerformanceSampleRow {
   prediction: string | null;
 }
 
+/* ── api_request_samples (AI Incident PREVENTION Phase 1) ────────────────── */
+/**
+ * One raw per-request telemetry sample. `id` is a BIGSERIAL surrogate (int8 → JS
+ * number via the pool parser). `method` / `status_code` / `duration_ms` and the
+ * request/response sizes are nullable — not every ingested request reports them.
+ */
+export interface ApiRequestSampleRow {
+  id: number;
+  service_name: string;
+  endpoint: string;
+  method: string | null;
+  timestamp: number;
+  status_code: number | null;
+  duration_ms: number | null;
+  request_size: number | null;
+  response_size: number | null;
+}
+
 /* ── risk_states (AI Incident PREVENTION Phase 1) ───────────────────────── */
 /**
  * Durable per-(service, endpoint) escalation state. `status` is an app-level

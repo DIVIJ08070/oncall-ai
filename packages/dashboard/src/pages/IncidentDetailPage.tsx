@@ -12,6 +12,7 @@ import {
   Timer,
   Clock,
   Sparkles,
+  ShieldQuestion,
 } from 'lucide-react';
 import type { Incident, IncidentDetailResponse } from '@oncall/shared';
 import { getIncident, getPostmortem, generatePostmortem } from '../api/incidents';
@@ -36,6 +37,8 @@ import { Drawer } from '../components/primitives/Drawer';
 import { SegmentedControl } from '../components/primitives/SegmentedControl';
 import { StatTile, SectionHeader } from '../components/primitives/StatTile';
 import { Entrance, StaggerGroup, StaggerItem, Press } from '../components/motion/primitives';
+import { WhatChangedPanel } from '../features/prevention/components/WhatChangedPanel';
+import { AskWhyModal } from '../features/prevention/components/AskWhyModal';
 
 /**
  * `/incidents` list + `/incidents/:id` detail (DESIGN_SPEC §6.3, FR-14/08/16, NFR-06).
@@ -74,6 +77,7 @@ export function IncidentDetailPage() {
 
   const [chatOpen, setChatOpen] = useState(false);
   const [pmOpen, setPmOpen] = useState(false);
+  const [askWhyOpen, setAskWhyOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('investigation');
 
   const { data, error, loading, refetch } = usePolling<IncidentDetailResponse>(
@@ -135,8 +139,11 @@ export function IncidentDetailPage() {
   );
 
   const aside = (
-    <DetailsAside detail={data} onAskAgent={askAgent} />
+    <DetailsAside detail={data} onAskAgent={askAgent} onAskWhy={() => setAskWhyOpen(true)} />
   );
+
+  const rootCause = session?.root_cause ?? incident.root_cause ?? null;
+  const confidence = session?.confidence ?? incident.confidence ?? null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -209,6 +216,16 @@ export function IncidentDetailPage() {
       >
         <PostmortemBody incidentId={id} open={pmOpen} />
       </Drawer>
+
+      {/* Ask Why — challenge the current hypothesis (AI PREVENTION Phase 5) */}
+      <AskWhyModal
+        incidentId={id}
+        open={askWhyOpen}
+        onClose={() => setAskWhyOpen(false)}
+        priorHypothesis={rootCause}
+        priorConfidence={confidence}
+        isDesktop={isDesktop}
+      />
     </div>
   );
 }
@@ -427,9 +444,11 @@ function IncidentStats({
 function DetailsAside({
   detail,
   onAskAgent,
+  onAskWhy,
 }: {
   detail: IncidentDetailResponse;
   onAskAgent: () => void;
+  onAskWhy: () => void;
 }) {
   const { incident, session, pull_request, timeline } = detail;
   const rootCause = session?.root_cause ?? incident.root_cause;
@@ -440,7 +459,22 @@ function DetailsAside({
     <StaggerGroup className="flex flex-col gap-4">
       <StaggerItem>
         <Card>
-          <CardHeader title="Findings" icon={<Icon icon={Sparkles} size={16} />} />
+          <CardHeader
+            title="Findings"
+            icon={<Icon icon={Sparkles} size={16} />}
+            right={
+              <Press>
+                <Button
+                  variant="secondary"
+                  className="h-8 px-2.5 text-sm"
+                  leadingIcon={<Icon icon={ShieldQuestion} size={14} />}
+                  onClick={onAskWhy}
+                >
+                  Ask why
+                </Button>
+              </Press>
+            }
+          />
           {rootCause ? (
             <div className="flex flex-col gap-2">
               {decision ? (
@@ -460,6 +494,10 @@ function DetailsAside({
             </p>
           )}
         </Card>
+      </StaggerItem>
+
+      <StaggerItem>
+        <WhatChangedPanel incidentId={incident.id} />
       </StaggerItem>
 
       <StaggerItem>

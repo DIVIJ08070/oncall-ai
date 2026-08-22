@@ -85,6 +85,74 @@ export const GetMetricsOutputSchema = z.object({
 });
 export type GetMetricsOutput = z.infer<typeof GetMetricsOutputSchema>;
 
+/* ── 2b. get_api_performance — read `api_performance_samples` (+ risk_states) ─
+ *
+ * Predictive companion to `get_metrics`: instead of one service's raw metric
+ * series, it returns the latest per-ENDPOINT performance profile — the 0-100
+ * score + letter grade, p95/error rate, and the forward-looking breach
+ * prediction (risk status, minutes-to-breach, probability). The rows are the
+ * pre-aggregated performance samples, never the raw request telemetry. */
+
+/** Letter grades an endpoint score maps to (mirrors shared `PerformanceGrade`). */
+export const PerformanceGradeSchema = z.enum([
+  'EXCELLENT',
+  'GOOD',
+  'DEGRADED',
+  'CRITICAL',
+]);
+
+/** Breach-prediction lifecycle status (mirrors shared `RiskStatus`). */
+export const RiskStatusSchema = z.enum([
+  'NORMAL',
+  'EARLY_RISK',
+  'WARNING',
+  'ESCALATED',
+  'BREACHED',
+  'RECOVERED',
+]);
+
+export const GetApiPerformanceInputSchema = z.object({
+  /** Restrict to one service (pushed into the sample query). */
+  service: z.string().optional(),
+  /** Restrict to one endpoint path. */
+  endpoint: z.string().optional(),
+  /** Only endpoints whose latest window ended within this many minutes. */
+  window_minutes: z.number().int().min(1).max(1440).default(60),
+});
+export type GetApiPerformanceInput = z.infer<typeof GetApiPerformanceInputSchema>;
+
+/** One endpoint's latest performance profile + breach prediction. */
+export const EndpointPerformanceSummarySchema = z.object({
+  service: z.string(),
+  endpoint: z.string(),
+  /** 0-100 weighted performance score (higher = healthier). */
+  score: z.number(),
+  grade: PerformanceGradeSchema,
+  /** p95 latency for the latest window (ms). */
+  p95: z.number(),
+  /** Error rate for the latest window (0-1). */
+  errorRate: z.number(),
+  /** Durable, flap-protected breach-risk lifecycle status. */
+  riskStatus: RiskStatusSchema,
+  /** Predicted minutes until the endpoint breaches its SLO; null when not trending up. */
+  minutesToBreach: z.number().nullable(),
+  /** 0-1 breach probability from the latest prediction. */
+  probability: z.number(),
+});
+export type EndpointPerformanceSummary = z.infer<
+  typeof EndpointPerformanceSummarySchema
+>;
+
+export const GetApiPerformanceOutputSchema = z.object({
+  window_minutes: z.number().int(),
+  /** Total endpoints matched before the row/byte cap. */
+  total: z.number().int(),
+  truncated: z.boolean(),
+  /** Worst score first (most at-risk endpoints lead). */
+  endpoints: z.array(EndpointPerformanceSummarySchema).max(100),
+});
+export type GetApiPerformanceOutput = z.infer<typeof GetApiPerformanceOutputSchema>;
+
 /* ── 3. get_recent_deploys — real git log via Octokit ───────────────────── */
 
 export const GetRecentDeploysInputSchema = z.object({
@@ -225,6 +293,7 @@ export type SubmitFindingsOutput = z.infer<typeof SubmitFindingsOutputSchema>;
 export const AGENT_TOOL_NAMES = [
   'search_logs',
   'get_metrics',
+  'get_api_performance',
   'get_recent_deploys',
   'get_deploy_diff',
   'read_file',

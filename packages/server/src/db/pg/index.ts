@@ -15,6 +15,7 @@ import { PgNotificationsDao } from './dao/notifications.js';
 import { PgRepoLearningsDao } from './dao/repo-learnings.js';
 import { PgApiPerformanceDao } from './dao/api-performance.js';
 import { PgRiskStatesDao } from './dao/risk-states.js';
+import { PgApiRequestSamplesDao } from './dao/api-request-samples.js';
 
 /**
  * PostgreSQL driver entry point (DB_DRIVER=postgres). Implements the same
@@ -39,6 +40,7 @@ export * from './dao/notifications.js';
 export * from './dao/repo-learnings.js';
 export * from './dao/api-performance.js';
 export * from './dao/risk-states.js';
+export * from './dao/api-request-samples.js';
 
 /** Construct the postgres DAO set bound to the single shared pool. */
 export function createPgDaos(pool: pg.Pool): Daos {
@@ -58,5 +60,6 @@ export function createPgDaos(pool: pg.Pool): Daos {
     repoLearnings: new PgRepoLearningsDao(pool),
     apiPerformance: new PgApiPerformanceDao(pool),
     riskStates: new PgRiskStatesDao(pool),
+    apiRequestSamples: new PgApiRequestSamplesDao(pool),
   };
 }

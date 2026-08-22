@@ -25,6 +25,10 @@ export interface OncallEventInput {
   method?: string | null;
   status?: number | null;
   latency_ms?: number | null;
+  /** Inbound body size in bytes (request `content-length`). */
+  request_size?: number | null;
+  /** Outbound body size in bytes (response `content-length`). */
+  response_size?: number | null;
 }
 
 interface OncallWireEvent {
@@ -37,6 +41,8 @@ interface OncallWireEvent {
   method?: string | null;
   status?: number | null;
   latency_ms?: number | null;
+  request_size?: number | null;
+  response_size?: number | null;
 }
 
 export interface OncallOptions {
@@ -106,6 +112,8 @@ export class OncallClient {
         method: event.method ?? null,
         status: event.status ?? null,
         latency_ms: event.latency_ms ?? null,
+        request_size: event.request_size ?? null,
+        response_size: event.response_size ?? null,
       });
       while (this.queue.length > this.opts.maxQueue) this.queue.shift();
       if (this.queue.length >= this.opts.batchSize) void this.flush();
@@ -205,12 +213,22 @@ interface Req {
   originalUrl?: string;
   url?: string;
   path?: string;
+  headers?: Record<string, string | string[] | undefined>;
 }
 interface Res {
   statusCode?: number;
   on(event: string, listener: () => void): unknown;
+  getHeader?(name: string): number | string | string[] | undefined;
 }
 type Next = (err?: unknown) => void;
+
+/** Parse a `content-length`-style value into a non-negative byte count, or null. */
+function toSize(v: number | string | string[] | undefined): number | null {
+  if (v == null) return null;
+  const raw = Array.isArray(v) ? v[0] : v;
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null;
+}
 
 /** Express middleware augmented with the shared client + a paired error handler. */
 export type OncallMiddleware = ((req: Req, res: Res, next: Next) => void) & {
@@ -256,6 +274,10 @@ export function oncall(options: OncallOptions): OncallMiddleware {
         method: req.method ?? null,
         status: res.statusCode ?? null,
         latency_ms: Date.now() - start,
+        // Byte sizes from content-length in/out (null when not advertised, e.g.
+        // a bodyless GET request or a chunked response).
+        request_size: toSize(req.headers?.['content-length']),
+        response_size: toSize(res.getHeader?.('content-length')),
       });
     };
     res.on('finish', finish);

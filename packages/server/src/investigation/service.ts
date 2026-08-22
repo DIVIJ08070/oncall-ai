@@ -76,6 +76,10 @@ function toToolDb(db: OncallDb): ToolDb {
       incidents: { update: (id, patch) => dao.incidents.update(id, patch) },
       pullRequests: { create: (input) => dao.pullRequests.create(input) },
       services: { getByName: (c, name) => dao.services.getByName(c, name) },
+      apiPerformance: {
+        latestPerService: (scope) => dao.apiPerformance.latestPerService(scope),
+      },
+      riskStates: { listAll: () => dao.riskStates.listAll() },
     },
   };
 }

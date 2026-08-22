@@ -81,6 +81,38 @@ export interface ToolServiceRow {
   last_event_at: number | null;
 }
 
+/**
+ * The `api_performance_samples` fields `get_api_performance` reads — the latest
+ * derived performance profile per (service, endpoint). The server
+ * `ApiPerformanceSampleRow` is a superset (extra window/latency columns), so it
+ * satisfies this narrower port structurally.
+ */
+export interface ToolApiPerformanceRow {
+  service_name: string;
+  endpoint: string;
+  method: string;
+  window_start: number;
+  window_end: number;
+  p95_latency_ms: number;
+  error_rate: number;
+  performance_score: number;
+  risk_score: number;
+}
+
+/**
+ * The `risk_states` fields `get_api_performance` reads — the durable per-endpoint
+ * escalation status plus the serialized latest prediction. The server
+ * `RiskStateRow` is a superset, so it satisfies this narrower port structurally.
+ */
+export interface ToolRiskStateRow {
+  service_name: string;
+  endpoint: string;
+  status: string;
+  current_risk_score: number | null;
+  /** JSON-serialized `RiskPrediction` (probability + minutesToBreach live here). */
+  prediction_details: string | null;
+}
+
 /** PR row the write tool persists (mirrors server `CreatePullRequestInput`). */
 export interface ToolCreatePrInput {
   incident_id: string;
@@ -139,6 +171,19 @@ export interface ToolDb {
         customerId: string,
         name: string,
       ): MaybePromise<ToolServiceRow | null>;
+    };
+    apiPerformance: {
+      /**
+       * The most-recent sample for every (service, endpoint) — one row per
+       * endpoint. `customerScope`, when given, restricts to those service names.
+       */
+      latestPerService(
+        customerScope?: readonly string[],
+      ): MaybePromise<ToolApiPerformanceRow[]>;
+    };
+    riskStates: {
+      /** Every tracked risk state (one row per (service, endpoint)). */
+      listAll(): MaybePromise<ToolRiskStateRow[]>;
     };
   };
 }

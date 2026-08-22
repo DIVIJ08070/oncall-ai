@@ -11,6 +11,10 @@ import {
   type PerformanceTicker,
 } from './detection/performance-ticker.js';
 import {
+  createRetentionPruner,
+  type RetentionPruner,
+} from './detection/retention-pruner.js';
+import {
   createInvestigationService,
   type InvestigationService,
 } from './investigation/service.js';
@@ -110,6 +114,27 @@ export function startPerformanceTicker(
 }
 
 /**
+ * Start the raw-sample retention pruner (AI Incident PREVENTION Phase 1) — the
+ * `PRUNE_INTERVAL_SEC` loop that batch-deletes `api_request_samples` rows older
+ * than `RAW_RETENTION_HOURS`, keeping the high-write raw table bounded. No-op
+ * when `PERF_ENABLED=false`. Runs alongside the performance ticker.
+ */
+export function startRetentionPruner(
+  db: OncallDb,
+  config: Config,
+): RetentionPruner {
+  const pruner = createRetentionPruner({
+    db,
+    config,
+    logger: (msg, meta) =>
+      // eslint-disable-next-line no-console
+      meta ? console.log(msg, meta) : console.log(msg),
+  });
+  pruner.start();
+  return pruner;
+}
+
+/**
  * Idempotent dev convenience: ensure a customer exists for the configured
  * `INGEST_API_KEY` so the ingest endpoint is usable end-to-end immediately.
  * `scripts/seed.ts` (later chunk) supersedes this with the full demo seed.
@@ -144,6 +169,7 @@ export async function main(): Promise<void> {
 
   const engine = startDetection(db, config, broker, investigation);
   const ticker = startPerformanceTicker(db, config, broker);
+  const pruner = startRetentionPruner(db, config);
   const poller = startMergePoller(db, config, broker);
 
   // Code Review Buddy — PR Watch poller (auto-reviews open PRs of watched
@@ -162,6 +188,7 @@ export async function main(): Promise<void> {
     console.log(`[oncall] ${signal} received — shutting down`);
     engine.stop();
     ticker.stop();
+    pruner.stop();
     poller?.stop();
     watcher.stop();
     // Close the HTTP server, then the db (drains the pg pool when the

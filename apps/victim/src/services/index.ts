@@ -20,9 +20,10 @@
  *     catalog-api routers do) when one logical service spans disjoint prefixes.
  */
 
-import type { Express, Router } from 'express';
+import type { Express, RequestHandler, Router } from 'express';
 import { config } from '../config.js';
 import { oncall, type OncallMiddleware } from '../telemetry.js';
+import { degradeEffectFor } from '../control.js';
 
 // Existing failure-mode demo routers (unchanged) — kept under "checkout-api".
 import { checkoutRouter } from '../routes/checkout.js';
@@ -80,11 +81,46 @@ export const SERVICES: ServiceDef[] = [
 ];
 
 /**
+ * Per-request controlled-degradation hook (see `control.ts`). Runs AFTER the
+ * telemetry logger (so any extra latency it adds is included in the measured
+ * `latency_ms`) and BEFORE the router. A no-op unless a degradation is active and
+ * matches this (service, endpoint); then it either delays the request by the
+ * current ramp amount (`kind: latency`) or fails it with a 503 (`kind: errors`).
+ * The endpoint path is taken WITHOUT query string so it matches shipped telemetry.
+ */
+function degradeMiddleware(service: string): RequestHandler {
+  return (req, res, next) => {
+    const raw = req.originalUrl ?? req.baseUrl + req.path;
+    const path = raw.split('?', 1)[0] ?? raw;
+    const eff = degradeEffectFor(service, path);
+    if (eff.extraDelayMs <= 0 && !eff.injectError) return next();
+
+    const proceed = (): void => {
+      if (eff.injectError) {
+        res.status(503).json({
+          error: { code: 'degraded_dependency', message: 'upstream dependency degraded' },
+        });
+        return;
+      }
+      next();
+    };
+
+    if (eff.extraDelayMs > 0) {
+      const t = setTimeout(proceed, eff.extraDelayMs);
+      if (typeof t.unref === 'function') t.unref();
+    } else {
+      proceed();
+    }
+  };
+}
+
+/**
  * Mount one service with its own telemetry:
- *   `app.use(basePath, tel, router, tel.errorHandler)`
+ *   `app.use(basePath, tel, degrade, router, tel.errorHandler)`
  * The request logger `tel` emits one info event per request (tagged `def.name`);
- * `tel.errorHandler` ships thrown errors with a stack before the global responder.
- * Returns the middleware so callers can `await tel.client.close()` on shutdown.
+ * the `degrade` hook applies any active controlled degradation (additive to the
+ * failure modes); `tel.errorHandler` ships thrown errors with a stack before the
+ * global responder. Returns the middleware so callers can `await tel.client.close()`.
  */
 export function mountService(app: Express, def: ServiceDef): OncallMiddleware {
   const tel = oncall({
@@ -92,6 +128,6 @@ export function mountService(app: Express, def: ServiceDef): OncallMiddleware {
     service: def.name,
     ingestUrl: config.ingestUrl,
   });
-  app.use(def.basePath, tel, def.router, tel.errorHandler);
+  app.use(def.basePath, tel, degradeMiddleware(def.name), def.router, tel.errorHandler);
   return tel;
 }

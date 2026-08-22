@@ -51,6 +51,17 @@ const TOOL_INPUT_SHAPES: Record<AgentToolName, z.ZodRawShape> = {
     window_sec: z.number().int().min(1).max(3600).default(900),
     resolution_sec: z.number().int().min(1).default(15),
   },
+  get_api_performance: {
+    service: z.string().optional().describe('restrict to one service'),
+    endpoint: z.string().optional().describe('restrict to one endpoint path'),
+    window_minutes: z
+      .number()
+      .int()
+      .min(1)
+      .max(1440)
+      .default(60)
+      .describe('only endpoints active within the last N minutes'),
+  },
   get_recent_deploys: {
     limit: z.number().int().min(1).max(20).default(10),
   },
@@ -91,6 +102,7 @@ const TOOL_INPUT_SHAPES: Record<AgentToolName, z.ZodRawShape> = {
 const READ_ONLY: Record<AgentToolName, boolean> = {
   search_logs: true,
   get_metrics: true,
+  get_api_performance: true,
   get_recent_deploys: true,
   get_deploy_diff: true,
   read_file: true,
@@ -102,6 +114,8 @@ const READ_ONLY: Record<AgentToolName, boolean> = {
 const TOOL_DESCRIPTIONS: Record<AgentToolName, string> = {
   search_logs: 'Read recent log events for a service, with repetitive errors summarized by signature.',
   get_metrics: 'Read a service’s current error-rate and latency percentiles vs its baseline.',
+  get_api_performance:
+    'Per-endpoint performance score (0-100) + grade, p95, error rate, and breach-risk prediction (status, minutes-to-breach, probability). Use it to see which endpoints are trending toward an SLO breach.',
   get_recent_deploys: 'List recent commits (deploys) on the pinned repo; is_current marks the live one.',
   get_deploy_diff: 'Show the code change a deploy introduced — pass {sha} or {base, head}.',
   read_file: 'Read a source file from the pinned repo (repo-relative path only).',

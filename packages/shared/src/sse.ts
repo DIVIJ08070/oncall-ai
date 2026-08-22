@@ -87,6 +87,53 @@ export const ChatStreamEventSchema = z.discriminatedUnion('event', [
 ]);
 export type ChatStreamEvent = z.infer<typeof ChatStreamEventSchema>;
 
+/* ── Performance stream: performance ticker feed (AI Incident PREVENTION) ── */
+
+/**
+ * Shared payload for every performance-stream frame. `service` + `endpoint`
+ * name the endpoint; `status` is its current `RiskStatus` (NORMAL … BREACHED);
+ * `riskScore` is the 0-100 roll-up; `minutesToBreach` (null when not trending)
+ * and `probability` (0-1) carry the breach prediction when one exists.
+ */
+export const PerformanceEventDataSchema = z.object({
+  service: z.string(),
+  endpoint: z.string(),
+  status: z.string(),
+  riskScore: z.number(),
+  minutesToBreach: z.number().nullish(),
+  probability: z.number().optional(),
+});
+export type PerformanceEventData = z.infer<typeof PerformanceEventDataSchema>;
+
+/** Emitted per processed endpoint each aggregation window. */
+export const PerformanceTickEventSchema = z.object({
+  event: z.literal('performance_tick'),
+  data: PerformanceEventDataSchema,
+});
+export type PerformanceTickEvent = z.infer<typeof PerformanceTickEventSchema>;
+
+/** Emitted when an endpoint escalates into the early-warning band (EARLY_RISK / WARNING). */
+export const EarlyWarningAlertEventSchema = z.object({
+  event: z.literal('early_warning_alert'),
+  data: PerformanceEventDataSchema,
+});
+export type EarlyWarningAlertEvent = z.infer<typeof EarlyWarningAlertEventSchema>;
+
+/** Emitted when an endpoint escalates into the high-severity band (ESCALATED / BREACHED). */
+export const RiskEscalationEventSchema = z.object({
+  event: z.literal('risk_escalation'),
+  data: PerformanceEventDataSchema,
+});
+export type RiskEscalationEvent = z.infer<typeof RiskEscalationEventSchema>;
+
+export const PerformanceStreamEventSchema = z.discriminatedUnion('event', [
+  PerformanceTickEventSchema,
+  EarlyWarningAlertEventSchema,
+  RiskEscalationEventSchema,
+  HeartbeatEventSchema,
+]);
+export type PerformanceStreamEvent = z.infer<typeof PerformanceStreamEventSchema>;
+
 /** All SSE event names used across the platform. */
 export const SSE_EVENT_NAMES = [
   'log',
@@ -100,5 +147,8 @@ export const SSE_EVENT_NAMES = [
   'error',
   'token',
   'done',
+  'performance_tick',
+  'early_warning_alert',
+  'risk_escalation',
 ] as const;
 export type SseEventName = (typeof SSE_EVENT_NAMES)[number];

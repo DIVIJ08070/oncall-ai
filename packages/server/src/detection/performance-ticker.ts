@@ -1,10 +1,12 @@
 import type {
   EndpointPerformance,
+  PerformanceEventData,
   RiskPrediction,
   RiskStatus,
 } from '@oncall/shared';
 import type { Config } from '../config.js';
 import type { OncallDb } from '../db/index.js';
+import type { ApiRequestEndpoint } from '../db/dao/types.js';
 import type { ApiPerformanceSampleRow } from '../db/rows.js';
 import type { Broker } from '../sse/broker.js';
 import { percentile } from '../metrics/percentile.js';
@@ -20,11 +22,12 @@ import type { DetectionLogger } from './seams.js';
 /**
  * Performance ticker — Phase 1 of AI Incident PREVENTION ("predict before" vs.
  * "fix after"). Every `PERF_WINDOW_SEC`, per (service, endpoint) seen in the
- * trailing window's `log_events`, it:
+ * trailing window's `api_request_samples` (the raw per-request telemetry the
+ * ingest writer populates), it:
  *
- *   1. rolls the raw events up into one window profile (request volume, rps,
+ *   1. rolls the raw samples up into one window profile (request volume, rps,
  *      p50/p95/p99 latency, error rate, timeout rate) — a **single grouped
- *      query** (Rule 2) over `db.pool`;
+ *      query** per endpoint (Rule 2) via the `api_request_samples` DAO;
  *   2. derives the endpoint baseline (trailing avg of prior samples), scores the
  *      window 0-100 via {@link calculateEndpointScore}, and predicts a breach
  *      via {@link predictBreach};
@@ -93,6 +96,20 @@ const ALL_STATUSES: ReadonlySet<string> = new Set<RiskStatus>([
   'BREACHED',
   'RECOVERED',
 ]);
+
+/**
+ * Severity rank of each status for escalation detection. NORMAL and the cooled
+ * RECOVERED both sit at the floor; a window whose durable status climbs to a
+ * higher rank is an *escalation* and emits an SSE alert.
+ */
+const STATUS_RANK: Record<RiskStatus, number> = {
+  NORMAL: 0,
+  RECOVERED: 0,
+  EARLY_RISK: 1,
+  WARNING: 2,
+  ESCALATED: 3,
+  BREACHED: 4,
+};
 
 /** Coerce a stored status string back to a known `RiskStatus` (default NORMAL). */
 function normalizeStatus(raw: string | undefined | null): RiskStatus {
@@ -317,17 +334,6 @@ export interface PerfTickResult {
   failed: number;
 }
 
-/** One raw aggregated group as returned by the grouped window query. */
-interface RawEndpointAgg {
-  service_name: string;
-  endpoint: string;
-  method: string | null;
-  request_count: number;
-  error_count: number;
-  timeout_count: number;
-  latencies: number[];
-}
-
 function clamp01(n: number): number {
   if (!Number.isFinite(n)) return 0;
   return Math.min(1, Math.max(0, n));
@@ -401,9 +407,14 @@ export class PerformanceTicker {
     const windowStart = now - this.config.performance.windowSec * 1000;
     const ctx = this.scoreContext();
 
-    const groups = await this.queryWindow(windowStart, windowEnd);
+    const endpoints = await this.db.dao.apiRequestSamples.listEndpointsInWindow(
+      windowStart,
+      windowEnd,
+    );
     const settled = await Promise.allSettled(
-      groups.map((g) => this.processEndpoint(g, windowStart, windowEnd, ctx, now)),
+      endpoints.map((ep) =>
+        this.processEndpoint(ep, windowStart, windowEnd, ctx, now),
+      ),
     );
 
     let upserted = 0;
@@ -427,91 +438,50 @@ export class PerformanceTicker {
       now,
       windowStart,
       windowEnd,
-      endpointsEvaluated: groups.length,
+      endpointsEvaluated: endpoints.length,
       upserted,
       failed,
     };
   }
 
   /**
-   * Roll every endpoint's trailing-window events up in one grouped query
-   * (Rule 2). `latencies` is aggregated as an array so `percentile()` (the same
+   * Roll one endpoint's trailing window up (single grouped query, Rule 2),
+   * score + predict it, persist the sample, and advance the risk state (Rule 4
+   * unit). `durations` is aggregated as an array so `percentile()` (the same
    * helper the metric rollups use) can compute p50/p95/p99 in JS.
    */
-  private async queryWindow(
-    windowStart: number,
-    windowEnd: number,
-  ): Promise<RawEndpointAgg[]> {
-    const res = await this.db.pool.query<{
-      service_name: string;
-      endpoint: string;
-      method: string | null;
-      request_count: number;
-      error_count: number;
-      timeout_count: number;
-      latencies: Array<number | string> | null;
-    }>(
-      `SELECT
-         service AS service_name,
-         endpoint,
-         (array_agg(method ORDER BY timestamp DESC)
-            FILTER (WHERE method IS NOT NULL))[1] AS method,
-         COUNT(*) FILTER (WHERE status IS NOT NULL OR latency_ms IS NOT NULL)
-           AS request_count,
-         COUNT(*) FILTER (WHERE (status IS NOT NULL AND status >= 500)
-                             OR level = 'error') AS error_count,
-         COUNT(*) FILTER (WHERE status = 504
-                             OR (latency_ms IS NOT NULL AND latency_ms > $3))
-           AS timeout_count,
-         COALESCE(
-           array_agg(latency_ms::double precision)
-             FILTER (WHERE latency_ms IS NOT NULL),
-           ARRAY[]::double precision[]
-         ) AS latencies
-       FROM log_events
-       WHERE timestamp >= $1 AND timestamp <= $2
-         AND endpoint IS NOT NULL AND endpoint <> ''
-       GROUP BY service, endpoint
-       HAVING COUNT(*) FILTER (WHERE status IS NOT NULL OR latency_ms IS NOT NULL) > 0`,
-      [windowStart, windowEnd, PERF_TIMEOUT_MS],
-    );
-    return res.rows.map((r) => ({
-      service_name: r.service_name,
-      endpoint: r.endpoint,
-      method: r.method,
-      request_count: Number(r.request_count),
-      error_count: Number(r.error_count),
-      timeout_count: Number(r.timeout_count),
-      latencies: (r.latencies ?? []).map((v) => Number(v)),
-    }));
-  }
-
-  /** Score, upsert, and advance the risk state for one endpoint (Rule 4 unit). */
   private async processEndpoint(
-    g: RawEndpointAgg,
+    ep: ApiRequestEndpoint,
     windowStart: number,
     windowEnd: number,
     ctx: ScoreContext,
     now: number,
   ): Promise<void> {
-    const requestCount = g.request_count;
+    const agg = await this.db.dao.apiRequestSamples.aggregateWindow(
+      ep.service_name,
+      ep.endpoint,
+      windowStart,
+      windowEnd,
+      PERF_TIMEOUT_MS,
+    );
+    const requestCount = agg.count;
     const windowSec = this.config.performance.windowSec;
     const rps = windowSec > 0 ? requestCount / windowSec : 0;
     const denom = Math.max(requestCount, 1);
 
     const m: PerfWindowMetrics = {
-      service: g.service_name,
-      endpoint: g.endpoint,
-      method: g.method && g.method.length > 0 ? g.method : 'GET',
+      service: ep.service_name,
+      endpoint: ep.endpoint,
+      method: ep.method && ep.method.length > 0 ? ep.method : 'GET',
       windowStart,
       windowEnd,
       requestCount,
       rps,
-      p50: percentile(g.latencies, 50),
-      p95: percentile(g.latencies, 95),
-      p99: percentile(g.latencies, 99),
-      errorRate: clamp01(g.error_count / denom),
-      timeoutRate: clamp01(g.timeout_count / denom),
+      p50: percentile(agg.durations, 50),
+      p95: percentile(agg.durations, 95),
+      p99: percentile(agg.durations, 99),
+      errorRate: clamp01(agg.errorCount / denom),
+      timeoutRate: clamp01(agg.timeoutCount / denom),
     };
 
     const priorRows = await this.db.dao.apiPerformance.listRecentForEndpoint(
@@ -543,7 +513,7 @@ export class PerformanceTicker {
     await this.advanceRiskState(m, scored, now);
   }
 
-  /** Persist the flap-protected next risk state for one endpoint. */
+  /** Persist the flap-protected next risk state for one endpoint, then stream it. */
   private async advanceRiskState(
     m: PerfWindowMetrics,
     scored: ScoredWindow,
@@ -563,6 +533,46 @@ export class PerformanceTicker {
       prediction_details: JSON.stringify(scored.prediction),
       updated_at: now,
     });
+    this.publishRiskEvents(m, scored, normalizeStatus(prev?.status), next.status);
+  }
+
+  /**
+   * Stream the per-endpoint SSE frames for this window (broker seam): a
+   * `performance_tick` for every processed endpoint, plus — when the durable
+   * risk state just stepped *up* a rung — an `early_warning_alert` (into
+   * EARLY_RISK / WARNING) or a `risk_escalation` (into ESCALATED / BREACHED).
+   * A single window steps at most one rung, so at most one alert fires.
+   */
+  private publishRiskEvents(
+    m: PerfWindowMetrics,
+    scored: ScoredWindow,
+    prevStatus: RiskStatus,
+    nextStatus: RiskStatus,
+  ): void {
+    if (!this.broker) return;
+    const data: PerformanceEventData = {
+      service: m.service,
+      endpoint: m.endpoint,
+      status: nextStatus,
+      riskScore: scored.riskScore,
+      minutesToBreach: scored.prediction.minutesToBreach,
+      probability: scored.prediction.probability,
+    };
+    this.broker.publish(performanceTopic(), { event: 'performance_tick', data });
+
+    if (STATUS_RANK[nextStatus] > STATUS_RANK[prevStatus]) {
+      if (nextStatus === 'EARLY_RISK' || nextStatus === 'WARNING') {
+        this.broker.publish(performanceTopic(), {
+          event: 'early_warning_alert',
+          data,
+        });
+      } else if (nextStatus === 'ESCALATED' || nextStatus === 'BREACHED') {
+        this.broker.publish(performanceTopic(), {
+          event: 'risk_escalation',
+          data,
+        });
+      }
+    }
   }
 }
 

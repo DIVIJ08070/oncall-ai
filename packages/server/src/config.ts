@@ -97,6 +97,9 @@ const EnvSchema = z.object({
   // performance ticker (AI Incident PREVENTION Phase 1)
   PERF_ENABLED: boolEnv(true),
   PERF_WINDOW_SEC: numEnv(300),
+  // raw sample retention (api_request_samples pruning)
+  RAW_RETENTION_HOURS: numEnv(1),
+  PRUNE_INTERVAL_SEC: numEnv(300),
 
   // victim
   VICTIM_PORT: numEnv(4000),
@@ -168,6 +171,10 @@ export interface Config {
     enabled: boolean;
     /** Rollup window (seconds) the ticker aggregates + predicts over. */
     windowSec: number;
+    /** Raw `api_request_samples` retention horizon (hours) before pruning. */
+    rawRetentionHours: number;
+    /** How often (seconds) the retention prune loop runs. */
+    pruneIntervalSec: number;
   };
   victim: {
     port: number;
@@ -252,6 +259,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     performance: {
       enabled: e.PERF_ENABLED,
       windowSec: e.PERF_WINDOW_SEC,
+      rawRetentionHours: e.RAW_RETENTION_HOURS,
+      pruneIntervalSec: e.PRUNE_INTERVAL_SEC,
     },
     victim: {
       port: e.VICTIM_PORT,

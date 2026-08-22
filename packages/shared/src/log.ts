@@ -22,6 +22,12 @@ export const LogEventInputSchema = z.object({
   method: z.string().nullish(),
   status: z.number().int().nullish(),
   latency_ms: z.number().int().nullish(),
+  /** Inbound body size (bytes, from request `content-length`); projected into
+   *  `api_request_samples.request_size`. Nullable — not every request reports it. */
+  request_size: z.number().int().nullish(),
+  /** Outbound body size (bytes, from response `content-length`); projected into
+   *  `api_request_samples.response_size`. Nullable — chunked responses omit it. */
+  response_size: z.number().int().nullish(),
 });
 export type LogEventInput = z.infer<typeof LogEventInputSchema>;
 
@@ -44,3 +50,26 @@ export const LogEventSchema = z.object({
   fingerprint_sig: z.string().nullable(),
 });
 export type LogEvent = z.infer<typeof LogEventSchema>;
+
+/**
+ * Raw per-request telemetry sample (AI Incident PREVENTION Phase 1).
+ *
+ * The dedicated wire/storage shape behind `api_request_samples` — one row per
+ * observed API request, the raw source the performance ticker rolls up each
+ * window (percentiles, error/timeout rates, RPS). The victim services already
+ * ship this same signal (endpoint, method, status, latency) inside their ingest
+ * log events; the ingest writer projects those into `api_request_samples`.
+ * `service_name`, `endpoint`, `method`, and `timestamp` are required; the size /
+ * status / duration fields are nullable (not every request reports them).
+ */
+export const ApiRequestSchema = z.object({
+  service_name: z.string().min(1),
+  endpoint: z.string().min(1),
+  method: z.string().min(1),
+  timestamp: z.number().int().nonnegative(),
+  status_code: z.number().int().nullish(),
+  duration_ms: z.number().nullish(),
+  request_size: z.number().int().nullish(),
+  response_size: z.number().int().nullish(),
+});
+export type ApiRequestPayload = z.infer<typeof ApiRequestSchema>;

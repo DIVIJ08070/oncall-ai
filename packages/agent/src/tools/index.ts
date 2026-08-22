@@ -3,6 +3,7 @@ import { AGENT_TOOL_NAMES, type AgentToolName } from '@oncall/shared';
 import type { ToolContext } from '../ports.js';
 import { searchLogs, searchLogsMeta } from './search_logs.js';
 import { getMetrics, getMetricsMeta } from './get_metrics.js';
+import { getApiPerformance, getApiPerformanceMeta } from './get_api_performance.js';
 import { getRecentDeploys, getRecentDeploysMeta } from './get_recent_deploys.js';
 import { getDeployDiff, getDeployDiffMeta } from './get_deploy_diff.js';
 import { readFile, readFileMeta } from './read_file.js';
@@ -24,6 +25,7 @@ import { submitFindings, submitFindingsMeta } from './submit_findings.js';
 export {
   searchLogs,
   getMetrics,
+  getApiPerformance,
   getRecentDeploys,
   getDeployDiff,
   readFile,
@@ -33,6 +35,7 @@ export {
 export {
   searchLogsMeta,
   getMetricsMeta,
+  getApiPerformanceMeta,
   getRecentDeploysMeta,
   getDeployDiffMeta,
   readFileMeta,
@@ -60,10 +63,11 @@ function def<S extends z.ZodTypeAny, O>(
   };
 }
 
-/** All 7 allowlisted tools, in a stable order (SPEC §9). */
+/** All allowlisted tools, in a stable order (SPEC §9 + prevention Phase 4). */
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
   def(searchLogsMeta, searchLogs),
   def(getMetricsMeta, getMetrics),
+  def(getApiPerformanceMeta, getApiPerformance),
   def(getRecentDeploysMeta, getRecentDeploys),
   def(getDeployDiffMeta, getDeployDiff),
   def(readFileMeta, readFile),
@@ -75,10 +79,11 @@ export const TOOL_BY_NAME: Record<AgentToolName, ToolDefinition> = Object.fromEn
   TOOL_DEFINITIONS.map((d) => [d.name, d]),
 ) as Record<AgentToolName, ToolDefinition>;
 
-/** The five read-only investigation tools (chat reuses these, minus writes/control). */
+/** The six read-only investigation tools (chat reuses these, minus writes/control). */
 export const READONLY_TOOL_NAMES: readonly AgentToolName[] = [
   'search_logs',
   'get_metrics',
+  'get_api_performance',
   'get_recent_deploys',
   'get_deploy_diff',
   'read_file',

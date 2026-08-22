@@ -1,6 +1,6 @@
 import type pg from 'pg';
 /** Bumped with every DDL change (was shared with the sqlite driver). */
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 import { withTransaction } from './pool.js';
 
 /**
@@ -302,6 +302,28 @@ CREATE TABLE IF NOT EXISTS risk_states (
   updated_at                   BIGINT NOT NULL,
   UNIQUE(service_name, endpoint)
 );
+
+-- ── api_request_samples (AI Incident PREVENTION Phase 1) ────────────────────
+-- Raw per-request telemetry — one row per observed API request, the raw source
+-- the performance ticker rolls up each window (percentiles, error/timeout rates,
+-- RPS). Populated by the ingest writer from the same endpoint/method/status/
+-- latency signal all victim services already ship. High-write + short-lived:
+-- retention prunes rows older than RAW_RETENTION_HOURS in batches. The id is a
+-- BIGSERIAL surrogate; the (service_name, endpoint, timestamp) index serves both
+-- the per-endpoint window aggregation and the timestamp-ranged prune.
+CREATE TABLE IF NOT EXISTS api_request_samples (
+  id             BIGSERIAL PRIMARY KEY,
+  service_name   TEXT NOT NULL,
+  endpoint       TEXT NOT NULL,
+  method         TEXT,
+  timestamp      BIGINT NOT NULL,
+  status_code    INTEGER,
+  duration_ms    DOUBLE PRECISION,
+  request_size   BIGINT,
+  response_size  BIGINT
+);
+CREATE INDEX IF NOT EXISTS idx_api_request_samples_svc_ep_ts
+  ON api_request_samples(service_name, endpoint, timestamp);
 
 -- ── schema_version (sqlite PRAGMA user_version equivalent) ──────────────────
 CREATE TABLE IF NOT EXISTS schema_version (

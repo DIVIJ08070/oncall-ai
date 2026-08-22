@@ -6,6 +6,7 @@ export * from './log.js';
 export * from './metrics.js';
 export * from './performance.js';
 export * from './incident.js';
+export * from './whatchanged.js';
 export * from './github.js';
 export * from './investigation.js';
 export * from './tools.js';

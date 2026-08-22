@@ -30,6 +30,9 @@ export const SEARCH_LOGS_MAX_PATTERNS = 50;
 /** get_metrics: `series` ≤ 60 points. */
 export const METRICS_SERIES_MAX = 60;
 
+/** get_api_performance: ≤ 100 endpoint summaries (the 12 KB envelope trims further). */
+export const GET_API_PERFORMANCE_MAX_ROWS = 100;
+
 /** get_deploy_diff: ≤ 20 files; patch ≤ 100 lines / 4000 chars; total ≤ 20 KB. */
 export const DIFF_MAX_FILES = 20;
 export const PATCH_MAX_LINES = 100;

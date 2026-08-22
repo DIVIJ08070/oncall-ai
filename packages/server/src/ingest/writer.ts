@@ -1,7 +1,10 @@
 import { LogEventInputSchema, type IngestResponse } from '@oncall/shared';
 import type { OncallDb } from '../db/index.js';
 import type { CustomerRow } from '../db/rows.js';
-import type { CreateLogEventInput } from '../db/dao/types.js';
+import type {
+  CreateApiRequestSampleInput,
+  CreateLogEventInput,
+} from '../db/dao/types.js';
 import { type Broker, logsTopic } from '../sse/broker.js';
 import { normalizeSignature } from './fingerprint.js';
 
@@ -37,6 +40,7 @@ export async function writeBatch(
 ): Promise<IngestResponse> {
   const receivedAt = Date.now();
   const toInsert: CreateLogEventInput[] = [];
+  const sampleInserts: CreateApiRequestSampleInput[] = [];
   const errors: { index: number; message: string }[] = [];
 
   for (let i = 0; i < rawEvents.length; i++) {
@@ -46,12 +50,13 @@ export async function writeBatch(
       continue;
     }
     const e = parsed.data;
+    const timestamp = e.timestamp ?? receivedAt;
     toInsert.push({
       customer_id: customer.id,
       service: e.service,
       level: e.level,
       message: e.message,
-      timestamp: e.timestamp ?? receivedAt,
+      timestamp,
       received_at: receivedAt,
       stack: e.stack ?? null,
       endpoint: e.endpoint ?? null,
@@ -60,11 +65,37 @@ export async function writeBatch(
       latency_ms: e.latency_ms ?? null,
       fingerprint_sig: normalizeSignature(e.message),
     });
+
+    // Project per-request telemetry into `api_request_samples` (the raw source
+    // the performance ticker rolls up). Any event that names an endpoint and
+    // carries a latency or a status is one observed request.
+    if (
+      e.endpoint != null &&
+      e.endpoint !== '' &&
+      (e.latency_ms != null || e.status != null)
+    ) {
+      sampleInserts.push({
+        service_name: e.service,
+        endpoint: e.endpoint,
+        method: e.method ?? null,
+        timestamp,
+        status_code: e.status ?? null,
+        duration_ms: e.latency_ms ?? null,
+        request_size: e.request_size ?? null,
+        response_size: e.response_size ?? null,
+      });
+    }
   }
 
   // Persist (single transaction; DAO truncates stack to 8 KB + assigns ULIDs).
   const rows =
     toInsert.length > 0 ? await deps.db.dao.logEvents.insertMany(toInsert) : [];
+
+  // Populate the raw performance sample table from the same telemetry (best
+  // effort — a sample-write failure must never fail the accepted log batch).
+  if (sampleInserts.length > 0) {
+    await deps.db.dao.apiRequestSamples.insertMany(sampleInserts);
+  }
 
   // Advance service heartbeats: touch the earliest then the latest event ts per
   // service so `first_event_at` = min-seen and `last_event_at` = max-seen (the

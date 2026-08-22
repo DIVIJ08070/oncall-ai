@@ -7,6 +7,8 @@ import {
 import type { AppContext } from '../app.js';
 import { buildIncidentDetail, toIncidentSummary } from '../incidents/detail.js';
 import { answerIncidentChat } from '../chat/handler.js';
+import { challengeHypothesis } from '../chat/challenge.js';
+import { computeWhatChanged } from '../services/what-changed/service.js';
 import { generateAndStorePostmortem } from '../postmortem/generate.js';
 import { currentCustomer } from '../github/session.js';
 import { sendError } from '../http/errors.js';
@@ -196,6 +198,42 @@ export function registerIncidentRoutes(app: FastifyInstance, ctx: AppContext): v
     for (const text of tokenize(answer.content)) channel.event('token', { text });
     channel.event('done', { content: answer.content });
     channel.close();
+  });
+
+  /* ── GET /incidents/:id/what-changed (deploy + metric correlation) ─────── */
+  app.get('/api/v1/incidents/:id/what-changed', async (req, reply) => {
+    const customer = await currentCustomer(req, db, config);
+    if (!customer) {
+      return sendError(reply, 401, 'unauthorized', 'Sign in to view what changed');
+    }
+    const { id } = req.params as { id: string };
+    const incident = await db.dao.incidents.getById(id);
+    if (!incident || incident.customer_id !== customer.id) {
+      return sendError(reply, 404, 'not_found', `Incident ${id} not found`);
+    }
+    const result = await computeWhatChanged(db, config, incident);
+    return reply.code(200).send(result);
+  });
+
+  /* ── POST /incidents/:id/challenge ("Ask Why" — challenge hypothesis) ──── */
+  app.post('/api/v1/incidents/:id/challenge', async (req, reply) => {
+    const parsed = ChatRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return sendError(reply, 400, 'validation_error', 'A non-empty message is required', {
+        issues: parsed.error.issues,
+      });
+    }
+    const customer = await currentCustomer(req, db, config);
+    if (!customer) {
+      return sendError(reply, 401, 'unauthorized', 'Sign in to challenge the hypothesis');
+    }
+    const { id } = req.params as { id: string };
+    const incident = await db.dao.incidents.getById(id);
+    if (!incident || incident.customer_id !== customer.id) {
+      return sendError(reply, 404, 'not_found', `Incident ${id} not found`);
+    }
+    const result = await challengeHypothesis({ db, config }, incident, parsed.data.message);
+    return reply.code(200).send(result);
   });
 
   /* ── POST /incidents/:id/postmortem (generate + store) ─────────────────── */

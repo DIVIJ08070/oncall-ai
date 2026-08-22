@@ -12,6 +12,7 @@ import { Icon } from '../components/primitives/Icon';
 import { StatTile, SectionHeader } from '../components/primitives/StatTile';
 import { Entrance, StaggerGroup, StaggerItem } from '../components/motion/primitives';
 import { EarlyWarningCard } from '../features/prevention/components/EarlyWarningCard';
+import { PreventionSpotlight } from '../features/prevention/components/PreventionSpotlight';
 import { pct, ms } from '../lib/format';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { TIME_RANGES } from '../config';
@@ -119,6 +120,9 @@ export function DashboardPage() {
 
       {/* AI Incident PREVENTION (Phase 1) — predictive breach forecast, leads the page */}
       <EarlyWarningCard />
+
+      {/* Deep dive on the most at-risk endpoint — score gauge + breach forecast */}
+      <PreventionSpotlight />
 
       {/* KPI overview — animated roll-up of the live service list */}
       <StaggerGroup className="grid grid-cols-2 gap-3 lg:grid-cols-4">
