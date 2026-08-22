@@ -93,20 +93,20 @@ export function renderPostmortem(
  * Generate the postmortem for an incident and persist it to `incidents.postmortem`.
  * Returns `null` when the incident does not exist.
  */
-export function generateAndStorePostmortem(
+export async function generateAndStorePostmortem(
   db: OncallDb,
   incidentId: string,
   customerId?: string,
-): string | null {
-  const incident = db.dao.incidents.getById(incidentId);
+): Promise<string | null> {
+  const incident = await db.dao.incidents.getById(incidentId);
   if (!incident) return null;
   if (customerId !== undefined && incident.customer_id !== customerId) return null;
 
-  const session = db.dao.sessions.latestForIncident(incidentId);
-  const pr = db.dao.pullRequests.getByIncident(incidentId);
+  const session = await db.dao.sessions.latestForIncident(incidentId);
+  const pr = await db.dao.pullRequests.getByIncident(incidentId);
   const timeline = buildTimeline(incident, session ?? null, pr);
   const markdown = renderPostmortem(incident, session ?? null, pr, timeline);
 
-  db.dao.incidents.update(incidentId, { postmortem: markdown });
+  await db.dao.incidents.update(incidentId, { postmortem: markdown });
   return markdown;
 }

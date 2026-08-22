@@ -13,11 +13,11 @@ export function registerServicesRoute(app: FastifyInstance, ctx: AppContext): vo
   const { db, config } = ctx;
 
   app.get('/api/v1/services', async (req, reply) => {
-    const customer = currentCustomer(req, db, config);
+    const customer = await currentCustomer(req, db, config);
     if (!customer) {
       return sendError(reply, 401, 'unauthorized', 'Sign in to view services');
     }
-    const body = buildServicesResponse(db, customer.id, Date.now(), config);
+    const body = await buildServicesResponse(db, customer.id, Date.now(), config);
     return reply.code(200).send(body);
   });
 }

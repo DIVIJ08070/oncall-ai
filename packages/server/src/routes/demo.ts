@@ -75,7 +75,7 @@ export function registerDemoRoutes(app: FastifyInstance, ctx: AppContext): void 
 
   // POST /api/v1/demo/failure-mode — flip the victim + record the deploy row.
   app.post('/api/v1/demo/failure-mode', async (req, reply) => {
-    const customer = currentCustomer(req, db, config);
+    const customer = await currentCustomer(req, db, config);
     if (!customer) {
       return sendError(reply, 401, 'unauthorized', 'Sign in to control the demo');
     }
@@ -114,12 +114,12 @@ export function registerDemoRoutes(app: FastifyInstance, ctx: AppContext): void 
     // (c) correlate git history with runtime: mark the mode's SHA current so the
     // agent's get_recent_deploys/get_deploy_diff tools return real data (§7.7).
     if (deployed_sha) {
-      const existing = db.dao.deploys.getBySha(customer.id, deployed_sha);
+      const existing = await db.dao.deploys.getBySha(customer.id, deployed_sha);
       if (existing) {
-        db.dao.deploys.markCurrent(customer.id, deployed_sha);
+        await db.dao.deploys.markCurrent(customer.id, deployed_sha);
       } else {
         // Unseeded SHA — insert a minimal correlated row, then mark it current.
-        db.dao.deploys.upsert({
+        await db.dao.deploys.upsert({
           customer_id: customer.id,
           sha: deployed_sha,
           short_sha: deployed_sha.slice(0, 7),
@@ -130,7 +130,7 @@ export function registerDemoRoutes(app: FastifyInstance, ctx: AppContext): void 
           source: FAILING_MODES.includes(mode) ? 'bad_deploy' : 'baseline',
           is_current: true,
         });
-        db.dao.deploys.markCurrent(customer.id, deployed_sha);
+        await db.dao.deploys.markCurrent(customer.id, deployed_sha);
       }
     }
 
@@ -139,7 +139,7 @@ export function registerDemoRoutes(app: FastifyInstance, ctx: AppContext): void 
 
   // GET /api/v1/demo/state — proxy the victim's current mode + deployed_sha.
   app.get('/api/v1/demo/state', async (req, reply) => {
-    const customer = currentCustomer(req, db, config);
+    const customer = await currentCustomer(req, db, config);
     if (!customer) {
       return sendError(reply, 401, 'unauthorized', 'Sign in to view demo state');
     }
@@ -152,7 +152,7 @@ export function registerDemoRoutes(app: FastifyInstance, ctx: AppContext): void 
 
   // POST /api/v1/demo/traffic — server-side burst at the victim (CORS-free load).
   app.post('/api/v1/demo/traffic', async (req, reply) => {
-    const customer = currentCustomer(req, db, config);
+    const customer = await currentCustomer(req, db, config);
     if (!customer) {
       return sendError(reply, 401, 'unauthorized', 'Sign in to drive demo traffic');
     }

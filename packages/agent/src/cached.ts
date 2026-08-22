@@ -257,7 +257,7 @@ export class CachedEngine implements InvestigationEngine {
     const scenario = scenarioName ? this.catalogue[scenarioName] : undefined;
     const model = scenario?.model ?? this.config.agent.model;
 
-    const session = this.sessions.create({
+    const session = await this.sessions.create({
       incident_id: incident.id,
       mode: 'cached',
       model,
@@ -289,7 +289,7 @@ export class CachedEngine implements InvestigationEngine {
 
     const emit = async (step: CachedStep): Promise<void> => {
       const created_at = this.now();
-      const appended = this.steps.append({
+      const appended = await this.steps.append({
         session_id: session.id,
         type: step.type,
         tool_name: step.tool_name ?? null,
@@ -443,10 +443,10 @@ export class CachedEngine implements InvestigationEngine {
         return { output, refused: false };
       } catch {
         // Octokit failed → fall back to a canned PR record so the demo continues.
-        return { output: this.cannedPr(ctx, input, canned), refused: false };
+        return { output: await this.cannedPr(ctx, input, canned), refused: false };
       }
     }
-    return { output: this.cannedPr(ctx, input, canned), refused: false };
+    return { output: await this.cannedPr(ctx, input, canned), refused: false };
   }
 
   /**
@@ -454,11 +454,11 @@ export class CachedEngine implements InvestigationEngine {
    * link incident `fix_proposed`) and fires `pr_created` so the feed/dashboard
    * still show a PR. Uses the PR captured at record time (a real historical PR).
    */
-  private cannedPr(
+  private async cannedPr(
     ctx: ToolContext,
     input: CreateFixPrInput,
     canned: CreateFixPrSuccess | undefined,
-  ): unknown {
+  ): Promise<unknown> {
     const pr: CreateFixPrSuccess = canned ?? {
       pr_number: 0,
       url: `https://github.com/${this.octokit.owner}/${this.octokit.repo}/pulls`,
@@ -467,7 +467,7 @@ export class CachedEngine implements InvestigationEngine {
       base: this.octokit.defaultBranch,
     };
     try {
-      const row = ctx.db.dao.pullRequests.create({
+      const row = await ctx.db.dao.pullRequests.create({
         incident_id: ctx.incident.id,
         customer_id: ctx.customer.id,
         github_pr_number: pr.pr_number,
@@ -480,7 +480,7 @@ export class CachedEngine implements InvestigationEngine {
         diagnostic_report: input.body,
         head_sha: pr.head_sha,
       });
-      ctx.db.dao.incidents.update(ctx.incident.id, {
+      await ctx.db.dao.incidents.update(ctx.incident.id, {
         status: 'fix_proposed',
         root_cause: input.root_cause,
         confidence: input.confidence,
@@ -495,7 +495,7 @@ export class CachedEngine implements InvestigationEngine {
 
   /* ── finalize (mirrors LiveClaudeEngine.finalize) ─────────────────────────── */
 
-  private finalize(args: {
+  private async finalize(args: {
     session: { id: string };
     incident: Incident;
     model: string;
@@ -503,7 +503,7 @@ export class CachedEngine implements InvestigationEngine {
     prRefused: boolean;
     prInput?: CreateFixPrInput;
     outcome: CachedOutcome;
-  }): SessionResult {
+  }): Promise<SessionResult> {
     const { session, incident, model, capture, prRefused, prInput, outcome } = args;
     const conclusion = capture.conclusion;
     const pr = capture.pr;
@@ -523,7 +523,7 @@ export class CachedEngine implements InvestigationEngine {
       } else {
         status = 'escalated';
         decision = 'escalate';
-        this.escalateIncident(incident, rootCause, confidence);
+        await this.escalateIncident(incident, rootCause, confidence);
       }
     } else if (fixProposed) {
       status = 'completed';
@@ -535,14 +535,14 @@ export class CachedEngine implements InvestigationEngine {
       confidence = outcome.confidence ?? null;
       decision = 'escalate';
       status = outcome.status === 'failed' ? 'failed' : 'escalated';
-      this.escalateIncident(incident, rootCause, confidence);
+      await this.escalateIncident(incident, rootCause, confidence);
     }
 
     const summary = fixProposed
       ? `Replayed cached investigation → proposed a ${pr!.kind} fix as PR #${pr!.number}.`
       : 'Replayed cached investigation → escalated for human review.';
 
-    this.sessions.finish(session.id, {
+    await this.sessions.finish(session.id, {
       status,
       root_cause: rootCause,
       confidence,
@@ -570,13 +570,13 @@ export class CachedEngine implements InvestigationEngine {
     };
   }
 
-  private escalateIncident(
+  private async escalateIncident(
     incident: Incident,
     rootCause: string | null,
     confidence: number | null,
-  ): void {
+  ): Promise<void> {
     try {
-      this.db.dao.incidents.update(incident.id, {
+      await this.db.dao.incidents.update(incident.id, {
         status: 'escalated',
         root_cause: rootCause,
         confidence,

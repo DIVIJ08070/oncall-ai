@@ -109,7 +109,7 @@ export class LiveClaudeEngine implements InvestigationEngine {
 
   async investigate(incident: Incident, userSink: StepSink): Promise<SessionResult> {
     const { model, maxIterations, costCapUsd } = this.config.agent;
-    const session = this.sessions.create({
+    const session = await this.sessions.create({
       incident_id: incident.id,
       mode: 'live',
       model,
@@ -142,7 +142,7 @@ export class LiveClaudeEngine implements InvestigationEngine {
     // Persist + stream one mapped step.
     const emit = async (mapped: MappedStep): Promise<void> => {
       const created_at = this.now();
-      const appended = this.steps.append({
+      const appended = await this.steps.append({
         session_id: session.id,
         type: mapped.type,
         tool_name: mapped.tool_name ?? null,
@@ -273,7 +273,7 @@ export class LiveClaudeEngine implements InvestigationEngine {
   }
 
   /** Resolve the terminal session state, persist it, and escalate the incident if needed. */
-  private finalize(args: {
+  private async finalize(args: {
     session: { id: string };
     incident: Incident;
     model: string;
@@ -287,7 +287,7 @@ export class LiveClaudeEngine implements InvestigationEngine {
     overflow: 'max_turns' | 'max_budget' | null;
     sdkError?: string;
     lastThought?: string;
-  }): SessionResult {
+  }): Promise<SessionResult> {
     const { session, incident, model, capture, refused } = args;
     const conclusion = capture.conclusion;
     const pr = capture.pr;
@@ -311,7 +311,7 @@ export class LiveClaudeEngine implements InvestigationEngine {
         // without actually opening a PR.
         status = 'escalated';
         decision = 'escalate';
-        this.escalateIncident(incident, rootCause, confidence);
+        await this.escalateIncident(incident, rootCause, confidence);
       }
     } else if (fixProposed) {
       // Stopped (iteration/cost cap or a silent stop) AFTER opening a real PR but
@@ -331,7 +331,7 @@ export class LiveClaudeEngine implements InvestigationEngine {
       confidence = null;
       decision = 'escalate';
       status = args.sdkError ? 'failed' : 'escalated';
-      this.escalateIncident(incident, rootCause, confidence);
+      await this.escalateIncident(incident, rootCause, confidence);
     }
 
     const summary = this.buildSummary({
@@ -343,7 +343,7 @@ export class LiveClaudeEngine implements InvestigationEngine {
       sdkError: args.sdkError,
     });
 
-    this.sessions.finish(session.id, {
+    await this.sessions.finish(session.id, {
       status,
       root_cause: rootCause,
       confidence,
@@ -372,13 +372,13 @@ export class LiveClaudeEngine implements InvestigationEngine {
   }
 
   /** Mark the incident escalated (no PR path). Never downgrades a fix_proposed incident. */
-  private escalateIncident(
+  private async escalateIncident(
     incident: Incident,
     rootCause: string | null,
     confidence: number | null,
-  ): void {
+  ): Promise<void> {
     try {
-      this.db.dao.incidents.update(incident.id, {
+      await this.db.dao.incidents.update(incident.id, {
         status: 'escalated',
         root_cause: rootCause,
         confidence,

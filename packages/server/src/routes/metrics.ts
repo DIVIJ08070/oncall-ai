@@ -20,12 +20,12 @@ export function registerMetricsRoute(app: FastifyInstance, ctx: AppContext): voi
         issues: parsed.error.issues,
       });
     }
-    const customer = currentCustomer(req, db, config);
+    const customer = await currentCustomer(req, db, config);
     if (!customer) {
       return sendError(reply, 401, 'unauthorized', 'Sign in to view metrics');
     }
     const { service, window_sec, resolution_sec } = parsed.data;
-    const snapshot = buildMetricsSnapshot(db, customer.id, {
+    const snapshot = await buildMetricsSnapshot(db, customer.id, {
       service,
       window_sec,
       resolution_sec,

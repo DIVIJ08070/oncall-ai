@@ -1,7 +1,7 @@
 import { LogEventInputSchema, type IngestResponse } from '@oncall/shared';
 import type { OncallDb } from '../db/index.js';
 import type { CustomerRow } from '../db/rows.js';
-import type { CreateLogEventInput } from '../db/dao/log-events.js';
+import type { CreateLogEventInput } from '../db/dao/types.js';
 import { type Broker, logsTopic } from '../sse/broker.js';
 import { normalizeSignature } from './fingerprint.js';
 
@@ -30,11 +30,11 @@ function issueMessage(err: import('zod').ZodError): string {
     .join('; ');
 }
 
-export function writeBatch(
+export async function writeBatch(
   deps: IngestDeps,
   customer: CustomerRow,
   rawEvents: unknown[],
-): IngestResponse {
+): Promise<IngestResponse> {
   const receivedAt = Date.now();
   const toInsert: CreateLogEventInput[] = [];
   const errors: { index: number; message: string }[] = [];
@@ -64,7 +64,7 @@ export function writeBatch(
 
   // Persist (single transaction; DAO truncates stack to 8 KB + assigns ULIDs).
   const rows =
-    toInsert.length > 0 ? deps.db.dao.logEvents.insertMany(toInsert) : [];
+    toInsert.length > 0 ? await deps.db.dao.logEvents.insertMany(toInsert) : [];
 
   // Advance service heartbeats: touch the earliest then the latest event ts per
   // service so `first_event_at` = min-seen and `last_event_at` = max-seen (the
@@ -78,10 +78,10 @@ export function writeBatch(
     if (l === undefined || r.timestamp > l) latestByService.set(r.service, r.timestamp);
   }
   for (const [service, ts] of earliestByService) {
-    deps.db.dao.services.touch(customer.id, service, ts);
+    await deps.db.dao.services.touch(customer.id, service, ts);
   }
   for (const [service, ts] of latestByService) {
-    deps.db.dao.services.touch(customer.id, service, ts);
+    await deps.db.dao.services.touch(customer.id, service, ts);
   }
 
   // Publish to the `logs/<service>` SSE topic (data = LogEvent, sans customer_id).

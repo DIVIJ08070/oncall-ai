@@ -1,5 +1,5 @@
 import type { Incident, IncidentStatus } from '@oncall/shared';
-import type { IncidentsDao } from '../db/dao/incidents.js';
+import type { IncidentsDao } from '../db/dao/types.js';
 
 /**
  * Incident lifecycle state machine helpers (SPEC §10.4). Small, reusable wrappers
@@ -30,12 +30,15 @@ export function isAutoHealable(status: IncidentStatus): boolean {
 export function markInvestigating(
   dao: IncidentsDao,
   id: string,
-): Incident | null {
+): Promise<Incident | null> {
   return dao.update(id, { status: 'investigating' });
 }
 
 /** Enter the recovery window on merge detection (SPEC §10.5). C9 calls this. */
-export function beginVerifying(dao: IncidentsDao, id: string): Incident | null {
+export function beginVerifying(
+  dao: IncidentsDao,
+  id: string,
+): Promise<Incident | null> {
   return dao.update(id, { status: 'verifying' });
 }
 
@@ -44,7 +47,7 @@ export function resolveIncident(
   dao: IncidentsDao,
   id: string,
   now: number,
-): Incident | null {
+): Promise<Incident | null> {
   return dao.update(id, { status: 'resolved', resolved_at: now });
 }
 
@@ -52,6 +55,6 @@ export function resolveIncident(
 export function escalateIncident(
   dao: IncidentsDao,
   id: string,
-): Incident | null {
+): Promise<Incident | null> {
   return dao.update(id, { status: 'escalated' });
 }

@@ -8,7 +8,7 @@ import type {
   Step,
   TimelineEntry,
 } from '@oncall/shared';
-import { TERMINAL_STATUSES } from '../db/dao/incidents.js';
+import { TERMINAL_STATUSES } from '../db/dao/types.js';
 import type { OncallDb } from '../db/index.js';
 
 /**
@@ -126,18 +126,18 @@ export function buildTimeline(
  * Assemble the full `GET /incidents/:id` DTO (SPEC §7.3). Returns `null` when the
  * incident does not exist (or belongs to another customer) → the route 404s.
  */
-export function buildIncidentDetail(
+export async function buildIncidentDetail(
   db: OncallDb,
   incidentId: string,
   customerId?: string,
-): IncidentDetailResponse | null {
-  const incident = db.dao.incidents.getById(incidentId);
+): Promise<IncidentDetailResponse | null> {
+  const incident = await db.dao.incidents.getById(incidentId);
   if (!incident) return null;
   if (customerId !== undefined && incident.customer_id !== customerId) return null;
 
-  const session = db.dao.sessions.latestForIncident(incidentId);
-  const steps: Step[] = session ? db.dao.steps.listBySession(session.id) : [];
-  const prRec = db.dao.pullRequests.getByIncident(incidentId);
+  const session = await db.dao.sessions.latestForIncident(incidentId);
+  const steps: Step[] = session ? await db.dao.steps.listBySession(session.id) : [];
+  const prRec = await db.dao.pullRequests.getByIncident(incidentId);
 
   return {
     incident,

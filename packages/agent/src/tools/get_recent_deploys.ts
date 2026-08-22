@@ -18,7 +18,7 @@ export async function getRecentDeploys(
   const limit = Math.min(input.limit, RECENT_DEPLOYS_MAX);
   const commits = await ctx.octokit.listCommits({ limit });
 
-  const currentSha = ctx.db.dao.deploys.getCurrent(ctx.customer.id)?.sha ?? null;
+  const currentSha = (await ctx.db.dao.deploys.getCurrent(ctx.customer.id))?.sha ?? null;
 
   const deploys = commits.slice(0, limit).map((c) => ({
     sha: c.sha,

@@ -1,5 +1,5 @@
-import type BetterSqlite3 from 'better-sqlite3';
 import type { LogLevel } from '@oncall/shared';
+import type { OncallDb } from '../db/index.js';
 import { percentile } from './percentile.js';
 
 /**
@@ -143,31 +143,33 @@ export function computeRollup(events: readonly RollupEvent[]): Rollup {
  * Windowing is on event `timestamp` (client/event time), consistent with the
  * `metric_samples` series and the `get_metrics` tool.
  */
-export function readWindowEvents(
-  raw: BetterSqlite3.Database,
+export async function readWindowEvents(
+  db: OncallDb,
   customerId: string,
   service: string,
   fromTs: number,
   toTs: number,
-): RollupEvent[] {
-  return raw
-    .prepare(
-      `SELECT timestamp, level, status, latency_ms, fingerprint_sig
-         FROM log_events
-        WHERE customer_id = ? AND service = ?
-          AND timestamp >= ? AND timestamp <= ?
-        ORDER BY timestamp ASC`,
-    )
-    .all(customerId, service, fromTs, toTs) as RollupEvent[];
+): Promise<RollupEvent[]> {
+  const res = await db.pool.query(
+    `SELECT timestamp, level, status, latency_ms, fingerprint_sig
+       FROM log_events
+      WHERE customer_id = $1 AND service = $2
+        AND timestamp >= $3 AND timestamp <= $4
+      ORDER BY timestamp ASC`,
+    [customerId, service, fromTs, toTs],
+  );
+  return res.rows as RollupEvent[];
 }
 
 /** Read + roll up a `[fromTs, toTs]` window straight from the database. */
-export function rollupWindow(
-  raw: BetterSqlite3.Database,
+export async function rollupWindow(
+  db: OncallDb,
   customerId: string,
   service: string,
   fromTs: number,
   toTs: number,
-): Rollup {
-  return computeRollup(readWindowEvents(raw, customerId, service, fromTs, toTs));
+): Promise<Rollup> {
+  return computeRollup(
+    await readWindowEvents(db, customerId, service, fromTs, toTs),
+  );
 }

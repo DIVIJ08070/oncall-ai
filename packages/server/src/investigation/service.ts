@@ -123,33 +123,38 @@ export class InvestigationService {
    * `POST /incidents/:id/investigate`). Non-blocking: returns the session id once
    * the engine has created its session, and a `done` promise for the full run.
    */
-  run(incident: Incident): InvestigationHandle {
+  async run(incident: Incident): Promise<InvestigationHandle> {
     // open → investigating (SPEC §10.4).
     try {
-      markInvestigating(this.db.dao.incidents, incident.id);
+      await markInvestigating(this.db.dao.incidents, incident.id);
     } catch (err) {
       this.log('[investigation] markInvestigating failed', err);
     }
-    const fresh = this.db.dao.incidents.getById(incident.id) ?? incident;
+    const fresh = (await this.db.dao.incidents.getById(incident.id)) ?? incident;
     const topic = feedTopic(incident.id);
     const sink = this.makeFeedSink(incident.id);
 
     // Wrap the sessions DAO so the feed sees session lifecycle frames and we can
-    // capture the session id synchronously (the engine creates its session before
-    // its first `await`).
+    // capture the session id as soon as the engine creates its session. `started`
+    // resolves at that moment so `run()` can return the id in the handle.
     let sessionId: string | undefined;
+    let resolveStarted!: () => void;
+    const started = new Promise<void>((res) => {
+      resolveStarted = res;
+    });
     const sessions: EngineSessionsDao = {
-      create: (input) => {
-        const s = this.db.dao.sessions.create(input);
+      create: async (input) => {
+        const s = await this.db.dao.sessions.create(input);
         sessionId = s.id;
         this.broker.publish(topic, {
           event: 'session_started',
           data: { session_id: s.id, mode: s.mode, model: s.model },
         });
+        resolveStarted();
         return s;
       },
-      finish: (id, fields) => {
-        const r = this.db.dao.sessions.finish(id, fields);
+      finish: async (id, fields) => {
+        const r = await this.db.dao.sessions.finish(id, fields);
         this.broker.publish(topic, {
           event: 'session_completed',
           data: {
@@ -166,7 +171,7 @@ export class InvestigationService {
     // prompt. Best-effort — a failure here must never block an investigation.
     let learnedContext = '';
     try {
-      learnedContext = buildLearnedContext(
+      learnedContext = await buildLearnedContext(
         this.db.dao,
         `${this.config.github.owner}/${this.config.github.repo}`,
       );
@@ -184,7 +189,7 @@ export class InvestigationService {
         steps: this.db.dao.steps,
         ...(learnedContext !== '' ? { learnedContext } : {}),
       });
-      // Call synchronously so the engine's session `create` runs now (captures id).
+      // Kick off the run; the session `create` above captures the id.
       done = engine.investigate(fresh, sink).catch((err) => {
         this.log('[investigation] run failed', err);
         this.broker.publish(topic, {
@@ -203,6 +208,10 @@ export class InvestigationService {
       done = Promise.resolve(null);
     }
 
+    // Wait until the engine has created its session (captures the id) or the
+    // run settled without ever creating one (failure before/without a session).
+    await Promise.race([started, done]);
+
     return { session_id: sessionId ?? null, done };
   }
 
@@ -210,7 +219,9 @@ export class InvestigationService {
   enqueuer(): InvestigationEnqueuer {
     return {
       enqueue: (incident) => {
-        this.run(incident);
+        void this.run(incident).catch((err: unknown) => {
+          this.log('[investigation] auto-start failed', err);
+        });
       },
     };
   }

@@ -75,7 +75,11 @@ const EnvSchema = z.object({
 
   // server / auth
   PORT: numEnv(3001),
-  DATABASE_URL: strEnv('./data/oncall.sqlite'),
+  DB_DRIVER: z.preprocess(
+    blankToUndefined,
+    z.enum(['sqlite', 'postgres']).default('sqlite'),
+  ),
+  DATABASE_URL: strEnv('postgresql://localhost/oncall'),
   PUBLIC_BASE_URL: strEnv('http://localhost:3001'),
   DASHBOARD_URL: strEnv('http://localhost:5173'),
   SESSION_SECRET: strEnv('dev-secret-change-me'),
@@ -139,6 +143,7 @@ export interface Config {
   };
   server: {
     port: number;
+    /** postgres:// connection URL. */
     databaseUrl: string;
     publicBaseUrl: string;
     dashboardUrl: string;

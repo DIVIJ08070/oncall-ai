@@ -279,7 +279,10 @@ function clipLearning(text: string): string {
  * `confirmOrCreate`). Strictly best-effort — any failure is logged and
  * swallowed so the watch cycle never breaks.
  */
-function recordReviewLearnings(daos: Daos, review: AutoReview): void {
+async function recordReviewLearnings(
+  daos: Daos,
+  review: AutoReview,
+): Promise<void> {
   try {
     const repo = `${review.owner}/${review.repo}`;
     for (const category of review.categories) {
@@ -288,7 +291,7 @@ function recordReviewLearnings(daos: Daos, review: AutoReview): void {
         category.findings.length > 0 ? category.findings : [category.summary];
       for (const finding of findings) {
         if (typeof finding !== 'string' || finding.trim() === '') continue;
-        daos.repoLearnings.confirmOrCreate({
+        await daos.repoLearnings.confirmOrCreate({
           repo,
           error_class: category.name,
           root_cause: clipLearning(finding),
@@ -326,7 +329,7 @@ async function reviewOnePr(
   // Self-learning: inject this repo's learned context into the review prompt
   // (buildLearnedContext never throws; '' when the repo has no learnings yet).
   const learnedContext = daos
-    ? buildLearnedContext(daos, `${watch.owner}/${watch.repo}`)
+    ? await buildLearnedContext(daos, `${watch.owner}/${watch.repo}`)
     : '';
 
   // Existing Gemini diff reviewer; the prompt layer keeps only enabled rules.
@@ -399,7 +402,7 @@ async function runWatchCycle(config: Config, daos?: Daos): Promise<void> {
         }
         persist(s);
         // Self-learning auto-signal (guarded inside; never breaks the cycle).
-        if (daos) recordReviewLearnings(daos, review);
+        if (daos) await recordReviewLearnings(daos, review);
         // eslint-disable-next-line no-console
         console.log(
           `[pr-watch] reviewed ${watch.owner}/${watch.repo}#${pr.number} @ ${pr.headSha.slice(0, 7)} ` +

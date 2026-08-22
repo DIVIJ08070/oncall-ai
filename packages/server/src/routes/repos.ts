@@ -25,7 +25,7 @@ export function registerRepoRoutes(
   const { db, config } = ctx;
 
   app.get('/api/v1/repos', async (req, reply) => {
-    const token = currentGithubToken(req, db, config);
+    const token = await currentGithubToken(req, db, config);
     if (!token) {
       return sendError(reply, 401, 'unauthorized', 'Sign in with GitHub to list repos');
     }
@@ -74,11 +74,11 @@ export function registerRepoRoutes(
     }
     const { owner, repo } = parsed.data;
 
-    const token = currentGithubToken(req, db, config);
+    const token = await currentGithubToken(req, db, config);
     if (!token) {
       return sendError(reply, 401, 'unauthorized', 'Sign in with GitHub to select a repo');
     }
-    const customer = currentCustomer(req, db, config);
+    const customer = await currentCustomer(req, db, config);
     if (!customer) {
       return sendError(reply, 401, 'unauthorized', 'No customer bound to this session');
     }
@@ -110,7 +110,7 @@ export function registerRepoRoutes(
       );
     }
 
-    const updated = db.dao.customers.setRepo(
+    const updated = await db.dao.customers.setRepo(
       customer.id,
       info.owner,
       info.repo,

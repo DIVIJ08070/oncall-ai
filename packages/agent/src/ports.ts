@@ -50,6 +50,13 @@ export const NOOP_SINK: StepSink = {};
 
 /* ── DB port (satisfied structurally by @oncall/server `Daos`) ────────────── */
 
+/**
+ * DB port results may be sync or async: the server's dual-driver DAO layer is
+ * async (`Promise`-returning), while test fakes may stay sync. Call sites in
+ * the tool layer always `await`.
+ */
+export type MaybePromise<T> = T | Promise<T>;
+
 /** A stored log row = the API `LogEvent` plus its owning `customer_id`. */
 export interface ToolLogRow extends LogEvent {
   customer_id?: string;
@@ -102,30 +109,36 @@ export type ToolIncidentPatch = Partial<
 export interface ToolDb {
   dao: {
     logEvents: {
-      query(q: ToolLogQuery): ToolLogRow[];
+      query(q: ToolLogQuery): MaybePromise<ToolLogRow[]>;
     };
     metricSamples: {
-      latestForService(customerId: string, service: string): MetricSample | null;
+      latestForService(
+        customerId: string,
+        service: string,
+      ): MaybePromise<MetricSample | null>;
       seriesForService(
         customerId: string,
         service: string,
         sinceTs: number,
         limit?: number,
-      ): MetricSample[];
+      ): MaybePromise<MetricSample[]>;
     };
     deploys: {
-      getBySha(customerId: string, sha: string): DeployRef | null;
-      getCurrent(customerId: string): DeployRef | null;
-      listRecent(customerId: string, limit?: number): DeployRef[];
+      getBySha(customerId: string, sha: string): MaybePromise<DeployRef | null>;
+      getCurrent(customerId: string): MaybePromise<DeployRef | null>;
+      listRecent(customerId: string, limit?: number): MaybePromise<DeployRef[]>;
     };
     incidents: {
-      update(id: string, patch: ToolIncidentPatch): Incident | null;
+      update(id: string, patch: ToolIncidentPatch): MaybePromise<Incident | null>;
     };
     pullRequests: {
-      create(input: ToolCreatePrInput): PullRequestRec;
+      create(input: ToolCreatePrInput): MaybePromise<PullRequestRec>;
     };
     services: {
-      getByName(customerId: string, name: string): ToolServiceRow | null;
+      getByName(
+        customerId: string,
+        name: string,
+      ): MaybePromise<ToolServiceRow | null>;
     };
   };
 }

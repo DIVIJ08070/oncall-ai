@@ -29,12 +29,12 @@ export function registerLogsRoutes(app: FastifyInstance, ctx: AppContext): void 
         issues: parsed.error.issues,
       });
     }
-    const customer = currentCustomer(req, db, config);
+    const customer = await currentCustomer(req, db, config);
     if (!customer) {
       return sendError(reply, 401, 'unauthorized', 'Sign in to view logs');
     }
     const { service, level, since, until, limit } = parsed.data;
-    const rows = db.dao.logEvents.query({
+    const rows = await db.dao.logEvents.query({
       customer_id: customer.id,
       service,
       level,
@@ -52,8 +52,8 @@ export function registerLogsRoutes(app: FastifyInstance, ctx: AppContext): void 
     return reply.code(200).send({ events, next_before });
   });
 
-  app.get('/api/v1/logs/stream', (req, reply) => {
-    const customer = currentCustomer(req, db, config);
+  app.get('/api/v1/logs/stream', async (req, reply) => {
+    const customer = await currentCustomer(req, db, config);
     if (!customer) {
       return sendError(reply, 401, 'unauthorized', 'Sign in to stream logs');
     }
@@ -62,7 +62,7 @@ export function registerLogsRoutes(app: FastifyInstance, ctx: AppContext): void 
     // Subscribe to the requested service, or every current service for the customer.
     const serviceNames = service
       ? [service]
-      : db.dao.services.listByCustomer(customer.id).map((s) => s.name);
+      : (await db.dao.services.listByCustomer(customer.id)).map((s) => s.name);
 
     const channel = startSse(req, reply);
     const unsubs = serviceNames.map((name) =>

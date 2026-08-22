@@ -27,13 +27,13 @@ function clip(text: string, max = MAX_FIELD_CHARS): string {
  * learnings (or the learnings store is unavailable). Positive-rated, most-
  * confirmed learnings come first (`topForPrompt` ordering).
  */
-export function buildLearnedContext(
+export async function buildLearnedContext(
   dao: Daos,
   repo: string,
   limit = MAX_PROMPT_LEARNINGS,
-): string {
+): Promise<string> {
   try {
-    const learnings = dao.repoLearnings.topForPrompt(repo, limit);
+    const learnings = await dao.repoLearnings.topForPrompt(repo, limit);
     if (learnings.length === 0) return '';
 
     const lines = learnings.map((l, i) => {

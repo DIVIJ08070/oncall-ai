@@ -10,7 +10,14 @@ import type {
   SessionStatus,
   StepType,
 } from '@oncall/shared';
-import type { PinnedGitHub, StepSink, ToolConfig, ToolContext, ToolDb } from './ports.js';
+import type {
+  MaybePromise,
+  PinnedGitHub,
+  StepSink,
+  ToolConfig,
+  ToolContext,
+  ToolDb,
+} from './ports.js';
 import type { EngineSdkMessage } from './stream.js';
 import { LiveClaudeEngine } from './live.js';
 
@@ -36,7 +43,7 @@ export interface EngineSessionsDao {
     mode: SessionMode;
     model: string;
     started_at?: number;
-  }): { id: string };
+  }): MaybePromise<{ id: string }>;
   finish(
     id: string,
     fields: {
@@ -64,7 +71,7 @@ export interface EngineStepsDao {
     tool_output?: unknown;
     content?: string | null;
     created_at?: number;
-  }): { seq: number };
+  }): MaybePromise<{ seq: number }>;
 }
 
 /* ── config (structurally satisfied by the server `Config`) ────────────────── */

@@ -58,8 +58,8 @@ export function registerLearningsRoutes(
   app.get('/api/v1/learnings/:owner/:repo', async (req, reply) => {
     const { owner, repo } = req.params as { owner: string; repo: string };
     const fullRepo = `${owner}/${repo}`;
-    const learnings = db.dao.repoLearnings.listByRepo(fullRepo);
-    const stats = db.dao.repoLearnings.stats(fullRepo);
+    const learnings = await db.dao.repoLearnings.listByRepo(fullRepo);
+    const stats = await db.dao.repoLearnings.stats(fullRepo);
     return reply.code(200).send({
       learnings: learnings.map(toLearningDto),
       stats,
@@ -76,7 +76,7 @@ export function registerLearningsRoutes(
       });
     }
     const body = parsed.data;
-    const learning = db.dao.repoLearnings.confirmOrCreate({
+    const learning = await db.dao.repoLearnings.confirmOrCreate({
       repo: body.repo,
       error_class: body.errorClass,
       root_cause: body.rootCause,

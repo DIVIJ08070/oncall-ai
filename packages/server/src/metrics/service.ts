@@ -61,25 +61,25 @@ function toCurrent(rollup: Rollup): MetricsCurrent {
  * `series` comes from the persisted `metric_samples` rows over `window_sec`,
  * capped to 240 points. Returns `null` when the service is unknown (→ C10 404s).
  */
-export function buildMetricsSnapshot(
+export async function buildMetricsSnapshot(
   db: OncallDb,
   customerId: string,
   opts: { service: string; window_sec?: number; resolution_sec?: number; now?: number },
-): MetricsSnapshot | null {
+): Promise<MetricsSnapshot | null> {
   const service = opts.service;
   const now = opts.now ?? Date.now();
   const windowSec = opts.window_sec ?? 900;
   const resolutionSec = opts.resolution_sec ?? WINDOW_SEC;
 
-  const svc = db.dao.services.getByName(customerId, service);
+  const svc = await db.dao.services.getByName(customerId, service);
   if (!svc) return null;
 
   const { from, to } = currentRange(now);
-  const current = rollupWindow(db.raw, customerId, service, from, to);
-  const baseline = computeBaseline(db.raw, customerId, service, now);
+  const current = await rollupWindow(db, customerId, service, from, to);
+  const baseline = await computeBaseline(db, customerId, service, now);
 
   const sinceTs = now - windowSec * 1000;
-  const samples = db.dao.metricSamples.seriesForService(
+  const samples = await db.dao.metricSamples.seriesForService(
     customerId,
     service,
     sinceTs,
@@ -105,16 +105,16 @@ export function buildMetricsSnapshot(
 }
 
 /** Build one `GET /services` entry from a service row (SPEC §7.2). */
-export function buildServiceHealth(
+export async function buildServiceHealth(
   db: OncallDb,
   customerId: string,
   svc: ServiceRow,
   now: number,
   config: Config,
-): ServiceHealth {
+): Promise<ServiceHealth> {
   const { from, to } = currentRange(now);
-  const rollup = rollupWindow(db.raw, customerId, svc.name, from, to);
-  const active = db.dao.incidents.list({
+  const rollup = await rollupWindow(db, customerId, svc.name, from, to);
+  const active = await db.dao.incidents.list({
     customer_id: customerId,
     service: svc.name,
     activeOnly: true,
@@ -132,16 +132,16 @@ export function buildServiceHealth(
 }
 
 /** Build the full `GET /services` response for a customer (SPEC §7.2). */
-export function buildServicesResponse(
+export async function buildServicesResponse(
   db: OncallDb,
   customerId: string,
   now: number,
   config: Config,
-): ServicesResponse {
-  const services = db.dao.services.listByCustomer(customerId);
-  return {
-    services: services.map((svc) =>
-      buildServiceHealth(db, customerId, svc, now, config),
-    ),
-  };
+): Promise<ServicesResponse> {
+  const serviceRows = await db.dao.services.listByCustomer(customerId);
+  const services: ServiceHealth[] = [];
+  for (const svc of serviceRows) {
+    services.push(await buildServiceHealth(db, customerId, svc, now, config));
+  }
+  return { services };
 }

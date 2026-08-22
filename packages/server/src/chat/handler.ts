@@ -5,7 +5,7 @@ import type {
   PullRequestRec,
   Session,
 } from '@oncall/shared';
-import type { StoredStep } from '../db/dao/investigation-steps.js';
+import type { StoredStep } from '../db/dao/types.js';
 import type { Config } from '../config.js';
 import type { OncallDb } from '../db/index.js';
 
@@ -39,10 +39,13 @@ export type ChatResponder = (
 ) => ChatMessage | Promise<ChatMessage>;
 
 /** Load the persisted evidence a chat answer is grounded in (read-only). */
-export function loadChatEvidence(db: OncallDb, incident: Incident): ChatEvidence {
-  const session = db.dao.sessions.latestForIncident(incident.id);
-  const steps = session ? db.dao.steps.listBySession(session.id) : [];
-  const pr = db.dao.pullRequests.getByIncident(incident.id);
+export async function loadChatEvidence(
+  db: OncallDb,
+  incident: Incident,
+): Promise<ChatEvidence> {
+  const session = await db.dao.sessions.latestForIncident(incident.id);
+  const steps = session ? await db.dao.steps.listBySession(session.id) : [];
+  const pr = await db.dao.pullRequests.getByIncident(incident.id);
   return { incident, session: session ?? null, steps, pr };
 }
 
@@ -158,9 +161,9 @@ export async function answerIncidentChat(
   message: string,
 ): Promise<ChatMessage> {
   const responder = deps.responder ?? defaultChatResponder;
-  const evidence = loadChatEvidence(deps.db, incident);
+  const evidence = await loadChatEvidence(deps.db, incident);
 
-  deps.db.dao.chatMessages.insert({
+  await deps.db.dao.chatMessages.insert({
     incident_id: incident.id,
     role: 'user',
     content: message,
@@ -171,7 +174,7 @@ export async function answerIncidentChat(
     { ...evidence, message },
   );
 
-  deps.db.dao.chatMessages.insert({
+  await deps.db.dao.chatMessages.insert({
     incident_id: incident.id,
     role: 'assistant',
     content: reply.content,

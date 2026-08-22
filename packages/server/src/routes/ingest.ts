@@ -27,9 +27,9 @@ export function registerIngestRoutes(
   app: FastifyInstance,
   ctx: AppContext,
 ): void {
-  app.post('/api/v1/ingest', (req, reply) => {
+  app.post('/api/v1/ingest', async (req, reply) => {
     const key = extractIngestKey(req.headers[INGEST_KEY_HEADER]);
-    const customer = authenticateIngest(ctx.db, key);
+    const customer = await authenticateIngest(ctx.db, key);
     if (!customer) {
       return sendError(
         reply,
@@ -46,7 +46,7 @@ export function registerIngestRoutes(
       });
     }
 
-    const result = writeBatch(
+    const result = await writeBatch(
       { db: ctx.db, broker: ctx.broker },
       customer,
       envelope.data.events,

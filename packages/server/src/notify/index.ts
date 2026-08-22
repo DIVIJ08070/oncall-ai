@@ -51,9 +51,13 @@ export function createSlackNotifier(deps: SlackNotifierDeps): Notifier {
     deps.fetchImpl ??
     ((url, init) => fetch(url, init).then((r) => ({ ok: r.ok, status: r.status })));
 
-  const record = (incident: Incident, status: NotificationStatus, payload: unknown): void => {
+  const record = async (
+    incident: Incident,
+    status: NotificationStatus,
+    payload: unknown,
+  ): Promise<void> => {
     try {
-      db.dao.notifications.insert({
+      await db.dao.notifications.insert({
         incident_id: incident.id,
         channel: 'slack',
         status,
@@ -69,7 +73,7 @@ export function createSlackNotifier(deps: SlackNotifierDeps): Notifier {
     if (!webhook) {
       // Log-only stub (SPEC §14: empty webhook → log-only).
       log(`[notify] (stub) ${payload.text}`, { incident_id: incident.id });
-      record(incident, 'stubbed', { ...payload, webhook_configured: false });
+      await record(incident, 'stubbed', { ...payload, webhook_configured: false });
       return;
     }
     try {
@@ -78,14 +82,14 @@ export function createSlackNotifier(deps: SlackNotifierDeps): Notifier {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      record(incident, res.ok ? 'sent' : 'failed', {
+      await record(incident, res.ok ? 'sent' : 'failed', {
         ...payload,
         webhook_configured: true,
         http_status: res.status,
       });
     } catch (err) {
       log('[notify] webhook POST failed', err);
-      record(incident, 'failed', { ...payload, webhook_configured: true });
+      await record(incident, 'failed', { ...payload, webhook_configured: true });
     }
   };
 

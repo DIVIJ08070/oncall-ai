@@ -29,7 +29,7 @@ export interface Notifier {
  * dashboard/postmortem can reference it.
  */
 export function createSlackStubNotifier(db: OncallDb, config: Config): Notifier {
-  const record = (incident: Incident, kind: string): void => {
+  const record = async (incident: Incident, kind: string): Promise<void> => {
     const payload = {
       kind,
       text: `:rotating_light: ${incident.title}`,
@@ -42,7 +42,7 @@ export function createSlackStubNotifier(db: OncallDb, config: Config): Notifier 
       webhook_configured: Boolean(config.notify.slackWebhookUrl),
     };
     try {
-      db.dao.notifications.insert({
+      await db.dao.notifications.insert({
         incident_id: incident.id,
         channel: 'slack',
         status: 'stubbed',

@@ -54,7 +54,7 @@ export async function createFixPr(
   }
 
   // (4) Persist + link so recovery/merge flows can track it (§10.4/§10.5).
-  const prRow = ctx.db.dao.pullRequests.create({
+  const prRow = await ctx.db.dao.pullRequests.create({
     incident_id: ctx.incident.id,
     customer_id: ctx.customer.id,
     github_pr_number: pr.number,
@@ -67,7 +67,7 @@ export async function createFixPr(
     diagnostic_report: input.body,
     head_sha: pr.head_sha,
   });
-  ctx.db.dao.incidents.update(ctx.incident.id, {
+  await ctx.db.dao.incidents.update(ctx.incident.id, {
     status: 'fix_proposed',
     root_cause: input.root_cause,
     confidence: input.confidence,

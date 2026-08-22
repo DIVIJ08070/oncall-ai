@@ -28,7 +28,7 @@ export async function searchLogs(
   const limit = Math.min(input.limit, SEARCH_LOGS_MAX_ROWS);
 
   // Pull a bounded scan using the indexed columns; refine the rest in memory.
-  const scanned = ctx.db.dao.logEvents.query({
+  const scanned = await ctx.db.dao.logEvents.query({
     customer_id: ctx.customer.id,
     service: input.service,
     level: input.level,

@@ -25,7 +25,7 @@ export async function getMetrics(
   const service = input.service;
   const windowMs = input.window_sec * 1000;
 
-  const samples = ctx.db.dao.metricSamples.seriesForService(
+  const samples = await ctx.db.dao.metricSamples.seriesForService(
     customerId,
     service,
     now - windowMs,
@@ -35,7 +35,7 @@ export async function getMetrics(
   const latest =
     samples.length > 0
       ? samples[samples.length - 1]
-      : ctx.db.dao.metricSamples.latestForService(customerId, service);
+      : await ctx.db.dao.metricSamples.latestForService(customerId, service);
 
   const current = latest
     ? {

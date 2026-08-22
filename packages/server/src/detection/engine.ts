@@ -105,13 +105,13 @@ export class DetectionEngine {
     this.timer = setInterval(() => {
       if (this.ticking) return; // never overlap ticks
       this.ticking = true;
-      try {
-        this.tick();
-      } catch (err) {
-        this.log('[detection] tick error', err);
-      } finally {
-        this.ticking = false;
-      }
+      void this.tick()
+        .catch((err: unknown) => {
+          this.log('[detection] tick error', err);
+        })
+        .finally(() => {
+          this.ticking = false;
+        });
     }, this.config.detection.intervalMs);
     // Don't keep the process alive solely for the loop.
     if (typeof this.timer.unref === 'function') this.timer.unref();
@@ -129,7 +129,7 @@ export class DetectionEngine {
   }
 
   /** Run exactly one detection pass across every customer/service. */
-  tick(): TickResult {
+  async tick(): Promise<TickResult> {
     const now = this.clock.now();
     const result: TickResult = {
       now,
@@ -141,26 +141,26 @@ export class DetectionEngine {
       escalated: [],
     };
 
-    for (const customer of this.db.dao.customers.list()) {
-      for (const svc of this.db.dao.services.listByCustomer(customer.id)) {
+    for (const customer of await this.db.dao.customers.list()) {
+      for (const svc of await this.db.dao.services.listByCustomer(customer.id)) {
         result.servicesEvaluated++;
-        this.evaluateService(customer.id, svc, now, result);
+        await this.evaluateService(customer.id, svc, now, result);
       }
     }
     return result;
   }
 
-  private evaluateService(
+  private async evaluateService(
     customerId: string,
     svc: ServiceRow,
     now: number,
     result: TickResult,
-  ): void {
+  ): Promise<void> {
     const { from, to } = currentRange(now);
-    const rollup = rollupWindow(this.db.raw, customerId, svc.name, from, to);
+    const rollup = await rollupWindow(this.db, customerId, svc.name, from, to);
 
     // (1) Persist the tick's rollup (SPEC §8 metric_samples, one row per tick).
-    this.db.dao.metricSamples.insert({
+    await this.db.dao.metricSamples.insert({
       customer_id: customerId,
       service: svc.name,
       bucket_ts: now,
@@ -190,7 +190,7 @@ export class DetectionEngine {
         det.detector,
         det.dominant_sig,
       );
-      const openRes = this.db.dao.incidents.openOrDedup({
+      const openRes = await this.db.dao.incidents.openOrDedup({
         customer_id: customerId,
         service: svc.name,
         detector: det.detector,
@@ -212,7 +212,7 @@ export class DetectionEngine {
     }
 
     // (4)/(5) Lifecycle: auto-heal pre-PR incidents + drive recovery verification.
-    const active = this.db.dao.incidents.list({
+    const active = await this.db.dao.incidents.list({
       customer_id: customerId,
       service: svc.name,
       activeOnly: true,
@@ -220,7 +220,7 @@ export class DetectionEngine {
     for (const inc of active) {
       if (AUTO_HEAL_STATUSES.includes(inc.status) && !breaching.has(inc.detector)) {
         // Transient auto-heal (SPEC §10.4): metrics recovered before any PR.
-        const resolved = resolveIncident(this.db.dao.incidents, inc.id, now);
+        const resolved = await resolveIncident(this.db.dao.incidents, inc.id, now);
         if (resolved) {
           this.recoveryVerifier?.forget(inc.id);
           result.resolved.push(resolved);
@@ -228,24 +228,24 @@ export class DetectionEngine {
           this.log('[detection] incident self-recovered', { id: inc.id });
         }
       } else if (inc.status === 'verifying' && this.recoveryVerifier) {
-        this.processVerifying(customerId, inc, now, rollup, result);
+        await this.processVerifying(customerId, inc, now, rollup, result);
       }
     }
   }
 
   /** Recovery-window evaluation for a `verifying` incident (SPEC §10.5). */
-  private processVerifying(
+  private async processVerifying(
     customerId: string,
     inc: Incident,
     now: number,
     rollup: Rollup,
     result: TickResult,
-  ): void {
+  ): Promise<void> {
     const verifier = this.recoveryVerifier;
     if (!verifier) return;
     const outcome = verifier.evaluate(inc, now, rollup);
     if (outcome === 'recovered') {
-      const resolved = resolveIncident(this.db.dao.incidents, inc.id, now);
+      const resolved = await resolveIncident(this.db.dao.incidents, inc.id, now);
       verifier.forget(inc.id);
       if (resolved) {
         result.resolved.push(resolved);
@@ -253,7 +253,7 @@ export class DetectionEngine {
         this.log('[detection] recovery verified', { id: inc.id });
       }
     } else if (outcome === 'not_recovered') {
-      const escalated = escalateIncident(this.db.dao.incidents, inc.id);
+      const escalated = await escalateIncident(this.db.dao.incidents, inc.id);
       verifier.forget(inc.id);
       if (escalated) {
         result.escalated.push(escalated);

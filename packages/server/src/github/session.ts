@@ -49,11 +49,11 @@ export function clearStateCookie(reply: FastifyReply): void {
 }
 
 /** The logged-in user (from the signed session cookie), or `null`. */
-export function currentUser(
+export async function currentUser(
   req: FastifyRequest,
   db: OncallDb,
   config: Config,
-): UserRow | null {
+): Promise<UserRow | null> {
   const userId = readSignedCookie(req, SESSION_COOKIE, config.server.sessionSecret);
   if (!userId) return null;
   return db.dao.users.getById(userId);
@@ -64,14 +64,14 @@ export function currentUser(
  * customer, else (only under `DEV_NO_AUTH`) the seed customer keyed by
  * `INGEST_API_KEY`. `null` ⇒ the caller must 401.
  */
-export function currentCustomer(
+export async function currentCustomer(
   req: FastifyRequest,
   db: OncallDb,
   config: Config,
-): CustomerRow | null {
-  const user = currentUser(req, db, config);
+): Promise<CustomerRow | null> {
+  const user = await currentUser(req, db, config);
   if (user?.customer_id) {
-    const c = db.dao.customers.getById(user.customer_id);
+    const c = await db.dao.customers.getById(user.customer_id);
     if (c) return c;
   }
   if (config.server.devNoAuth) {
@@ -85,12 +85,12 @@ export function currentCustomer(
  * else (under `DEV_NO_AUTH`) the platform PAT so the demo can list/select the
  * pinned victim repo before OAuth is configured. `null` ⇒ 401.
  */
-export function currentGithubToken(
+export async function currentGithubToken(
   req: FastifyRequest,
   db: OncallDb,
   config: Config,
-): string | null {
-  const user = currentUser(req, db, config);
+): Promise<string | null> {
+  const user = await currentUser(req, db, config);
   if (user?.access_token) return user.access_token;
   if (config.server.devNoAuth && config.github.token) return config.github.token;
   return null;

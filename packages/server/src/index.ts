@@ -87,8 +87,11 @@ export function startDetection(
  * `INGEST_API_KEY` so the ingest endpoint is usable end-to-end immediately.
  * `scripts/seed.ts` (later chunk) supersedes this with the full demo seed.
  */
-export function ensureSeedCustomer(db: OncallDb, config: Config): CustomerRow {
-  const existing = db.dao.customers.getByIngestKey(config.ingest.apiKey);
+export async function ensureSeedCustomer(
+  db: OncallDb,
+  config: Config,
+): Promise<CustomerRow> {
+  const existing = await db.dao.customers.getByIngestKey(config.ingest.apiKey);
   if (existing) return existing;
   return db.dao.customers.create({
     name: 'demo',
@@ -101,8 +104,8 @@ export function ensureSeedCustomer(db: OncallDb, config: Config): CustomerRow {
 
 export async function main(): Promise<void> {
   const config = await initConfig();
-  const db = openDatabase(config.server.databaseUrl);
-  ensureSeedCustomer(db, config);
+  const db = await openDatabase(config.server.databaseUrl);
+  await ensureSeedCustomer(db, config);
 
   const broker = createBroker();
 
@@ -132,7 +135,16 @@ export async function main(): Promise<void> {
     engine.stop();
     poller?.stop();
     watcher.stop();
-    void app.close().finally(() => process.exit(0));
+    // Close the HTTP server, then the db (drains the pg pool when the
+    // postgres driver is active) before exiting.
+    void app
+      .close()
+      .then(() => db.close())
+      .catch((err: unknown) => {
+        // eslint-disable-next-line no-console
+        console.error('[oncall] shutdown error', err);
+      })
+      .finally(() => process.exit(0));
   };
   process.once('SIGTERM', shutdown);
   process.once('SIGINT', shutdown);

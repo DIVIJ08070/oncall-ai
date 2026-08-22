@@ -17,8 +17,8 @@ export function registerIntegrationSnippetRoute(
 ): void {
   const { db, config } = ctx;
 
-  app.get('/api/v1/integration-snippet', (req, reply) => {
-    const customer = currentCustomer(req, db, config);
+  app.get('/api/v1/integration-snippet', async (req, reply) => {
+    const customer = await currentCustomer(req, db, config);
     const apiKey = customer?.ingest_api_key ?? config.ingest.apiKey;
     const ingestUrl = `${config.server.publicBaseUrl.replace(/\/+$/, '')}/api/v1/ingest`;
 

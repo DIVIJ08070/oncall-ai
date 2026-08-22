@@ -18,10 +18,10 @@ export function extractIngestKey(
 }
 
 /** Resolve the owning customer for an ingest key, or `null` if unauthenticated. */
-export function authenticateIngest(
+export async function authenticateIngest(
   db: OncallDb,
   key: string | null,
-): CustomerRow | null {
+): Promise<CustomerRow | null> {
   if (!key) return null;
   return db.dao.customers.getByIngestKey(key);
 }

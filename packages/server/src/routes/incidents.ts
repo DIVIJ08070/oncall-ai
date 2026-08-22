@@ -34,12 +34,12 @@ export function registerIncidentRoutes(app: FastifyInstance, ctx: AppContext): v
         issues: parsed.error.issues,
       });
     }
-    const customer = currentCustomer(req, db, config);
+    const customer = await currentCustomer(req, db, config);
     if (!customer) {
       return sendError(reply, 401, 'unauthorized', 'Sign in to view incidents');
     }
     const { status, service, limit } = parsed.data;
-    const incidents = db.dao.incidents.list({
+    const incidents = await db.dao.incidents.list({
       customer_id: customer.id,
       service,
       status: status as IncidentStatus | undefined,
@@ -50,12 +50,12 @@ export function registerIncidentRoutes(app: FastifyInstance, ctx: AppContext): v
 
   /* ── GET /incidents/:id (full detail DTO) ──────────────────────────────── */
   app.get('/api/v1/incidents/:id', async (req, reply) => {
-    const customer = currentCustomer(req, db, config);
+    const customer = await currentCustomer(req, db, config);
     if (!customer) {
       return sendError(reply, 401, 'unauthorized', 'Sign in to view incidents');
     }
     const { id } = req.params as { id: string };
-    const detail = buildIncidentDetail(db, id, customer.id);
+    const detail = await buildIncidentDetail(db, id, customer.id);
     if (!detail) {
       return sendError(reply, 404, 'not_found', `Incident ${id} not found`);
     }
@@ -64,19 +64,19 @@ export function registerIncidentRoutes(app: FastifyInstance, ctx: AppContext): v
 
   /* ── POST /incidents/:id/investigate (manual re-trigger) ───────────────── */
   app.post('/api/v1/incidents/:id/investigate', async (req, reply) => {
-    const customer = currentCustomer(req, db, config);
+    const customer = await currentCustomer(req, db, config);
     if (!customer) {
       return sendError(reply, 401, 'unauthorized', 'Sign in to start an investigation');
     }
     const { id } = req.params as { id: string };
-    const incident = db.dao.incidents.getById(id);
+    const incident = await db.dao.incidents.getById(id);
     if (!incident || incident.customer_id !== customer.id) {
       return sendError(reply, 404, 'not_found', `Incident ${id} not found`);
     }
     if (!ctx.investigation) {
       return sendError(reply, 503, 'upstream_error', 'Investigation engine not available');
     }
-    const handle = ctx.investigation.run(incident);
+    const handle = await ctx.investigation.run(incident);
     if (!handle.session_id) {
       return sendError(reply, 500, 'internal', 'Failed to start the investigation');
     }
@@ -84,13 +84,13 @@ export function registerIncidentRoutes(app: FastifyInstance, ctx: AppContext): v
   });
 
   /* ── GET /incidents/:id/feed (SSE — replay-then-live) ──────────────────── */
-  app.get('/api/v1/incidents/:id/feed', (req, reply) => {
-    const customer = currentCustomer(req, db, config);
+  app.get('/api/v1/incidents/:id/feed', async (req, reply) => {
+    const customer = await currentCustomer(req, db, config);
     if (!customer) {
       return sendError(reply, 401, 'unauthorized', 'Sign in to view the feed');
     }
     const { id } = req.params as { id: string };
-    const incident = db.dao.incidents.getById(id);
+    const incident = await db.dao.incidents.getById(id);
     if (!incident || incident.customer_id !== customer.id) {
       return sendError(reply, 404, 'not_found', `Incident ${id} not found`);
     }
@@ -119,14 +119,14 @@ export function registerIncidentRoutes(app: FastifyInstance, ctx: AppContext): v
     channel.onClose(unsub);
 
     // Replay the persisted steps of the latest session (NFR-06).
-    const session = db.dao.sessions.latestForIncident(id);
+    const session = await db.dao.sessions.latestForIncident(id);
     if (session) {
       channel.event('session_started', {
         session_id: session.id,
         mode: session.mode,
         model: session.model,
       });
-      const steps = db.dao.steps.listBySession(session.id);
+      const steps = await db.dao.steps.listBySession(session.id);
       for (const s of steps) if (s.seq > replayedMaxSeq) replayedMaxSeq = s.seq;
       channel.event('replay', { steps });
       if (session.status !== 'running') {
@@ -153,12 +153,12 @@ export function registerIncidentRoutes(app: FastifyInstance, ctx: AppContext): v
         issues: parsed.error.issues,
       });
     }
-    const customer = currentCustomer(req, db, config);
+    const customer = await currentCustomer(req, db, config);
     if (!customer) {
       return sendError(reply, 401, 'unauthorized', 'Sign in to chat');
     }
     const { id } = req.params as { id: string };
-    const incident = db.dao.incidents.getById(id);
+    const incident = await db.dao.incidents.getById(id);
     if (!incident || incident.customer_id !== customer.id) {
       return sendError(reply, 404, 'not_found', `Incident ${id} not found`);
     }
@@ -172,7 +172,7 @@ export function registerIncidentRoutes(app: FastifyInstance, ctx: AppContext): v
 
   /* ── GET /incidents/:id/chat/stream (SSE token stream) ─────────────────── */
   app.get('/api/v1/incidents/:id/chat/stream', async (req, reply) => {
-    const customer = currentCustomer(req, db, config);
+    const customer = await currentCustomer(req, db, config);
     if (!customer) {
       return sendError(reply, 401, 'unauthorized', 'Sign in to chat');
     }
@@ -181,7 +181,7 @@ export function registerIncidentRoutes(app: FastifyInstance, ctx: AppContext): v
     if (!message || message.trim() === '') {
       return sendError(reply, 400, 'validation_error', 'A non-empty `message` query is required');
     }
-    const incident = db.dao.incidents.getById(id);
+    const incident = await db.dao.incidents.getById(id);
     if (!incident || incident.customer_id !== customer.id) {
       return sendError(reply, 404, 'not_found', `Incident ${id} not found`);
     }
@@ -200,12 +200,12 @@ export function registerIncidentRoutes(app: FastifyInstance, ctx: AppContext): v
 
   /* ── POST /incidents/:id/postmortem (generate + store) ─────────────────── */
   app.post('/api/v1/incidents/:id/postmortem', async (req, reply) => {
-    const customer = currentCustomer(req, db, config);
+    const customer = await currentCustomer(req, db, config);
     if (!customer) {
       return sendError(reply, 401, 'unauthorized', 'Sign in to generate a postmortem');
     }
     const { id } = req.params as { id: string };
-    const markdown = generateAndStorePostmortem(db, id, customer.id);
+    const markdown = await generateAndStorePostmortem(db, id, customer.id);
     if (markdown === null) {
       return sendError(reply, 404, 'not_found', `Incident ${id} not found`);
     }
@@ -214,12 +214,12 @@ export function registerIncidentRoutes(app: FastifyInstance, ctx: AppContext): v
 
   /* ── GET /incidents/:id/postmortem (stored draft) ──────────────────────── */
   app.get('/api/v1/incidents/:id/postmortem', async (req, reply) => {
-    const customer = currentCustomer(req, db, config);
+    const customer = await currentCustomer(req, db, config);
     if (!customer) {
       return sendError(reply, 401, 'unauthorized', 'Sign in to view the postmortem');
     }
     const { id } = req.params as { id: string };
-    const incident = db.dao.incidents.getById(id);
+    const incident = await db.dao.incidents.getById(id);
     if (!incident || incident.customer_id !== customer.id) {
       return sendError(reply, 404, 'not_found', `Incident ${id} not found`);
     }

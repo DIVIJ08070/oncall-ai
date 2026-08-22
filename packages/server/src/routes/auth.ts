@@ -100,8 +100,8 @@ export function registerAuthRoutes(
     }
 
     // Link the user to the seed customer so repo-select has a customer to bind (SPEC §7.5).
-    const seed = db.dao.customers.getByIngestKey(config.ingest.apiKey);
-    const user = db.dao.users.upsertByGithubUserId({
+    const seed = await db.dao.customers.getByIngestKey(config.ingest.apiKey);
+    const user = await db.dao.users.upsertByGithubUserId({
       github_user_id: profile.id,
       github_login: profile.login,
       avatar_url: profile.avatar_url,
@@ -113,8 +113,8 @@ export function registerAuthRoutes(
     return reply.redirect(`${config.server.dashboardUrl.replace(/\/+$/, '')}/onboarding`, 302);
   });
 
-  app.get('/api/v1/auth/me', (req, reply) => {
-    const user = currentUser(req, db, config);
+  app.get('/api/v1/auth/me', async (req, reply) => {
+    const user = await currentUser(req, db, config);
     if (!user) {
       return sendError(reply, 401, 'unauthorized', 'Not authenticated');
     }

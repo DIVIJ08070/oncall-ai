@@ -120,7 +120,7 @@ export type SampleRollup = (
   customerId: string,
   service: string,
   now: number,
-) => Rollup;
+) => Rollup | Promise<Rollup>;
 
 export interface MergePollerOptions {
   db: OncallDb;
@@ -174,7 +174,7 @@ export class MergePoller {
       opts.sampleRollup ??
       ((customerId, service, now) => {
         const { from, to } = currentRange(now);
-        return rollupWindow(this.db.raw, customerId, service, from, to);
+        return rollupWindow(this.db, customerId, service, from, to);
       });
   }
 
@@ -213,20 +213,20 @@ export class MergePoller {
     const now = this.clock.now();
     const result: MergePollResult = { now, merged: [], resolved: [], escalated: [] };
 
-    for (const customer of this.db.dao.customers.list()) {
+    for (const customer of await this.db.dao.customers.list()) {
       // Phase 1 — detect merges of PRs whose incident is awaiting_merge.
-      for (const inc of this.db.dao.incidents.list({
+      for (const inc of await this.db.dao.incidents.list({
         customer_id: customer.id,
         status: 'awaiting_merge',
       })) {
         await this.checkForMerge(customer.id, inc, now, result);
       }
       // Phase 2 — drive verifying incidents through the recovery window.
-      for (const inc of this.db.dao.incidents.list({
+      for (const inc of await this.db.dao.incidents.list({
         customer_id: customer.id,
         status: 'verifying',
       })) {
-        this.evaluateRecovery(customer.id, inc, now, result);
+        await this.evaluateRecovery(customer.id, inc, now, result);
       }
     }
     return result;
@@ -239,7 +239,7 @@ export class MergePoller {
     now: number,
     result: MergePollResult,
   ): Promise<void> {
-    const pr = this.db.dao.pullRequests.getByIncident(inc.id);
+    const pr = await this.db.dao.pullRequests.getByIncident(inc.id);
     if (!pr) return;
 
     let data: MergePollerPull;
@@ -257,10 +257,10 @@ export class MergePoller {
 
     if (data.state === 'closed' && !data.merged) {
       // PR closed without merging → record closed; leave incident for humans.
-      this.db.dao.pullRequests.update(pr.id, { state: 'closed' });
+      await this.db.dao.pullRequests.update(pr.id, { state: 'closed' });
       // Self-learning auto-signal: humans rejected this AI fix (source
       // "closed", rating −1). Guarded — never breaks the poller.
-      this.recordOutcomeLearning(customerId, inc, pr, 'closed');
+      await this.recordOutcomeLearning(customerId, inc, pr, 'closed');
       return;
     }
     if (!data.merged) return; // still open — nothing to do yet.
@@ -269,7 +269,7 @@ export class MergePoller {
     const mergedAt = data.merged_at ? Date.parse(data.merged_at) : now;
 
     await this.recordMergeDeploy(customerId, pr, mergeSha, mergedAt);
-    this.db.dao.pullRequests.update(pr.id, {
+    await this.db.dao.pullRequests.update(pr.id, {
       state: 'merged',
       merged_at: Number.isNaN(mergedAt) ? now : mergedAt,
       head_sha: mergeSha,
@@ -277,14 +277,14 @@ export class MergePoller {
 
     // Self-learning auto-signal: humans merged this AI fix (source "merge",
     // rating +1). Guarded — never breaks the poller.
-    this.recordOutcomeLearning(customerId, inc, pr, 'merge');
+    await this.recordOutcomeLearning(customerId, inc, pr, 'merge');
 
     // Simulate the customer redeploy of the fixed code on the local victim.
     await this.healer.heal();
 
     // Enter the recovery window (SPEC §10.5 step 3). The just-verified incident is
     // picked up by Phase 2 of this same poll, which starts its sustained-health clock.
-    const verifying = beginVerifying(this.db.dao.incidents, inc.id);
+    const verifying = await beginVerifying(this.db.dao.incidents, inc.id);
     this.verifier.begin(verifying ?? inc, now);
     if (verifying) {
       result.merged.push(verifying);
@@ -306,21 +306,21 @@ export class MergePoller {
    * conclusion (falling back to the incident title), fix_approach from the PR
    * title. Everything is try/caught: learning failures NEVER break the poller.
    */
-  private recordOutcomeLearning(
+  private async recordOutcomeLearning(
     customerId: string,
     inc: Incident,
     pr: PullRequestRec,
     outcome: 'merge' | 'closed',
-  ): void {
+  ): Promise<void> {
     try {
-      const customer = this.db.dao.customers.getById(customerId);
+      const customer = await this.db.dao.customers.getById(customerId);
       const owner = customer?.github_owner ?? this.config.github.owner;
       const name = customer?.github_repo ?? this.config.github.repo;
       const clip = (text: string, max: number): string => {
         const t = text.replace(/\s+/g, ' ').trim();
         return t.length > max ? `${t.slice(0, max - 1)}…` : t;
       };
-      this.db.dao.repoLearnings.confirmOrCreate({
+      await this.db.dao.repoLearnings.confirmOrCreate({
         repo: `${owner}/${name}`,
         error_class: inc.detector,
         root_cause: clip(inc.root_cause ?? inc.title, 400),
@@ -366,7 +366,7 @@ export class MergePoller {
       this.log('[merge-poller] getCommit(merge) failed; using PR metadata', err);
     }
 
-    this.db.dao.deploys.upsert({
+    await this.db.dao.deploys.upsert({
       customer_id: customerId,
       sha: mergeSha,
       short_sha: mergeSha.slice(0, 7),
@@ -379,25 +379,25 @@ export class MergePoller {
       source: 'merge',
       pr_id: pr.id,
     });
-    this.db.dao.deploys.markCurrent(customerId, mergeSha);
+    await this.db.dao.deploys.markCurrent(customerId, mergeSha);
   }
 
   /** Phase 2: evaluate one `verifying` incident against the recovery window. */
-  private evaluateRecovery(
+  private async evaluateRecovery(
     customerId: string,
     inc: Incident,
     now: number,
     result: MergePollResult,
-  ): void {
-    const rollup = this.sample(customerId, inc.service, now);
+  ): Promise<void> {
+    const rollup = await this.sample(customerId, inc.service, now);
     const outcome = this.verifier.evaluate(inc, now, rollup);
     if (outcome === 'pending') return;
 
-    const pr = this.db.dao.pullRequests.getByIncident(inc.id);
+    const pr = await this.db.dao.pullRequests.getByIncident(inc.id);
     this.verifier.forget(inc.id);
 
     if (outcome === 'recovered') {
-      const resolved = resolveIncident(this.db.dao.incidents, inc.id, now);
+      const resolved = await resolveIncident(this.db.dao.incidents, inc.id, now);
       if (pr) {
         void this.commentAndFinalize(pr, 'recovered', inc, rollup, now);
       }
@@ -407,7 +407,7 @@ export class MergePoller {
         this.log('[merge-poller] recovery verified → resolved', { incident: inc.id });
       }
     } else {
-      const escalated = escalateIncident(this.db.dao.incidents, inc.id);
+      const escalated = await escalateIncident(this.db.dao.incidents, inc.id);
       if (pr) {
         void this.commentAndFinalize(pr, 'not_recovered', inc, rollup, now);
       }
@@ -453,7 +453,7 @@ export class MergePoller {
     } catch (err) {
       this.log('[merge-poller] createComment failed', err);
     }
-    this.db.dao.pullRequests.update(pr.id, {
+    await this.db.dao.pullRequests.update(pr.id, {
       verification_status,
       verification_comment_id: commentId,
     });
