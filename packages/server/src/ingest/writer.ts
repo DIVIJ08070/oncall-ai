@@ -1,8 +1,13 @@
-import { LogEventInputSchema, type IngestResponse } from '@oncall/shared';
+import {
+  HostMetricSchema,
+  LogEventInputSchema,
+  type IngestResponse,
+} from '@oncall/shared';
 import type { OncallDb } from '../db/index.js';
 import type { CustomerRow } from '../db/rows.js';
 import type {
   CreateApiRequestSampleInput,
+  CreateHostMetricSampleInput,
   CreateLogEventInput,
 } from '../db/dao/types.js';
 import { type Broker, logsTopic } from '../sse/broker.js';
@@ -122,4 +127,49 @@ export async function writeBatch(
   }
 
   return { accepted: rows.length, rejected: errors.length, errors };
+}
+
+/**
+ * Host-metric ingest writer (AI Incident PREVENTION — HOST early warning).
+ *
+ * Validates each raw host reading against `HostMetricSchema` and batch-inserts
+ * the valid ones into `host_metric_samples` (the raw source the host-ticker
+ * rolls up per (service, metric)). Invalid readings are rejected per-index
+ * without failing the valid batch — the same contract the log path uses. Host
+ * samples carry no customer dimension (a host belongs to a service, not a
+ * tenant), so `customer` is accepted only to keep the ingest signature uniform.
+ */
+export async function writeHostMetrics(
+  deps: IngestDeps,
+  _customer: CustomerRow,
+  rawMetrics: unknown[],
+): Promise<IngestResponse> {
+  const receivedAt = Date.now();
+  const toInsert: CreateHostMetricSampleInput[] = [];
+  const errors: { index: number; message: string }[] = [];
+
+  for (let i = 0; i < rawMetrics.length; i++) {
+    const parsed = HostMetricSchema.safeParse(rawMetrics[i]);
+    if (!parsed.success) {
+      errors.push({ index: i, message: issueMessage(parsed.error) });
+      continue;
+    }
+    const m = parsed.data;
+    toInsert.push({
+      host: m.host,
+      service: m.service,
+      timestamp: m.timestamp || receivedAt,
+      cpu_pct: m.cpu_pct,
+      mem_pct: m.mem_pct,
+      db_pool_pct: m.db_pool_pct ?? null,
+      event_loop_lag_ms: m.event_loop_lag_ms ?? null,
+    });
+  }
+
+  const accepted =
+    toInsert.length > 0
+      ? await deps.db.dao.hostMetricSamples.insertMany(toInsert)
+      : 0;
+
+  return { accepted, rejected: errors.length, errors };
 }

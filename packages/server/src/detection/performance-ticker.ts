@@ -18,6 +18,7 @@ import {
 } from '../services/trend-prediction.js';
 import { type Clock, systemClock } from './clock.js';
 import type { DetectionLogger } from './seams.js';
+import type { EscalationEngine } from '../services/escalation/policy.js';
 
 /**
  * Performance ticker — Phase 1 of AI Incident PREVENTION ("predict before" vs.
@@ -112,7 +113,7 @@ const STATUS_RANK: Record<RiskStatus, number> = {
 };
 
 /** Coerce a stored status string back to a known `RiskStatus` (default NORMAL). */
-function normalizeStatus(raw: string | undefined | null): RiskStatus {
+export function normalizeStatus(raw: string | undefined | null): RiskStatus {
   return raw != null && ALL_STATUSES.has(raw) ? (raw as RiskStatus) : 'NORMAL';
 }
 
@@ -322,6 +323,8 @@ export interface PerformanceTickerOptions {
   broker?: Broker;
   clock?: Clock;
   logger?: DetectionLogger;
+  /** Escalation ladder engine (ESCALATE IF IGNORED). Optional — skipped if absent. */
+  escalation?: EscalationEngine;
 }
 
 /** Per-aggregate summary (returned from `aggregate()` for tests + logging). */
@@ -345,6 +348,7 @@ export class PerformanceTicker {
   private readonly broker?: Broker;
   private readonly clock: Clock;
   private readonly log: DetectionLogger;
+  private readonly escalation?: EscalationEngine;
 
   private timer?: ReturnType<typeof setInterval>;
   private isAggregating = false; // Rule 3: single-flight mutex
@@ -355,6 +359,7 @@ export class PerformanceTicker {
     this.broker = opts.broker;
     this.clock = opts.clock ?? systemClock;
     this.log = opts.logger ?? (() => {});
+    this.escalation = opts.escalation;
   }
 
   get running(): boolean {
@@ -533,7 +538,30 @@ export class PerformanceTicker {
       prediction_details: JSON.stringify(scored.prediction),
       updated_at: now,
     });
-    this.publishRiskEvents(m, scored, normalizeStatus(prev?.status), next.status);
+    const prevStatus = normalizeStatus(prev?.status);
+    this.publishRiskEvents(m, scored, prevStatus, next.status);
+
+    // ESCALATE IF IGNORED — advance the escalation ladder for this endpoint.
+    if (this.escalation) {
+      await this.escalation.onRiskUpdate({
+        source: 'api',
+        service: m.service,
+        metric: m.endpoint,
+        riskService: m.service,
+        riskEndpoint: m.endpoint,
+        prevStatus,
+        status: next.status,
+        current: m.p95,
+        threshold: this.config.detection.latencyP95ThresholdMs,
+        probability: scored.prediction.probability,
+        minutesToBreach: scored.prediction.minutesToBreach,
+        likelyCause: scored.prediction.detail,
+        recommendedAction:
+          'Investigate the slow path — scale out, add caching, or optimize the query',
+        title: `${m.service} ${m.endpoint} latency risk`,
+        now,
+      });
+    }
   }
 
   /**

@@ -101,6 +101,20 @@ const EnvSchema = z.object({
   RAW_RETENTION_HOURS: numEnv(1),
   PRUNE_INTERVAL_SEC: numEnv(300),
 
+  // host early warning (AI Incident PREVENTION — HOST layer: CPU/Mem/DB-pool)
+  HOST_ENABLED: boolEnv(true),
+  HOST_WINDOW_SEC: numEnv(30),
+  HOST_CPU_THRESHOLD: numEnv(85),
+  HOST_MEM_THRESHOLD: numEnv(90),
+  HOST_DBPOOL_THRESHOLD: numEnv(90),
+  /** Logical service name the platform self-samples its own pool under. */
+  HOST_SELF_SERVICE: strEnv('platform-api'),
+
+  // escalation ladder + recovery (AI Incident PREVENTION — ESCALATE IF IGNORED)
+  ESCALATION_ENABLED: boolEnv(true),
+  /** Grace period (seconds) a WARNING may go unacknowledged before CRITICAL. */
+  ACK_GRACE_SEC: numEnv(45),
+
   // victim
   VICTIM_PORT: numEnv(4000),
   VICTIM_CONTROL_URL: strEnv('http://localhost:4000'),
@@ -175,6 +189,26 @@ export interface Config {
     rawRetentionHours: number;
     /** How often (seconds) the retention prune loop runs. */
     pruneIntervalSec: number;
+  };
+  host: {
+    /** Master switch for the host-metric ticker + prediction loop. */
+    enabled: boolean;
+    /** Host aggregation window (seconds) — how often the host-ticker runs. */
+    windowSec: number;
+    /** CPU% threshold a host must not cross. */
+    cpuThreshold: number;
+    /** Memory% threshold a host must not cross. */
+    memThreshold: number;
+    /** DB-pool utilization% threshold a host must not cross. */
+    dbPoolThreshold: number;
+    /** Logical service name the platform self-samples its own pg pool under. */
+    selfService: string;
+  };
+  escalation: {
+    /** Master switch for the escalation ladder + recovery notifications. */
+    enabled: boolean;
+    /** Seconds a WARNING may go unacknowledged before escalating to CRITICAL. */
+    ackGraceSec: number;
   };
   victim: {
     port: number;
@@ -261,6 +295,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       windowSec: e.PERF_WINDOW_SEC,
       rawRetentionHours: e.RAW_RETENTION_HOURS,
       pruneIntervalSec: e.PRUNE_INTERVAL_SEC,
+    },
+    host: {
+      enabled: e.HOST_ENABLED,
+      windowSec: e.HOST_WINDOW_SEC,
+      cpuThreshold: e.HOST_CPU_THRESHOLD,
+      memThreshold: e.HOST_MEM_THRESHOLD,
+      dbPoolThreshold: e.HOST_DBPOOL_THRESHOLD,
+      selfService: e.HOST_SELF_SERVICE,
+    },
+    escalation: {
+      enabled: e.ESCALATION_ENABLED,
+      ackGraceSec: e.ACK_GRACE_SEC,
     },
     victim: {
       port: e.VICTIM_PORT,

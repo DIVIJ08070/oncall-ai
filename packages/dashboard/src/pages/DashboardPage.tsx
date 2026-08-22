@@ -12,6 +12,8 @@ import { Icon } from '../components/primitives/Icon';
 import { StatTile, SectionHeader } from '../components/primitives/StatTile';
 import { Entrance, StaggerGroup, StaggerItem } from '../components/motion/primitives';
 import { EarlyWarningCard } from '../features/prevention/components/EarlyWarningCard';
+import { HostEarlyWarningCard } from '../features/prevention/components/HostEarlyWarningCard';
+import { EscalationTimeline } from '../features/prevention/components/EscalationTimeline';
 import { PreventionSpotlight } from '../features/prevention/components/PreventionSpotlight';
 import { pct, ms } from '../lib/format';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -118,7 +120,17 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* AI Incident PREVENTION (Phase 1) — predictive breach forecast, leads the page */}
+      {/* AI Incident PREVENTION (HOST layer) — the "AI EARLY WARNING" resource
+          forecast + the "ESCALATE IF IGNORED" ladder, leading the page. The
+          timeline collapses out when no alert is in play, letting the card fill. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="min-w-0 lg:flex-[1.6]">
+          <HostEarlyWarningCard />
+        </div>
+        <EscalationTimeline />
+      </div>
+
+      {/* AI Incident PREVENTION (Phase 1) — predictive breach forecast (API layer) */}
       <EarlyWarningCard />
 
       {/* Deep dive on the most at-risk endpoint — score gauge + breach forecast */}

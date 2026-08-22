@@ -12,10 +12,16 @@
  * unified with the platform `POST /api/v1/demo/failure-mode` response (BUG-004).
  *
  * `activeDegrade` is a SEPARATE, additive knob from the failure modes: a controlled
- * degradation that makes one endpoint's latency (or error rate) CLIMB gradually over
- * `rampSeconds` — so the platform trend prediction shows a rising "may breach in ~N
- * min" BEFORE the metric actually crosses its SLO. Applied per-request by the
- * degradation middleware in `services/index.ts`; the failure modes are untouched.
+ * degradation that makes a signal CLIMB gradually over `rampSeconds` — so the platform
+ * trend prediction shows a rising "may breach in ~N min" BEFORE the metric actually
+ * crosses its SLO. Two families share the one knob:
+ *   - request-level (`latency` | `errors`): ramps one endpoint's added delay / injected
+ *     failure probability, applied per-request by the degradation middleware in
+ *     `services/index.ts`;
+ *   - HOST-level (`cpu` | `dbpool`): ramps the process's REPORTED cpu_pct / db_pool_pct
+ *     upward, read by the host sampler (`host.ts`) so the AI EARLY WARNING card shows
+ *     e.g. CPU 40→55→65→75→82 climbing toward its threshold.
+ * The failure modes are untouched by either.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -36,7 +42,19 @@ export function setActiveMode(mode: FailureMode): void {
 
 /* ── controlled degradation (predictive-trend demo) ──────────────────────── */
 
-export type DegradeKind = 'latency' | 'errors';
+/**
+ * Request-level degradations (`latency` | `errors`) shape one endpoint's per-request
+ * behavior; HOST-level degradations (`cpu` | `dbpool`) ramp the process's reported
+ * resource metrics for the AI EARLY WARNING card. All share the single `activeDegrade`.
+ */
+export type DegradeKind = 'latency' | 'errors' | 'cpu' | 'dbpool';
+
+/** The HOST-level degrade kinds (ramp reported cpu_pct / db_pool_pct). */
+export const HOST_DEGRADE_KINDS: readonly DegradeKind[] = ['cpu', 'dbpool'];
+
+export function isHostDegradeKind(kind: DegradeKind): boolean {
+  return kind === 'cpu' || kind === 'dbpool';
+}
 
 /** An active controlled degradation targeting one (service, endpoint). */
 export interface DegradeState {
@@ -44,7 +62,10 @@ export interface DegradeState {
   service: string;
   /** Exact endpoint path to match (e.g. `/api/payments/charge`); `''` = any path. */
   endpoint: string;
-  /** `latency` ramps extra delay; `errors` ramps an injected-failure probability. */
+  /**
+   * `latency` ramps extra delay; `errors` ramps an injected-failure probability;
+   * `cpu` / `dbpool` ramp the process's reported cpu_pct / db_pool_pct (HOST layer).
+   */
   kind: DegradeKind;
   /** Seconds over which the effect climbs from 0 to its ceiling (then holds). */
   rampSeconds: number;
@@ -54,6 +75,10 @@ export interface DegradeState {
   maxExtraLatencyMs: number;
   /** Error-rate ceiling (0-1 injected-failure probability) for `kind: errors`. */
   maxErrorRatio: number;
+  /** Host-metric ramp FLOOR (starting %) for `kind: cpu | dbpool`. */
+  minHostPct: number;
+  /** Host-metric ramp CEILING (full-ramp %) for `kind: cpu | dbpool`. */
+  maxHostPct: number;
 }
 
 /** Defaults chosen so the demo target (payments charge) breaches ~mid-ramp. */
@@ -64,6 +89,10 @@ export const DEGRADE_DEFAULTS = {
   rampSeconds: 120,
   maxExtraLatencyMs: 1600,
   maxErrorRatio: 0.6,
+  // HOST ramp: climb from 40% up past the CPU (85) / DB-pool (90) thresholds so the
+  // AI EARLY WARNING card shows a rising prediction that eventually breaches.
+  minHostPct: 40,
+  maxHostPct: 95,
 } as const;
 
 let activeDegrade: DegradeState | null = null;
@@ -104,6 +133,9 @@ export function degradeEffectFor(
 ): DegradeEffect {
   const d = activeDegrade;
   if (!d) return NO_EFFECT;
+  // HOST-level degrades (cpu/dbpool) never touch the request path — they only
+  // ramp reported resource metrics, read separately by the host sampler.
+  if (isHostDegradeKind(d.kind)) return NO_EFFECT;
   if (d.service && d.service !== service) return NO_EFFECT;
   if (d.endpoint && d.endpoint !== path) return NO_EFFECT;
 
@@ -119,6 +151,44 @@ export function degradeEffectFor(
   // errors: injected-failure probability climbs 0 → maxErrorRatio.
   const failProb = progress * d.maxErrorRatio;
   return { extraDelayMs: 0, injectError: Math.random() < failProb, progress };
+}
+
+/* ── HOST-level degrade (ramps reported cpu_pct / db_pool_pct) ────────────── */
+
+/** What a HOST degrade currently reports for cpu / db-pool (null = not ramped). */
+export interface HostDegradeEffect {
+  /** Ramped CPU% to report, or `null` when no `cpu` degrade is active. */
+  cpuPct: number | null;
+  /** Ramped DB-pool% to report, or `null` when no `dbpool` degrade is active. */
+  dbPoolPct: number | null;
+  /** Ramp progress 0-1 (for observability). */
+  progress: number;
+}
+
+const NO_HOST_EFFECT: HostDegradeEffect = { cpuPct: null, dbPoolPct: null, progress: 0 };
+
+function clampPct(n: number): number {
+  return Math.min(100, Math.max(0, n));
+}
+
+/**
+ * The host-metric value the active degrade currently dictates. Returns a nulls
+ * result unless a `cpu` / `dbpool` degrade is active; when one is, the matching
+ * metric ramps `minHostPct → maxHostPct` across `rampSeconds` (small ±2% jitter so
+ * the sparkline looks organic) and holds at the ceiling. The host sampler overlays
+ * the non-null field onto its otherwise-real reading.
+ */
+export function hostDegradeEffect(now: number = Date.now()): HostDegradeEffect {
+  const d = activeDegrade;
+  if (!d || !isHostDegradeKind(d.kind)) return NO_HOST_EFFECT;
+
+  const elapsed = Math.max(0, now - d.startedAt);
+  const progress = d.rampSeconds > 0 ? Math.min(1, elapsed / (d.rampSeconds * 1000)) : 1;
+  const ramped = d.minHostPct + progress * (d.maxHostPct - d.minHostPct);
+  const jittered = clampPct(ramped * (0.98 + Math.random() * 0.04));
+
+  if (d.kind === 'cpu') return { cpuPct: jittered, dbPoolPct: null, progress };
+  return { cpuPct: null, dbPoolPct: jittered, progress };
 }
 
 function numOr(v: unknown, dflt: number): number {
@@ -196,19 +266,34 @@ export function registerControl(app: Express): void {
     return res.status(200).json({ mode });
   });
 
-  // Controlled degradation — start a gradual latency/error ramp on one endpoint.
+  // Controlled degradation — start a gradual ramp. Request-level kinds
+  // (`latency` | `errors`) target one endpoint; HOST-level kinds (`cpu` |
+  // `dbpool`) ramp the reported process resource metrics for the AI EARLY
+  // WARNING card. Body: { kind?, service?, endpoint?, rampSeconds?,
+  // maxExtraLatencyMs?, maxErrorRatio?, minHostPct?, maxHostPct? }.
   app.post('/__control/degrade', (req: Request, res: Response) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
 
     const rawKind = b.kind;
-    const kind: DegradeKind =
-      rawKind === 'errors' ? 'errors' : rawKind === undefined || rawKind === 'latency' ? 'latency' : ('' as DegradeKind);
-    if (kind !== 'latency' && kind !== 'errors') {
+    const kind: DegradeKind | null =
+      rawKind === undefined || rawKind === 'latency'
+        ? 'latency'
+        : rawKind === 'errors' ||
+            rawKind === 'cpu' ||
+            rawKind === 'dbpool'
+          ? (rawKind as DegradeKind)
+          : null;
+    if (kind === null) {
       return res.status(400).json({
-        error: { code: 'validation_error', message: 'kind must be "latency" or "errors"' },
+        error: {
+          code: 'validation_error',
+          message: 'kind must be "latency", "errors", "cpu", or "dbpool"',
+        },
       });
     }
 
+    const minHostPct = clampPct(numOr(b.minHostPct, DEGRADE_DEFAULTS.minHostPct));
+    const maxHostPct = clampPct(numOr(b.maxHostPct, DEGRADE_DEFAULTS.maxHostPct));
     const state: DegradeState = {
       service:
         typeof b.service === 'string' && b.service.length > 0
@@ -224,6 +309,9 @@ export function registerControl(app: Express): void {
         numOr(b.maxExtraLatencyMs, DEGRADE_DEFAULTS.maxExtraLatencyMs),
       ),
       maxErrorRatio: Math.min(1, Math.max(0, numOr(b.maxErrorRatio, DEGRADE_DEFAULTS.maxErrorRatio))),
+      // Keep floor ≤ ceiling so the ramp always climbs (or holds), never inverts.
+      minHostPct: Math.min(minHostPct, maxHostPct),
+      maxHostPct: Math.max(minHostPct, maxHostPct),
     };
     setDegrade(state);
     return res.status(200).json({ ok: true, degrade: state });

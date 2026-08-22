@@ -73,3 +73,27 @@ export const ApiRequestSchema = z.object({
   response_size: z.number().int().nullish(),
 });
 export type ApiRequestPayload = z.infer<typeof ApiRequestSchema>;
+
+/**
+ * Host-level resource sample (AI Incident PREVENTION — HOST early warning).
+ *
+ * One point-in-time reading of a running process/host: CPU%, memory%, and —
+ * when the process owns a connection pool — DB-pool utilization %, plus the
+ * event-loop lag (ms) as a saturation proxy. `host` names the machine/process,
+ * `service` the logical service it belongs to (both required so the host-ticker
+ * can group by service and predict a breach per metric). The victim ships these
+ * every few seconds to `POST /api/v1/ingest` (as `host_metrics`); the platform
+ * also self-samples its own pg pool each host tick. `cpu_pct` / `mem_pct` are
+ * 0-100 percentages; `db_pool_pct` / `event_loop_lag_ms` are nullable (not every
+ * host reports them).
+ */
+export const HostMetricSchema = z.object({
+  host: z.string().min(1),
+  service: z.string().min(1),
+  timestamp: z.number().int().nonnegative(),
+  cpu_pct: z.number(),
+  mem_pct: z.number(),
+  db_pool_pct: z.number().nullish(),
+  event_loop_lag_ms: z.number().nullish(),
+});
+export type HostMetricPayload = z.infer<typeof HostMetricSchema>;

@@ -33,6 +33,8 @@ export const ID_PREFIX = {
   chat_message: 'msg',
   notification: 'ntf',
   repo_learning: 'lrn',
+  alert: 'alr',
+  alert_notification: 'aln',
 } as const;
 
 export type IdPrefix = (typeof ID_PREFIX)[keyof typeof ID_PREFIX];
@@ -71,3 +73,6 @@ export const newNotificationId = (t?: number): string =>
   newId(ID_PREFIX.notification, t);
 export const newRepoLearningId = (t?: number): string =>
   newId(ID_PREFIX.repo_learning, t);
+export const newAlertId = (t?: number): string => newId(ID_PREFIX.alert, t);
+export const newAlertNotificationId = (t?: number): string =>
+  newId(ID_PREFIX.alert_notification, t);

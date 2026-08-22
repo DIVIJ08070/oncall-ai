@@ -126,10 +126,97 @@ export const RiskEscalationEventSchema = z.object({
 });
 export type RiskEscalationEvent = z.infer<typeof RiskEscalationEventSchema>;
 
+/* ── Host early-warning stream: HOST resource prediction (CPU/Mem/DB-pool) ── */
+
+/**
+ * Shared payload for every host early-warning frame. `service` + `metric` name
+ * the tracked resource (`metric` is a `HostMetricName`: cpu | mem | db_pool);
+ * `status` is its durable `RiskStatus`; `current` is the latest reading and
+ * `threshold` the SLO it climbs toward; `probability` (0-1) + `minutesToBreach`
+ * (null when not trending) carry the prediction; `likelyCause` +
+ * `recommendedAction` are the operator guidance the AI EARLY WARNING card shows.
+ */
+export const HostEarlyWarningEventDataSchema = z.object({
+  service: z.string(),
+  metric: z.string(),
+  status: z.string(),
+  current: z.number(),
+  threshold: z.number(),
+  probability: z.number().optional(),
+  minutesToBreach: z.number().nullish(),
+  likelyCause: z.string(),
+  recommendedAction: z.string(),
+});
+export type HostEarlyWarningEventData = z.infer<
+  typeof HostEarlyWarningEventDataSchema
+>;
+
+/** Emitted per host metric each host-ticker window (and on escalation). */
+export const HostEarlyWarningEventSchema = z.object({
+  event: z.literal('host_early_warning'),
+  data: HostEarlyWarningEventDataSchema,
+});
+export type HostEarlyWarningEvent = z.infer<typeof HostEarlyWarningEventSchema>;
+
+/* ── Escalation ladder + recovery: the "ESCALATE IF IGNORED" stream ────────── */
+
+/**
+ * Emitted once per channel send as an alert climbs the escalation ladder
+ * (Dashboard → Email → CRITICAL). `alertId` ties the frame to its `Alert`;
+ * `step` is the ladder rung (`EARLY_RISK` | `WARNING` | `CRITICAL`), `channel`
+ * the delivery adapter (`dashboard` | `email` | …), `message` the rendered body,
+ * and `acknowledged` reflects whether the alert has been acked (escalation
+ * stops once true). `source` is `host` | `api`; `metric` names the resource
+ * (cpu | mem | db_pool) or endpoint.
+ */
+export const EscalationNoticeEventDataSchema = z.object({
+  alertId: z.string(),
+  source: z.string(),
+  service: z.string(),
+  metric: z.string(),
+  step: z.string(),
+  channel: z.string(),
+  status: z.string(),
+  message: z.string(),
+  acknowledged: z.boolean(),
+  at: z.number(),
+});
+export type EscalationNoticeEventData = z.infer<
+  typeof EscalationNoticeEventDataSchema
+>;
+
+export const EscalationNoticeEventSchema = z.object({
+  event: z.literal('escalation_notice'),
+  data: EscalationNoticeEventDataSchema,
+});
+export type EscalationNoticeEvent = z.infer<typeof EscalationNoticeEventSchema>;
+
+/** Emitted when an alert returns to normal — the RECOVERY all-clear. */
+export const RecoveryNoticeEventDataSchema = z.object({
+  alertId: z.string(),
+  source: z.string(),
+  service: z.string(),
+  metric: z.string(),
+  message: z.string(),
+  at: z.number(),
+});
+export type RecoveryNoticeEventData = z.infer<
+  typeof RecoveryNoticeEventDataSchema
+>;
+
+export const RecoveryNoticeEventSchema = z.object({
+  event: z.literal('recovery_notice'),
+  data: RecoveryNoticeEventDataSchema,
+});
+export type RecoveryNoticeEvent = z.infer<typeof RecoveryNoticeEventSchema>;
+
 export const PerformanceStreamEventSchema = z.discriminatedUnion('event', [
   PerformanceTickEventSchema,
   EarlyWarningAlertEventSchema,
   RiskEscalationEventSchema,
+  HostEarlyWarningEventSchema,
+  EscalationNoticeEventSchema,
+  RecoveryNoticeEventSchema,
   HeartbeatEventSchema,
 ]);
 export type PerformanceStreamEvent = z.infer<typeof PerformanceStreamEventSchema>;
@@ -150,5 +237,8 @@ export const SSE_EVENT_NAMES = [
   'performance_tick',
   'early_warning_alert',
   'risk_escalation',
+  'host_early_warning',
+  'escalation_notice',
+  'recovery_notice',
 ] as const;
 export type SseEventName = (typeof SSE_EVENT_NAMES)[number];

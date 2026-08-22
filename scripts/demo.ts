@@ -35,8 +35,23 @@
  *   and pass a matching `--window 30` so the harness paces its waits to the ticker.
  *     npm run demo -- --scenario predictive_trend --window 30 --ramp 180
  *
+ * PROACTIVE-PREVENTION scenario (the full HOST story — Monitor → Predict → Alert
+ *   → ESCALATE IF IGNORED → Recover): ramps a HOST resource (DB-pool by default,
+ *   or CPU) on `payments-api` via `POST /__control/degrade` so the platform's AI
+ *   EARLY WARNING card shows the bar climbing toward its threshold with a rising
+ *   breach prediction, then narrates the escalation ladder read LIVE from
+ *   `GET /api/v1/host-early-warning` + `GET /api/v1/alerts`:
+ *     EARLY_RISK → Dashboard · WARNING → Email · (nobody ACKs, grace passes) →
+ *     CRITICAL → critical Email · then ACK + clear the degrade → RECOVERY.
+ *   Email is the only live channel; SMS/WhatsApp are disabled stubs and are NOT
+ *   claimed as sent. Same short-window advice as predictive_trend applies — start
+ *   the server with a short HOST_WINDOW_SEC (default 30) for a watchable run:
+ *     npm run demo -- --scenario proactive_prevention --window 30
+ *     npm run demo -- --scenario proactive_prevention --metric cpu --ramp 0 \
+ *       --min 90 --max 97          # fast: jump straight over the threshold
+ *
  * Flags:
- *   --scenario <bad_deploy|slow_db|config_error|predictive_trend>  (default bad_deploy)
+ *   --scenario <bad_deploy|slow_db|config_error|predictive_trend|proactive_prevention>  (default bad_deploy)
  *   --rate <req/min>                              (default 80; background mix)
  *   --platform <url>   (default $PUBLIC_BASE_URL or http://localhost:3001)
  *   --victim <url>     (default $VICTIM_CONTROL_URL or http://localhost:4000)
@@ -48,6 +63,18 @@
  *   --charge-rate <req/min> direct payments-charge load (default 240)
  *   --window <seconds>      rollup-window hint used to pace waits (default 30;
  *                           set to the server's PERF_WINDOW_SEC)
+ *   proactive_prevention only:
+ *   --metric <dbpool|cpu>   host resource to ramp (default dbpool — its guidance
+ *                           reads "increase pool 100→150"; cpu shows the CPU bar
+ *                           climbing and escalates identically)
+ *   --service <name>        host service to degrade (default payments-api)
+ *   --ramp <seconds>        ramp duration for the host metric (default 90; 0 =
+ *                           jump straight to the ceiling)
+ *   --min <pct> --max <pct> ramp floor/ceiling % (default 40 → 96)
+ *   --window <seconds>      HOST_WINDOW_SEC hint used to pace waits (default 30)
+ *   --critical-wait <sec>   how long to wait for CRITICAL after WARNING (default
+ *                           150; must exceed the server's ACK_GRACE_SEC)
+ *   --recover-mode <ack|clear|both>  how to recover (default both)
  */
 
 type Mode = 'healthy' | 'bad_deploy' | 'slow_db' | 'config_error';
@@ -553,6 +580,333 @@ async function runPredictiveTrend(): Promise<void> {
   console.log(`\n${c.green(c.bold('Predictive-trend demo complete.'))}\n`);
 }
 
+/* ── proactive_prevention: host early-warning + escalation ladder ──────────── */
+
+/** One row of the AI EARLY WARNING card (`GET /api/v1/host-early-warning`). */
+interface HostMetricDTO {
+  service: string;
+  metric: 'cpu' | 'mem' | 'db_pool';
+  current: number;
+  bars: number;
+  status: string;
+  probability: number;
+  minutesToBreach: number | null;
+  threshold: number;
+  likelyCause: string;
+  recommendedAction: string;
+  series: number[];
+}
+/** One fired rung in an alert's escalation timeline. */
+interface EscalationStepDTO {
+  id: string;
+  step: 'EARLY_RISK' | 'WARNING' | 'CRITICAL' | 'RECOVERY';
+  channel: 'dashboard' | 'email' | 'sms' | 'whatsapp';
+  status: string;
+  message: string;
+  at: number;
+}
+/** One durable alert + its escalation timeline (`GET /api/v1/alerts`). */
+interface AlertDTO {
+  id: string;
+  source: string;
+  service: string;
+  metric: string;
+  title: string;
+  status: string;
+  step: 'EARLY_RISK' | 'WARNING' | 'CRITICAL' | null;
+  current: number | null;
+  threshold: number | null;
+  probability: number | null;
+  minutesToBreach: number | null;
+  likelyCause: string | null;
+  recommendedAction: string | null;
+  acknowledged: boolean;
+  acknowledgedBy: string | null;
+  firstDetectedAt: number;
+  resolvedAt: number | null;
+  active: boolean;
+  timeline: EscalationStepDTO[];
+}
+
+async function getHostMetrics(): Promise<HostMetricDTO[]> {
+  const r = await getJson<{ metrics: HostMetricDTO[] }>(`${API}/host-early-warning`);
+  return r.metrics ?? [];
+}
+async function getAlerts(): Promise<AlertDTO[]> {
+  const r = await getJson<{ alerts: AlertDTO[] }>(`${API}/alerts`);
+  return r.alerts ?? [];
+}
+async function ackAlert(id: string, by: string): Promise<AlertDTO> {
+  const r = await getJson<{ alert: AlertDTO }>(`${API}/alerts/${id}/ack`, {
+    method: 'POST',
+    body: JSON.stringify({ by }),
+  });
+  return r.alert;
+}
+
+function metricOf(
+  metrics: HostMetricDTO[],
+  service: string,
+  metric: string,
+): HostMetricDTO | undefined {
+  return metrics.find((m) => m.service === service && m.metric === metric);
+}
+/** Prefer the active alert; fall back to the most-recent matching row. */
+function findAlert(
+  alerts: AlertDTO[],
+  service: string,
+  metric: string,
+): AlertDTO | undefined {
+  const matches = alerts.filter(
+    (a) => a.source === 'host' && a.service === service && a.metric === metric,
+  );
+  return matches.find((a) => a.active) ?? matches[0];
+}
+/**
+ * Whether an alert's timeline carries a rung fired in the CURRENT episode.
+ * The `alert_notifications` timeline is CUMULATIVE across reopens, so an alert
+ * that already lived a full lifecycle keeps its old CRITICAL / RECOVERY rows.
+ * `since` (captured before this run started its ramp) gates to this episode only,
+ * so a re-run never matches a previous episode's stale rung.
+ */
+function hasStep(
+  alert: AlertDTO | undefined,
+  step: string,
+  channel: string | undefined,
+  since: number,
+): boolean {
+  if (!alert) return false;
+  return alert.timeline.some(
+    (t) => t.at >= since && t.step === step && (channel ? t.channel === channel : true),
+  );
+}
+function stepMessage(
+  alert: AlertDTO | undefined,
+  step: string,
+  channel: string | undefined,
+  since: number,
+): string | undefined {
+  return alert?.timeline.find(
+    (t) => t.at >= since && t.step === step && (channel ? t.channel === channel : true),
+  )?.message;
+}
+function statusColored(status: string): string {
+  const r = RANK[status] ?? 0;
+  if (r >= 2) return c.red(status);
+  if (r === 1) return c.yellow(status);
+  return c.green(status);
+}
+function bar(pct: number, width = 14): string {
+  const filled = Math.round((Math.min(100, Math.max(0, pct)) / 100) * width);
+  return '█'.repeat(filled) + c.dim('░'.repeat(width - filled));
+}
+/** Render the CPU / MEM / DB-pool bars + the focus metric's prediction line. */
+function showCard(
+  prefix: string,
+  metrics: HostMetricDTO[],
+  service: string,
+  focus: string,
+): void {
+  const cell = (label: string, m?: HostMetricDTO): string =>
+    m
+      ? `${label} ${bar(m.bars)} ${String(Math.round(m.current)).padStart(3)}%  ${statusColored(m.status)}`
+      : `${label} ${c.dim('— (no samples yet)')}`;
+  info(prefix);
+  info(`  ${cell('CPU    ', metricOf(metrics, service, 'cpu'))}`);
+  info(`  ${cell('MEM    ', metricOf(metrics, service, 'mem'))}`);
+  info(`  ${cell('DB-pool', metricOf(metrics, service, 'db_pool'))}`);
+  const f = metricOf(metrics, service, focus);
+  if (f) {
+    const mtb = f.minutesToBreach != null ? ` · ~${f.minutesToBreach}min to breach` : '';
+    info(
+      `  ${c.dim('prediction')} ${c.yellow(focus)} → ${statusColored(f.status)}${mtb} · breach prob ${Math.round(f.probability * 100)}%`,
+    );
+  }
+}
+
+async function runProactivePrevention(): Promise<void> {
+  const metricArg = (arg('metric', 'dbpool') as string).toLowerCase();
+  const kind: 'cpu' | 'dbpool' = metricArg === 'cpu' ? 'cpu' : 'dbpool';
+  const hostMetric: 'cpu' | 'db_pool' = kind === 'cpu' ? 'cpu' : 'db_pool';
+  const service = arg('service', 'payments-api') as string;
+  const rampSec = Math.max(0, Number(arg('ramp', '90')));
+  const minPct = Number(arg('min', '40'));
+  const maxPct = Number(arg('max', '96'));
+  const windowSec = Math.max(1, Number(arg('window', '30')));
+  const criticalWaitSec = Math.max(1, Number(arg('critical-wait', '150')));
+  const recoverMode = (arg('recover-mode', 'both') as string).toLowerCase();
+  const thresholdHint = hostMetric === 'cpu' ? 85 : 90;
+  const W = windowSec * 1000;
+
+  console.log(
+    c.bold('\nOnCall AI — proactive prevention  (Monitor → Predict → Alert → ESCALATE IF IGNORED → Recover)'),
+  );
+  info(`${c.dim('platform')} ${PLATFORM}  ${c.dim('victim')} ${VICTIM}`);
+  info(
+    `${c.dim('target')} ${service}  ${c.dim('metric')} ${hostMetric}  ` +
+      `${c.dim('ramp')} ${minPct}→${maxPct}% over ${rampSec}s  ${c.dim('window-hint')} ${windowSec}s`,
+  );
+
+  // 1 — Preflight.
+  step(1, 'Preflight — platform, victim, host early-warning + alerts routes');
+  await preflight();
+  try {
+    await getHostMetrics();
+    ok('host early-warning route present (GET /api/v1/host-early-warning)');
+  } catch (e) {
+    fail(`host early-warning route not responding: ${(e as Error).message}`);
+  }
+  try {
+    await getAlerts();
+    ok('alerts route present (GET /api/v1/alerts + POST /alerts/:id/ack)');
+  } catch (e) {
+    fail(`alerts route not responding: ${(e as Error).message}`);
+  }
+
+  // 2 — Healthy baseline.
+  step(2, 'Healthy baseline — clear any degradation, read the AI EARLY WARNING card');
+  await flipMode('healthy').catch(() => {});
+  await clearDegrade().catch(() => {});
+  await sleep(Math.min(3000, W));
+  const baseM = await getHostMetrics();
+  ok('victim healthy · degradation cleared (cpu + dbpool reset)');
+  showCard('baseline card:', baseM, service, hostMetric);
+  const baseCpu = metricOf(baseM, service, 'cpu');
+  if (baseCpu) info(`CPU baseline ≈ ${Math.round(baseCpu.current)}% — nothing paging`);
+
+  // 3 — Start the host ramp. Capture the episode boundary FIRST: the escalation
+  // timeline is cumulative across reopens, so we only count rungs fired at/after
+  // this instant as belonging to this run.
+  step(3, `Trigger a gradual ${hostMetric.toUpperCase()} ramp on ${service} — PREDICT before the breach`);
+  const sinceMs = Date.now();
+  await startDegrade({
+    service,
+    endpoint: '',
+    kind,
+    rampSeconds: rampSec,
+    minHostPct: minPct,
+    maxHostPct: maxPct,
+  });
+  ok(
+    `POST ${VICTIM}/__control/degrade → ${hostMetric} climbs ${minPct}% → ${maxPct}% ` +
+      `over ${rampSec}s toward its ${thresholdHint}% threshold`,
+  );
+  info(`contract: ${JSON.stringify({ service, kind, rampSeconds: rampSec, minHostPct: minPct, maxHostPct: maxPct })}`);
+
+  // 4 — EARLY_RISK → Dashboard alert.
+  step(4, 'EARLY_RISK → Dashboard alert (the rising trend is caught early)');
+  const early = await pollUntil(
+    'EARLY_RISK dashboard alert',
+    async () => ({ metrics: await getHostMetrics(), alerts: await getAlerts() }),
+    ({ alerts }) =>
+      hasStep(findAlert(alerts, service, hostMetric), 'EARLY_RISK', 'dashboard', sinceMs),
+    Math.max(180_000, 8 * W),
+    2500,
+  );
+  process.stdout.write('\n');
+  if (early) {
+    showCard('now:', early.metrics, service, hostMetric);
+    if (hasStep(findAlert(early.alerts, service, hostMetric), 'EARLY_RISK', 'dashboard', sinceMs)) {
+      ok('Dashboard alert raised (EARLY_RISK) on the AI EARLY WARNING card');
+    } else {
+      warn('metric elevated — dashboard alert still forming this window…');
+    }
+  } else {
+    warn('EARLY_RISK not observed — long ticker window? try a shorter --ramp or match --window to the server');
+  }
+
+  // 5 — WARNING → Email sent.
+  step(5, 'WARNING → Email sent (risk sustained across windows)');
+  const warned = await pollUntil(
+    'WARNING email',
+    getAlerts,
+    (alerts) => hasStep(findAlert(alerts, service, hostMetric), 'WARNING', 'email', sinceMs),
+    Math.max(180_000, 8 * W),
+    2500,
+  );
+  process.stdout.write('\n');
+  const warnAlert = warned ? findAlert(warned, service, hostMetric) : undefined;
+  if (hasStep(warnAlert, 'WARNING', 'email', sinceMs)) {
+    ok(`Email sent — "${stepMessage(warnAlert, 'WARNING', 'email', sinceMs) ?? 'warning email'}"`);
+  } else {
+    warn('WARNING email not observed within the window.');
+  }
+
+  // 6 — NOBODY ACKS → CRITICAL.
+  step(6, 'NOBODY ACKNOWLEDGES → grace window passes → CRITICAL');
+  info('the harness deliberately does NOT acknowledge — this is the "escalate if ignored" path');
+  const crit = await pollUntil(
+    'CRITICAL escalation',
+    getAlerts,
+    (alerts) => hasStep(findAlert(alerts, service, hostMetric), 'CRITICAL', 'email', sinceMs),
+    Math.max(criticalWaitSec * 1000, 4 * W),
+    3000,
+  );
+  process.stdout.write('\n');
+  const critAlert = crit ? findAlert(crit, service, hostMetric) : warnAlert;
+  if (hasStep(critAlert, 'CRITICAL', 'email', sinceMs)) {
+    ok(`Critical email sent — "${stepMessage(critAlert, 'CRITICAL', 'email', sinceMs) ?? 'critical email'}"`);
+    info(c.dim('SMS / WhatsApp paging are wired as disabled stubs — NOT claimed as sent (coming later).'));
+  } else {
+    warn('CRITICAL not observed yet — it fires ~ACK_GRACE_SEC after WARNING while still unacknowledged.');
+  }
+
+  // 7 — The prediction the card carries.
+  step(7, 'The prediction the AI EARLY WARNING card carries');
+  const finalAlerts = crit ?? warned ?? early?.alerts ?? (await getAlerts());
+  const fa = findAlert(finalAlerts, service, hostMetric);
+  const fm = metricOf(await getHostMetrics(), service, hostMetric);
+  if (fa || fm) {
+    const thr = fa?.threshold ?? fm?.threshold ?? thresholdHint;
+    info(`prediction  : ${service} ${hostMetric} may breach its ${thr}% threshold`);
+    if (fm?.minutesToBreach != null) {
+      info(`ETA / prob  : ~${fm.minutesToBreach}min to breach · ${Math.round((fm.probability ?? 0) * 100)}% probability`);
+    } else {
+      info(`probability : ${Math.round(((fa?.probability ?? fm?.probability) ?? 0) * 100)}%`);
+    }
+    info(`likely cause: ${fa?.likelyCause ?? fm?.likelyCause ?? '—'}`);
+    info(`recommended : ${c.bold(fa?.recommendedAction ?? fm?.recommendedAction ?? '—')}`);
+  }
+
+  // 8 — Recovery.
+  if (!RECOVER) {
+    warn('--no-recover: leaving the ramp active + alert open. Ctrl-C when done.');
+    return;
+  }
+  step(8, 'Recovery — acknowledge + clear the degradation → RECOVERY notice');
+  if ((recoverMode === 'ack' || recoverMode === 'both') && fa) {
+    const acked = await ackAlert(fa.id, 'demo-oncall');
+    ok(`POST /api/v1/alerts/${fa.id}/ack → acknowledged by ${acked.acknowledgedBy ?? 'demo-oncall'} · escalation stops`);
+  }
+  if (recoverMode !== 'ack') {
+    await clearDegrade();
+    ok(`POST ${VICTIM}/__control/degrade/clear → ${hostMetric} returns toward baseline`);
+  }
+  const recovered = await pollUntil(
+    'RECOVERY / resolved',
+    async () => ({ metrics: await getHostMetrics(), alerts: await getAlerts() }),
+    ({ alerts }) => {
+      const a = findAlert(alerts, service, hostMetric);
+      return (
+        (a?.resolvedAt != null && a.resolvedAt >= sinceMs) ||
+        hasStep(a, 'RECOVERY', undefined, sinceMs)
+      );
+    },
+    Math.max(300_000, 12 * W),
+    3000,
+  );
+  process.stdout.write('\n');
+  const ra = recovered ? findAlert(recovered.alerts, service, hostMetric) : undefined;
+  if (ra && ((ra.resolvedAt != null && ra.resolvedAt >= sinceMs) || hasStep(ra, 'RECOVERY', undefined, sinceMs))) {
+    showCard('recovered card:', recovered!.metrics, service, hostMetric);
+    ok(`RECOVERY notice — "${stepMessage(ra, 'RECOVERY', undefined, sinceMs) ?? `${service} ${hostMetric} recovered`}" · resolved`);
+  } else {
+    warn('recovery not confirmed within the window — the flap machine cools one rung per couple of windows; re-poll GET /api/v1/alerts.');
+  }
+
+  console.log(`\n${c.green(c.bold('Proactive-prevention demo complete.'))}\n`);
+}
+
 /* ── main ─────────────────────────────────────────────────────────────────── */
 
 async function main(): Promise<void> {
@@ -560,8 +914,12 @@ async function main(): Promise<void> {
     await runPredictiveTrend();
     return;
   }
+  if (SCENARIO === 'proactive_prevention') {
+    await runProactivePrevention();
+    return;
+  }
   if (SCENARIO === 'healthy' || !(SCENARIO in SCENARIO_TARGET)) {
-    fail(`--scenario must be one of: bad_deploy, slow_db, config_error, predictive_trend`);
+    fail(`--scenario must be one of: bad_deploy, slow_db, config_error, predictive_trend, proactive_prevention`);
   }
   console.log(c.bold('\nOnCall AI — demo rehearsal'));
   info(`${c.dim('platform')} ${PLATFORM}  ${c.dim('victim')} ${VICTIM}`);

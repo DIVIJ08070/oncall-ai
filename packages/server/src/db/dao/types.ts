@@ -21,11 +21,14 @@ import type {
   VerificationStatus,
 } from '@oncall/shared';
 import type {
+  AlertNotificationRow,
+  AlertRow,
   ApiPerformanceSampleRow,
   ApiRequestSampleRow,
   ChatMessageRow,
   ChatRole,
   CustomerRow,
+  HostMetricSampleRow,
   LearningSource,
   LogEventRow,
   NotificationChannel,
@@ -620,6 +623,135 @@ export interface ApiRequestSamplesDao {
   ): Promise<number>;
 }
 
+/* ── host_metric_samples (AI Incident PREVENTION — HOST early warning) ───── */
+
+/** Insert payload for one raw host reading (id is BIGSERIAL, DB-assigned). */
+export interface CreateHostMetricSampleInput {
+  host: string;
+  service: string;
+  timestamp: number;
+  cpu_pct?: number | null;
+  mem_pct?: number | null;
+  db_pool_pct?: number | null;
+  event_loop_lag_ms?: number | null;
+}
+
+/** Physical `host_metric_samples` column backing a `HostMetricName`. */
+export type HostMetricColumn = 'cpu_pct' | 'mem_pct' | 'db_pool_pct';
+
+/** One point of a metric's sparkline series: its timestamp + value. */
+export interface HostMetricPoint {
+  timestamp: number;
+  value: number;
+}
+
+export interface HostMetricSamplesDao {
+  /** Batch insert raw host readings; returns the number of rows written. */
+  insertMany(rows: CreateHostMetricSampleInput[]): Promise<number>;
+  /** Distinct `service` names with a sample in `[fromTs, toTs]`. */
+  listServicesInWindow(fromTs: number, toTs: number): Promise<string[]>;
+  /**
+   * Newest-first non-null readings of one metric column for one service (capped
+   * by `limit`) — the sparkline + trend source. Rows whose column is NULL are
+   * skipped so a metric no host reports simply yields an empty series.
+   */
+  recentSeries(
+    service: string,
+    metric: HostMetricColumn,
+    limit?: number,
+  ): Promise<HostMetricPoint[]>;
+  /** The most-recent full sample row for a service (highest `timestamp`). */
+  latestForService(service: string): Promise<HostMetricSampleRow | null>;
+}
+
+/* ── alerts + alert_notifications (ESCALATE IF IGNORED ladder) ───────────── */
+
+/** Insert payload for a new alert (id defaults to a fresh prefixed ULID). */
+export interface CreateAlertInput {
+  source: string;
+  service: string;
+  metric: string;
+  risk_service: string;
+  risk_endpoint: string;
+  title: string;
+  status: string;
+  step?: string | null;
+  current_value?: number | null;
+  threshold?: number | null;
+  probability?: number | null;
+  minutes_to_breach?: number | null;
+  likely_cause?: string | null;
+  recommended_action?: string | null;
+  acknowledged?: boolean;
+  acknowledged_at?: number | null;
+  acknowledged_by?: string | null;
+  first_detected_at: number;
+  last_escalated_at?: number | null;
+  warning_at?: number | null;
+  resolved_at?: number | null;
+  created_at?: number;
+  updated_at?: number;
+  id?: string;
+}
+
+/** Fields the escalation engine + ack route patch onto an alert. */
+export interface AlertPatch {
+  status?: string;
+  step?: string | null;
+  current_value?: number | null;
+  threshold?: number | null;
+  probability?: number | null;
+  minutes_to_breach?: number | null;
+  likely_cause?: string | null;
+  recommended_action?: string | null;
+  acknowledged?: boolean;
+  acknowledged_at?: number | null;
+  acknowledged_by?: string | null;
+  first_detected_at?: number;
+  last_escalated_at?: number | null;
+  warning_at?: number | null;
+  resolved_at?: number | null;
+  updated_at?: number;
+}
+
+export interface AlertsDao {
+  getById(id: string): Promise<AlertRow | null>;
+  /** The alert tracking one risk_states unit, or null if none. */
+  getByRiskKey(
+    riskService: string,
+    riskEndpoint: string,
+  ): Promise<AlertRow | null>;
+  create(input: CreateAlertInput): Promise<AlertRow>;
+  /** Patch lifecycle fields; always bumps `updated_at`. */
+  update(id: string, patch: AlertPatch): Promise<AlertRow | null>;
+  /**
+   * Alerts that are still active (unresolved) OR resolved at/after
+   * `resolvedSinceMs` (so the dashboard can render a brief RECOVERY notice),
+   * most-recently-updated first.
+   */
+  listActive(resolvedSinceMs?: number): Promise<AlertRow[]>;
+}
+
+/** Insert payload for one escalation-timeline row. */
+export interface CreateAlertNotificationInput {
+  alert_id: string;
+  step: string;
+  channel: string;
+  status: string;
+  message: string;
+  payload?: unknown;
+  created_at?: number;
+  id?: string;
+}
+
+export interface AlertNotificationsDao {
+  insert(input: CreateAlertNotificationInput): Promise<AlertNotificationRow>;
+  /** One alert's timeline, oldest → newest. */
+  listByAlert(alertId: string): Promise<AlertNotificationRow[]>;
+  /** Timelines for many alerts in one query, oldest → newest across all. */
+  listByAlerts(alertIds: readonly string[]): Promise<AlertNotificationRow[]>;
+}
+
 /* ── the full DAO set ───────────────────────────────────────────────────── */
 
 /** All typed DAOs, one per table (SPEC §8 + self-learning + prevention). */
@@ -640,4 +772,7 @@ export interface Daos {
   apiPerformance: ApiPerformanceDao;
   riskStates: RiskStatesDao;
   apiRequestSamples: ApiRequestSamplesDao;
+  hostMetricSamples: HostMetricSamplesDao;
+  alerts: AlertsDao;
+  alertNotifications: AlertNotificationsDao;
 }

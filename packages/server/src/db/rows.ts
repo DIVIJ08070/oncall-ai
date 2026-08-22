@@ -157,6 +157,79 @@ export interface RiskStateRow {
   updated_at: number;
 }
 
+/* ── host_metric_samples (AI Incident PREVENTION — HOST early warning) ───── */
+/**
+ * One raw host/process resource reading. `id` is a BIGSERIAL surrogate (int8 →
+ * JS number via the pool parser). `host` names the machine/process, `service`
+ * the logical service it belongs to. The four metric columns are nullable — not
+ * every host reports every metric (e.g. only a pool-owning process fills
+ * `db_pool_pct`; only the victim reports `event_loop_lag_ms`).
+ */
+export interface HostMetricSampleRow {
+  id: number;
+  host: string;
+  service: string;
+  timestamp: number;
+  cpu_pct: number | null;
+  mem_pct: number | null;
+  db_pool_pct: number | null;
+  event_loop_lag_ms: number | null;
+}
+
+/* ── alerts (AI Incident PREVENTION — ESCALATE IF IGNORED ladder) ────────── */
+/**
+ * One durable early-warning alert per risky (service, metric/endpoint). Keyed by
+ * the `risk_states` surrogate key (`risk_service`/`risk_endpoint`). `step` is the
+ * highest ladder rung reached (`EARLY_RISK` | `WARNING` | `CRITICAL`, null before
+ * the first escalation); `acknowledged` is a 0/1 flag (stops escalation);
+ * `warning_at` records when the WARNING/email rung fired (the CRITICAL grace-timer
+ * origin); `resolved_at` is set once the RECOVERY fires. `id` is a prefixed ULID.
+ */
+export interface AlertRow {
+  id: string;
+  source: string;
+  service: string;
+  metric: string;
+  risk_service: string;
+  risk_endpoint: string;
+  title: string;
+  status: string;
+  step: string | null;
+  current_value: number | null;
+  threshold: number | null;
+  probability: number | null;
+  minutes_to_breach: number | null;
+  likely_cause: string | null;
+  recommended_action: string | null;
+  /** 0/1 acknowledgement flag (SQLite-parity integer boolean). */
+  acknowledged: number;
+  acknowledged_at: number | null;
+  acknowledged_by: string | null;
+  first_detected_at: number;
+  last_escalated_at: number | null;
+  warning_at: number | null;
+  resolved_at: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
+/* ── alert_notifications (per-alert escalation timeline) ──────────────────── */
+/**
+ * One channel send in an alert's escalation timeline. `step` is the ladder rung
+ * (`EARLY_RISK` | `WARNING` | `CRITICAL` | `RECOVERY`); `channel` the delivery
+ * adapter; `payload` persists as JSON TEXT and is parsed back on read.
+ */
+export interface AlertNotificationRow {
+  id: string;
+  alert_id: string;
+  step: string;
+  channel: string;
+  status: string;
+  message: string;
+  payload: unknown;
+  created_at: number;
+}
+
 /* ── codecs (JSON columns + SQLite 0/1 booleans) ────────────────────────── */
 
 /** Serialize a value for a JSON TEXT column (`null`/`undefined` → SQL NULL). */

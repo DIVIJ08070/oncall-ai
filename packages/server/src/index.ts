@@ -11,6 +11,10 @@ import {
   type PerformanceTicker,
 } from './detection/performance-ticker.js';
 import {
+  createHostTicker,
+  type HostTicker,
+} from './detection/host-ticker.js';
+import {
   createRetentionPruner,
   type RetentionPruner,
 } from './detection/retention-pruner.js';
@@ -18,6 +22,10 @@ import {
   createInvestigationService,
   type InvestigationService,
 } from './investigation/service.js';
+import {
+  createEscalationEngine,
+  type EscalationEngine,
+} from './services/escalation/policy.js';
 import { createSlackNotifier } from './notify/index.js';
 import { startCodeReviewWatcher } from './services/code-review/watcher.js';
 
@@ -100,11 +108,41 @@ export function startPerformanceTicker(
   db: OncallDb,
   config: Config,
   broker: Broker,
+  escalation?: EscalationEngine,
 ): PerformanceTicker {
   const ticker = createPerformanceTicker({
     db,
     config,
     broker,
+    escalation,
+    logger: (msg, meta) =>
+      // eslint-disable-next-line no-console
+      meta ? console.log(msg, meta) : console.log(msg),
+  });
+  ticker.start();
+  return ticker;
+}
+
+/**
+ * Start the host-metric ticker (AI Incident PREVENTION — HOST layer) — the
+ * `HOST_WINDOW_SEC` loop that self-samples the platform's own process + pg pool,
+ * reads recent `host_metric_samples` per (service, metric in [cpu, mem, db_pool]),
+ * predicts a resource breach via the shared trend engine, advances the
+ * `risk_states` ladder (keyed `host:<service>`), and streams `host_early_warning`
+ * SSE frames with a recommended action. No-op when `HOST_ENABLED=false`. Runs
+ * alongside (and independently of) detection + the performance ticker.
+ */
+export function startHostTicker(
+  db: OncallDb,
+  config: Config,
+  broker: Broker,
+  escalation?: EscalationEngine,
+): HostTicker {
+  const ticker = createHostTicker({
+    db,
+    config,
+    broker,
+    escalation,
     logger: (msg, meta) =>
       // eslint-disable-next-line no-console
       meta ? console.log(msg, meta) : console.log(msg),
@@ -167,8 +205,22 @@ export async function main(): Promise<void> {
 
   const app = await buildApp({ config, db, broker, investigation });
 
+  // ESCALATE IF IGNORED — one escalation engine shared by both tickers. When a
+  // risk_states row climbs (or returns to normal), the engine advances the
+  // channel ladder (Dashboard → Email → CRITICAL) / fires RECOVERY, persisting
+  // the timeline + streaming SSE. Reuses the Slack webhook for email when set.
+  const escalation = createEscalationEngine({
+    db,
+    config,
+    broker,
+    logger: (msg, meta) =>
+      // eslint-disable-next-line no-console
+      meta ? console.log(msg, meta) : console.log(msg),
+  });
+
   const engine = startDetection(db, config, broker, investigation);
-  const ticker = startPerformanceTicker(db, config, broker);
+  const ticker = startPerformanceTicker(db, config, broker, escalation);
+  const hostTicker = startHostTicker(db, config, broker, escalation);
   const pruner = startRetentionPruner(db, config);
   const poller = startMergePoller(db, config, broker);
 
@@ -188,6 +240,7 @@ export async function main(): Promise<void> {
     console.log(`[oncall] ${signal} received — shutting down`);
     engine.stop();
     ticker.stop();
+    hostTicker.stop();
     pruner.stop();
     poller?.stop();
     watcher.stop();

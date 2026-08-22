@@ -42,6 +42,16 @@ export const config = {
   /** Simulated slow-query delay window (ms) for `slow_db` (SPEC §12: 2–4s). */
   slowDbMinMs: numEnv('VICTIM_SLOW_DB_MIN_MS', 2200),
   slowDbMaxMs: numEnv('VICTIM_SLOW_DB_MAX_MS', 3800),
+  /* ── HOST early-warning sampler (CPU / Memory / DB-pool / event-loop lag) ── */
+  /** Logical service name the victim's host/process readings are tagged with.
+   *  Defaults to `payments-api` so a `cpu`/`dbpool` degrade lines up with the
+   *  demo target the AI EARLY WARNING card highlights. */
+  hostService: strEnv('VICTIM_HOST_SERVICE', 'payments-api'),
+  /** How often (ms) the host sampler ships a resource reading. Default 5s. */
+  hostSampleMs: numEnv('VICTIM_HOST_SAMPLE_MS', 5000),
+  /** Simulated memory ceiling (MB) so `mem_pct` reads like a real container
+   *  limit (rss / ceiling) rather than a rounding-to-zero share of host RAM. */
+  memCeilingMb: numEnv('VICTIM_MEM_CEILING_MB', 512),
   /**
    * Optional path to the seed manifest (mode → real bad SHA), written by
    * `scripts/init-victim-repo.ts`. If absent, `deployed_sha` reports `null`.

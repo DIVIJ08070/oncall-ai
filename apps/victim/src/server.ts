@@ -19,6 +19,7 @@ import express, {
 import { config } from './config.js';
 import { oncall } from './telemetry.js';
 import { registerControl } from './control.js';
+import { startHostSampler } from './host.js';
 import { SERVICES, mountService } from './services/index.js';
 import { startSelfTraffic } from './traffic.js';
 
@@ -88,5 +89,14 @@ if (isMain()) {
       // eslint-disable-next-line no-console
       console.log('[victim] self-traffic generator ON (~6–12 req/s across all services)');
     }
+
+    // HOST early-warning sampler — ships the victim process's CPU/memory/lag
+    // (and a ramped cpu/db-pool under a controlled degrade) every few seconds so
+    // the platform's AI EARLY WARNING card has a live host-metric signal.
+    startHostSampler();
+    // eslint-disable-next-line no-console
+    console.log(
+      `[victim] host sampler ON → shipping host_metrics as "${config.hostService}" every ${config.hostSampleMs}ms`,
+    );
   });
 }

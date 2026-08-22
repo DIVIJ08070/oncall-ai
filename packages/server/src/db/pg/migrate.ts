@@ -1,6 +1,6 @@
 import type pg from 'pg';
 /** Bumped with every DDL change (was shared with the sqlite driver). */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 5;
 import { withTransaction } from './pool.js';
 
 /**
@@ -324,6 +324,83 @@ CREATE TABLE IF NOT EXISTS api_request_samples (
 );
 CREATE INDEX IF NOT EXISTS idx_api_request_samples_svc_ep_ts
   ON api_request_samples(service_name, endpoint, timestamp);
+
+-- ── host_metric_samples (AI Incident PREVENTION — HOST early warning) ───────
+-- One point-in-time host/process resource reading: CPU%, memory%, DB-pool
+-- utilization %, and event-loop lag (ms). Populated two ways: the victim ships
+-- its real process CPU/mem (+ a ramped cpu/db-pool under a controlled degrade)
+-- to POST /api/v1/ingest, and the platform self-samples its own pg pool each
+-- host tick. The host-ticker rolls the trailing window per (service, metric)
+-- into a trend prediction. cpu/mem/db_pool/lag are all nullable (not every host
+-- reports every metric); the (service, timestamp DESC) index serves both the
+-- per-service window read and the latest-sample lookup.
+CREATE TABLE IF NOT EXISTS host_metric_samples (
+  id                 BIGSERIAL PRIMARY KEY,
+  host               TEXT NOT NULL,
+  service            TEXT NOT NULL,
+  timestamp          BIGINT NOT NULL,
+  cpu_pct            DOUBLE PRECISION,
+  mem_pct            DOUBLE PRECISION,
+  db_pool_pct        DOUBLE PRECISION,
+  event_loop_lag_ms  DOUBLE PRECISION
+);
+CREATE INDEX IF NOT EXISTS idx_host_metric_samples_svc_ts
+  ON host_metric_samples(service, timestamp DESC);
+
+-- ── alerts (AI Incident PREVENTION — ESCALATE IF IGNORED ladder) ────────────
+-- One durable early-warning alert per risky (service, metric/endpoint), keyed
+-- by the risk_states surrogate key (risk_service = "host:<svc>" | real service;
+-- risk_endpoint = cpu|mem|db_pool | the endpoint path). Carries the live
+-- prediction snapshot, the highest ladder rung reached (step), the grace-timer
+-- origin (warning_at), the acknowledgement state that stops escalation, and
+-- the recovery timestamp. One row per unit via ON CONFLICT (risk_service,
+-- risk_endpoint); a resolved row is reopened in place for a new episode.
+CREATE TABLE IF NOT EXISTS alerts (
+  id                  TEXT PRIMARY KEY,
+  source              TEXT NOT NULL,
+  service             TEXT NOT NULL,
+  metric              TEXT NOT NULL,
+  risk_service        TEXT NOT NULL,
+  risk_endpoint       TEXT NOT NULL,
+  title               TEXT NOT NULL,
+  status              TEXT NOT NULL,
+  step                TEXT,
+  current_value       DOUBLE PRECISION,
+  threshold           DOUBLE PRECISION,
+  probability         DOUBLE PRECISION,
+  minutes_to_breach   DOUBLE PRECISION,
+  likely_cause        TEXT,
+  recommended_action  TEXT,
+  acknowledged        BIGINT NOT NULL DEFAULT 0,
+  acknowledged_at     BIGINT,
+  acknowledged_by     TEXT,
+  first_detected_at   BIGINT NOT NULL,
+  last_escalated_at   BIGINT,
+  warning_at          BIGINT,
+  resolved_at         BIGINT,
+  created_at          BIGINT NOT NULL,
+  updated_at          BIGINT NOT NULL,
+  UNIQUE(risk_service, risk_endpoint)
+);
+CREATE INDEX IF NOT EXISTS idx_alerts_active ON alerts(resolved_at, updated_at DESC);
+
+-- ── alert_notifications (the per-alert escalation timeline) ──────────────────
+-- One row per channel send as an alert climbs the ladder (and per RECOVERY
+-- send). Channels are SIMULATED: each row records the channel, the delivery
+-- status, the rendered message body, and the JSON payload. Ordered by
+-- (created_at, id) so same-ms rows return in insertion order.
+CREATE TABLE IF NOT EXISTS alert_notifications (
+  id          TEXT PRIMARY KEY,
+  alert_id    TEXT NOT NULL REFERENCES alerts(id),
+  step        TEXT NOT NULL,
+  channel     TEXT NOT NULL,
+  status      TEXT NOT NULL,
+  message     TEXT NOT NULL,
+  payload     TEXT NOT NULL,
+  created_at  BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_alert_notifications_alert
+  ON alert_notifications(alert_id, created_at, id);
 
 -- ── schema_version (sqlite PRAGMA user_version equivalent) ──────────────────
 CREATE TABLE IF NOT EXISTS schema_version (
