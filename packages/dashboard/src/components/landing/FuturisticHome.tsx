@@ -380,9 +380,9 @@ const STATS: {
     iconColor: '#FF8233',
   },
   {
-    label: 'MTTR',
+    label: 'Time to Fix',
     target: 18,
-    format: (n) => `${Math.round(n)}m`,
+    format: (n) => (n < 1 ? `${Math.round(n * 60)}s` : `${n.toFixed(1)}m`),
     delta: '8% faster',
     deltaTone: 'good',
     icon: Clock,
@@ -517,15 +517,19 @@ function useRealStats(): RealStats {
     getIncidents({ limit: 100 }, ctrl.signal)
       .then(({ incidents }) => {
         const today = incidents.filter((i) => i.opened_at >= dayStart).length;
-        // MTTR over RECENT incidents only (last 7 days) so stale migrated
-        // incidents with multi-day spans don't skew the average.
+        // "Time to Fix" = how fast the AI acts: incident detected → fix PR
+        // opened. (Full resolution/MTTR would include the human merge wait,
+        // which isn't the AI's speed.) Averaged over recent incidents.
         const weekAgo = Date.now() - 7 * 86_400_000;
-        const resolved = incidents.filter(
-          (i) => i.resolved_at != null && i.opened_at >= weekAgo,
+        const withPr = incidents.filter(
+          (i) => i.pr?.created_at != null && i.opened_at >= weekAgo,
         );
-        const mttr = resolved.length
-          ? resolved.reduce((a, i) => a + ((i.resolved_at ?? 0) - i.opened_at), 0) /
-            resolved.length /
+        const mttr = withPr.length
+          ? withPr.reduce(
+              (a, i) => a + Math.max(0, (i.pr!.created_at - i.opened_at)),
+              0,
+            ) /
+            withPr.length /
             60000
           : null;
         setStats((s) => ({ ...s, incidentsToday: today, mttrMin: mttr }));
@@ -560,7 +564,7 @@ function StatsRow() {
   const real = useRealStats();
   const live: Array<{ target: number | null; delta?: string }> = [
     { target: real.incidentsToday, delta: 'live · today' },
-    { target: real.mttrMin == null ? null : Math.max(1, Math.round(real.mttrMin)), delta: 'avg resolution' },
+    { target: real.mttrMin, delta: 'detect → fix PR' },
     { target: real.alerts, delta: 'events ingested' },
     { target: real.services, delta: real.services === 1 ? 'service connected' : 'services connected' },
     { target: real.accuracy, delta: 'from rated learnings' },

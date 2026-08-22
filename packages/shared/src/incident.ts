@@ -76,6 +76,7 @@ export const IncidentSummarySchema = z.object({
     .object({
       number: z.number().int(),
       state: z.string(), // 'open' | 'merged' | 'closed'
+      created_at: z.number().int(), // when the AI opened the fix PR
     })
     .nullable()
     .optional(),

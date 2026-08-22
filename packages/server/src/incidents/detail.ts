@@ -36,7 +36,9 @@ export function toIncidentSummary(
     opened_at: inc.opened_at,
     resolved_at: inc.resolved_at,
     active: !TERMINAL_STATUSES.includes(inc.status),
-    pr: pr ? { number: pr.github_pr_number, state: pr.state } : null,
+    pr: pr
+      ? { number: pr.github_pr_number, state: pr.state, created_at: pr.created_at }
+      : null,
   };
 }
 
