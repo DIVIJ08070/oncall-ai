@@ -21,6 +21,7 @@ import type {
   VerificationStatus,
 } from '@oncall/shared';
 import type {
+  ApiPerformanceSampleRow,
   ChatMessageRow,
   ChatRole,
   CustomerRow,
@@ -30,6 +31,7 @@ import type {
   NotificationRow,
   NotificationStatus,
   RepoLearningRow,
+  RiskStateRow,
   ServiceRow,
   UserRow,
 } from '../rows.js';
@@ -478,9 +480,84 @@ export interface RepoLearningsDao {
   confirmOrCreate(input: CreateRepoLearningInput): Promise<RepoLearningRow>;
 }
 
+/* ── api_performance_samples (AI Incident PREVENTION Phase 1) ────────────── */
+
+/** Upsert payload for one performance window (id is BIGSERIAL, assigned by DB). */
+export interface UpsertApiPerformanceSampleInput {
+  service_name: string;
+  endpoint: string;
+  method: string;
+  window_start: number;
+  window_end: number;
+  request_count: number;
+  rps: number;
+  p50_latency_ms: number;
+  p95_latency_ms: number;
+  p99_latency_ms: number;
+  error_rate: number;
+  timeout_rate: number;
+  performance_score: number;
+  risk_score: number;
+  prediction?: string | null;
+}
+
+export interface ApiPerformanceDao {
+  /**
+   * Insert one window's performance sample, or overwrite it in place when the
+   * same (service_name, endpoint, window_start) already exists. Returns the
+   * stored row (with its DB-assigned `id`).
+   */
+  upsertWindow(
+    sample: UpsertApiPerformanceSampleInput,
+  ): Promise<ApiPerformanceSampleRow>;
+  /**
+   * The most-recent sample for every (service_name, endpoint) — one row per
+   * endpoint, highest `window_start` wins. Optionally restrict to a set of
+   * service names (a customer's owned services); omit for all services.
+   */
+  latestPerService(
+    customerScope?: readonly string[],
+  ): Promise<ApiPerformanceSampleRow[]>;
+  /** Newest-first window history for a single endpoint (capped by `limit`). */
+  listRecentForEndpoint(
+    service: string,
+    endpoint: string,
+    limit?: number,
+  ): Promise<ApiPerformanceSampleRow[]>;
+}
+
+/* ── risk_states (AI Incident PREVENTION Phase 1) ───────────────────────── */
+
+/** Upsert payload for a per-endpoint risk state (id is BIGSERIAL, DB-assigned). */
+export interface UpsertRiskStateInput {
+  service_name: string;
+  endpoint: string;
+  status: string;
+  first_detected_at?: number | null;
+  last_escalated_at?: number | null;
+  consecutive_risk_windows?: number;
+  consecutive_healthy_windows?: number;
+  current_risk_score?: number | null;
+  prediction_details?: string | null;
+  updated_at?: number;
+}
+
+export interface RiskStatesDao {
+  /** The risk state for one endpoint, or `null` if none tracked yet. */
+  get(service: string, endpoint: string): Promise<RiskStateRow | null>;
+  /**
+   * Insert, or update in place on (service_name, endpoint). Streak/score/status
+   * fields are replaced by the supplied values; `updated_at` defaults to now,
+   * the `consecutive_*` counters default to 0 on first insert.
+   */
+  upsert(state: UpsertRiskStateInput): Promise<RiskStateRow>;
+  /** Every tracked risk state (dashboard overview). */
+  listAll(): Promise<RiskStateRow[]>;
+}
+
 /* ── the full DAO set ───────────────────────────────────────────────────── */
 
-/** All 13 typed DAOs, one per table (SPEC §8 + self-learning). */
+/** All typed DAOs, one per table (SPEC §8 + self-learning + prevention). */
 export interface Daos {
   customers: CustomersDao;
   users: UsersDao;
@@ -495,4 +572,6 @@ export interface Daos {
   chatMessages: ChatMessagesDao;
   notifications: NotificationsDao;
   repoLearnings: RepoLearningsDao;
+  apiPerformance: ApiPerformanceDao;
+  riskStates: RiskStatesDao;
 }

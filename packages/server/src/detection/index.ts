@@ -18,3 +18,4 @@ export * from './lifecycle.js';
 export * from './recovery.js';
 export * from './seams.js';
 export * from './engine.js';
+export * from './performance-ticker.js';

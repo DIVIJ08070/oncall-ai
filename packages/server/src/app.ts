@@ -13,6 +13,7 @@ import { registerServicesRoute } from './routes/services.js';
 import { registerMetricsRoute } from './routes/metrics.js';
 import { registerLogsRoutes } from './routes/logs.js';
 import { registerIncidentRoutes } from './routes/incidents.js';
+import { registerPerformanceRoute } from './routes/performance.js';
 import { registerDemoRoutes } from './routes/demo.js';
 import { registerCodeReviewRoutes } from './routes/code-review.js';
 import { registerLearningsRoutes } from './routes/learnings.js';
@@ -103,6 +104,10 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   registerMetricsRoute(app, ctx);
   registerLogsRoutes(app, ctx);
   registerIncidentRoutes(app, ctx);
+
+  // AI Incident PREVENTION Phase 1 — per-endpoint performance score + breach
+  // prediction (latest window per endpoint, worst score first). Open read route.
+  registerPerformanceRoute(app, ctx);
 
   // C15 — demo control plane (SPEC §7.7): FailureModeSwitch + TrafficGenerator.
   // Drives the victim + records correlated deploy rows for the live demo.

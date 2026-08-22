@@ -94,6 +94,10 @@ const EnvSchema = z.object({
   RECOVERY_WINDOW_MS: numEnv(60000),
   MERGE_POLL_INTERVAL_MS: numEnv(5000),
 
+  // performance ticker (AI Incident PREVENTION Phase 1)
+  PERF_ENABLED: boolEnv(true),
+  PERF_WINDOW_SEC: numEnv(300),
+
   // victim
   VICTIM_PORT: numEnv(4000),
   VICTIM_CONTROL_URL: strEnv('http://localhost:4000'),
@@ -158,6 +162,12 @@ export interface Config {
     silenceWindowMs: number;
     recoveryWindowMs: number;
     mergePollIntervalMs: number;
+  };
+  performance: {
+    /** Master switch for the performance ticker + prediction loop. */
+    enabled: boolean;
+    /** Rollup window (seconds) the ticker aggregates + predicts over. */
+    windowSec: number;
   };
   victim: {
     port: number;
@@ -238,6 +248,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       silenceWindowMs: e.SILENCE_WINDOW_MS,
       recoveryWindowMs: e.RECOVERY_WINDOW_MS,
       mergePollIntervalMs: e.MERGE_POLL_INTERVAL_MS,
+    },
+    performance: {
+      enabled: e.PERF_ENABLED,
+      windowSec: e.PERF_WINDOW_SEC,
     },
     victim: {
       port: e.VICTIM_PORT,

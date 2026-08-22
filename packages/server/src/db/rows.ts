@@ -91,6 +91,54 @@ export interface RepoLearningRow {
   updated_at: number;
 }
 
+/* ── api_performance_samples (AI Incident PREVENTION Phase 1) ────────────── */
+/**
+ * One derived performance profile per (service, endpoint) per rollup window.
+ * All numeric columns are NOT NULL (the compute layer always fills them, using
+ * 0 where a window has no data); only the free-text `prediction` is optional.
+ * `id` is a BIGSERIAL surrogate key (int8 → JS number via the pool parser).
+ */
+export interface ApiPerformanceSampleRow {
+  id: number;
+  service_name: string;
+  endpoint: string;
+  method: string;
+  window_start: number;
+  window_end: number;
+  request_count: number;
+  rps: number;
+  p50_latency_ms: number;
+  p95_latency_ms: number;
+  p99_latency_ms: number;
+  error_rate: number;
+  timeout_rate: number;
+  performance_score: number;
+  risk_score: number;
+  /** Human-readable trend prediction, e.g. "may breach in ~14 min (87%)". */
+  prediction: string | null;
+}
+
+/* ── risk_states (AI Incident PREVENTION Phase 1) ───────────────────────── */
+/**
+ * Durable per-(service, endpoint) escalation state. `status` is an app-level
+ * label (e.g. `healthy` | `watch` | `at_risk`); the two `consecutive_*` streaks
+ * default to 0. `prediction_details` holds the serialized prediction payload
+ * (JSON TEXT). `id` is a BIGSERIAL surrogate key.
+ */
+export interface RiskStateRow {
+  id: number;
+  service_name: string;
+  endpoint: string;
+  status: string;
+  first_detected_at: number | null;
+  last_escalated_at: number | null;
+  consecutive_risk_windows: number;
+  consecutive_healthy_windows: number;
+  current_risk_score: number | null;
+  prediction_details: string | null;
+  updated_at: number;
+}
+
 /* ── codecs (JSON columns + SQLite 0/1 booleans) ────────────────────────── */
 
 /** Serialize a value for a JSON TEXT column (`null`/`undefined` → SQL NULL). */

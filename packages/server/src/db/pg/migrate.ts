@@ -1,11 +1,12 @@
 import type pg from 'pg';
 /** Bumped with every DDL change (was shared with the sqlite driver). */
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 import { withTransaction } from './pool.js';
 
 /**
  * Idempotent PostgreSQL schema migration — the full sqlite DDL (SPEC §8)
- * translated. All 13 tables + indexes, executed inside **one transaction**.
+ * translated, plus the AI Incident PREVENTION tables (Phase 1). All 15 tables
+ * + indexes, executed inside **one transaction**.
  *
  * Translation decisions (sqlite → postgres):
  *
@@ -254,6 +255,53 @@ CREATE TABLE IF NOT EXISTS repo_learnings (
   updated_at     BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_repo_learnings_repo ON repo_learnings(repo);
+
+-- ── api_performance_samples (AI Incident PREVENTION Phase 1) ────────────────
+-- One row per (service, endpoint) per rollup window: the derived performance
+-- profile (percentiles, rates, RPS), a 0-100 performance_score, a 0-100
+-- risk_score, and a human-readable trend prediction. Rebuilt/updated each
+-- window via ON CONFLICT (service_name, endpoint, window_start).
+CREATE TABLE IF NOT EXISTS api_performance_samples (
+  id                 BIGSERIAL PRIMARY KEY,
+  service_name       TEXT NOT NULL,
+  endpoint           TEXT NOT NULL,
+  method             TEXT NOT NULL,
+  window_start       BIGINT NOT NULL,
+  window_end         BIGINT NOT NULL,
+  request_count      BIGINT NOT NULL,
+  rps                DOUBLE PRECISION NOT NULL,
+  p50_latency_ms     DOUBLE PRECISION NOT NULL,
+  p95_latency_ms     DOUBLE PRECISION NOT NULL,
+  p99_latency_ms     DOUBLE PRECISION NOT NULL,
+  error_rate         DOUBLE PRECISION NOT NULL,
+  timeout_rate       DOUBLE PRECISION NOT NULL,
+  performance_score  DOUBLE PRECISION NOT NULL,
+  risk_score         DOUBLE PRECISION NOT NULL,
+  prediction         TEXT,
+  UNIQUE(service_name, endpoint, window_start)
+);
+CREATE INDEX IF NOT EXISTS idx_api_perf_svc_ep_window
+  ON api_performance_samples(service_name, endpoint, window_start DESC);
+
+-- ── risk_states (AI Incident PREVENTION Phase 1) ────────────────────────────
+-- Durable per-(service, endpoint) escalation state driven by successive
+-- performance windows: current status, consecutive risk/healthy streaks, the
+-- live risk score, and the serialized prediction detail. One row per endpoint
+-- via ON CONFLICT (service_name, endpoint).
+CREATE TABLE IF NOT EXISTS risk_states (
+  id                           BIGSERIAL PRIMARY KEY,
+  service_name                 TEXT NOT NULL,
+  endpoint                     TEXT NOT NULL,
+  status                       TEXT NOT NULL,
+  first_detected_at            BIGINT,
+  last_escalated_at            BIGINT,
+  consecutive_risk_windows     BIGINT NOT NULL DEFAULT 0,
+  consecutive_healthy_windows  BIGINT NOT NULL DEFAULT 0,
+  current_risk_score           DOUBLE PRECISION,
+  prediction_details           TEXT,
+  updated_at                   BIGINT NOT NULL,
+  UNIQUE(service_name, endpoint)
+);
 
 -- ── schema_version (sqlite PRAGMA user_version equivalent) ──────────────────
 CREATE TABLE IF NOT EXISTS schema_version (
