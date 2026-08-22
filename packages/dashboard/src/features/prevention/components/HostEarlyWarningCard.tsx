@@ -243,11 +243,14 @@ export function HostEarlyWarningCard() {
               ))}
             </div>
 
-            {/* Prediction + probability + cause + action */}
-            {worst && (
+            {/* Prediction panel — the consequence sentence, likely cause and
+                recommended action are RISK context: rendering them while every
+                metric is healthy reads as a live warning at "0%", which is
+                nonsense. Healthy ⇒ a calm all-clear line instead. */}
+            {worst && atRisk ? (
               <div
                 className="mt-4 rounded-xl border px-3.5 py-3"
-                style={{ borderColor: headColor + (atRisk ? '55' : '30'), backgroundColor: headColor + '12' }}
+                style={{ borderColor: headColor + '55', backgroundColor: headColor + '12' }}
               >
                 <div className="flex items-start gap-2.5">
                   <TrendingUp className="mt-0.5 h-4 w-4 shrink-0" style={{ color: headColor }} />
@@ -294,7 +297,25 @@ export function HostEarlyWarningCard() {
                   </div>
                 </dl>
               </div>
-            )}
+            ) : worst ? (
+              <div
+                className="mt-4 flex items-center gap-2.5 rounded-xl border px-3.5 py-3"
+                style={{ borderColor: GREEN + '35', backgroundColor: GREEN + '10' }}
+              >
+                <ShieldCheck className="h-4 w-4 shrink-0" style={{ color: GREEN }} />
+                <div className="min-w-0">
+                  <span
+                    className="block text-[9px] uppercase tracking-[0.2em] text-white/45"
+                    style={{ fontFamily: MONO }}
+                  >
+                    Prediction
+                  </span>
+                  <span className="block text-sm font-semibold leading-snug" style={{ color: GREEN }}>
+                    No breach predicted — {focus?.service ?? 'host'} resources healthy
+                  </span>
+                </div>
+              </div>
+            ) : null}
           </>
         )}
       </div>
