@@ -359,6 +359,11 @@ async function generateAiReport(
   const secondParsed = AiReportSchema.safeParse(parseModelJson(second.text));
   if (secondParsed.success) return { ai: secondParsed.data, engine: second.engine };
 
+  console.error('[health-report] AI JSON invalid twice', {
+    engine: second.engine,
+    zod: secondParsed.error.issues.slice(0, 3),
+    head: second.text.slice(0, 400),
+  });
   throw new CodeReviewError(
     502,
     'upstream_error',

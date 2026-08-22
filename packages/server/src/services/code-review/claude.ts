@@ -127,5 +127,17 @@ export async function claudeGenerateText(
       'The Claude engine returned no text — is Claude Code signed in on this machine?',
     );
   }
+  // Auth/limit failures often come back as PROSE, not an error exit — returning
+  // them as an "answer" poisons every caller and defeats the Gemini fallback.
+  if (
+    text.length < 400 &&
+    /not logged in|please run \/login|invalid api key|credit balance|usage limit|please sign in/i.test(text)
+  ) {
+    throw new CodeReviewError(
+      502,
+      'upstream_error',
+      `Claude subscription auth failed: ${text.slice(0, 120)} — refresh CLAUDE_CODE_OAUTH_TOKEN (claude setup-token).`,
+    );
+  }
   return text;
 }
