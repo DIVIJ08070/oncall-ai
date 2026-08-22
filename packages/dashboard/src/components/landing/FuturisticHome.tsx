@@ -335,21 +335,6 @@ function Hero() {
             </Link>
           </div>
         </StaggerItem>
-
-        <StaggerItem>
-          <Link
-            to="/dashboard"
-            className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-2 backdrop-blur-md transition-colors hover:border-white/25"
-          >
-            <span className="h-1.5 w-1.5 animate-pulse-live rounded-full bg-[#52D273]" />
-            <span
-              className="text-[10px] uppercase tracking-[0.18em] text-white/60"
-              style={{ fontFamily: MONO }}
-            >
-              All systems operational · View status →
-            </span>
-          </Link>
-        </StaggerItem>
       </StaggerGroup>
     </section>
   );
