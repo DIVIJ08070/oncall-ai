@@ -14,6 +14,12 @@ const SelfLearningPage = lazy(() =>
     default: m.SelfLearningPage,
   })),
 );
+// Lazy-loaded like the other feature pages — the report UI is only needed on /health.
+const ProjectHealthPage = lazy(() =>
+  import('./features/health/pages/ProjectHealthPage').then((m) => ({
+    default: m.ProjectHealthPage,
+  })),
+);
 import { LandingPage as CodeReviewLandingPage } from './features/code-review-buddy/pages/LandingPage';
 import { DemoPage as CodeReviewAppPage } from './features/code-review-buddy/pages/DemoPage';
 
@@ -36,6 +42,14 @@ export function AppRoutes() {
           element={
             <Suspense fallback={<LazyPageFallback />}>
               <SelfLearningPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/health"
+          element={
+            <Suspense fallback={<LazyPageFallback />}>
+              <ProjectHealthPage />
             </Suspense>
           }
         />

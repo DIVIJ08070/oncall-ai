@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   GitPullRequest,
   GraduationCap,
+  HeartPulse,
   PlayCircle,
   ArrowRight,
 } from 'lucide-react';
@@ -27,6 +28,7 @@ const SIDE_NAV: { label: string; to: string; icon: LucideIcon; end?: boolean }[]
   { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
   { label: 'Incidents', to: '/incidents', icon: AlertTriangle },
   { label: 'Code Review', to: '/code-review', icon: GitPullRequest },
+  { label: 'Project Health', to: '/health', icon: HeartPulse },
   { label: 'Self-Learning', to: '/learning', icon: GraduationCap },
   { label: 'Live Demo', to: '/demo', icon: PlayCircle },
 ];
