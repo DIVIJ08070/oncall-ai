@@ -222,7 +222,6 @@ export class DetectionEngine {
       if (AUTO_HEAL_STATUSES.includes(inc.status) && !breaching.has(inc.detector)) {
         // Transient auto-heal (SPEC §10.4): metrics recovered before any PR.
         const resolved = await resolveIncident(this.db.dao.incidents, inc.id, now);
-      if (resolved) void emailIncidentResolved(this.db, this.config, resolved);
         if (resolved) void emailIncidentResolved(this.db, this.config, resolved);
         if (resolved) {
           this.recoveryVerifier?.forget(inc.id);
