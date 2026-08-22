@@ -9,14 +9,18 @@ import {
   startHealthReport,
 } from '../../../api/healthReport';
 import type { HealthReport } from '../../../api/healthReport';
+import { getSelectedRepo } from '../../../api';
 
 /** The repo the user connected for incident catching (same source as the
  * Self-Learning page); health opens on THIS repo automatically. */
-function connectedRepoUrl(): string {
+async function connectedRepoUrl(): Promise<string> {
   const stored = localStorage.getItem('oncall.selfLearning.repo');
-  const slug =
-    (stored && /^[\w.-]+\/[\w.-]+$/.test(stored) ? stored : null) ??
-    'DIVIJ08070/oncall-ai-victim';
+  if (stored && /^[\w.-]+\/[\w.-]+$/.test(stored)) {
+    return `https://github.com/${stored}`;
+  }
+  // Follow the repo connected in onboarding (Setup Wizard → select repo).
+  const sel = await getSelectedRepo();
+  const slug = sel ? `${sel.owner}/${sel.repo}` : 'DIVIJ08070/oncall-ai-victim';
   return `https://github.com/${slug}`;
 }
 import { StageChecklist } from '../components/StageChecklist';
@@ -45,24 +49,29 @@ type Phase =
 
 export function ProjectHealthPage() {
   const [phase, setPhase] = useState<Phase>({ kind: 'boot' });
+  const [connectedUrl, setConnectedUrl] = useState<string | null>(null);
 
-  /* boot: show the connected repo's latest report, or analyze it now */
+  /* boot: resolve the connected repo (onboarding-selected), then show its
+     latest report or analyze it now */
   useEffect(() => {
     if (phase.kind !== 'boot') return;
     let alive = true;
-    const repoUrl = connectedRepoUrl();
-    getLatestHealthReport(repoUrl)
-      .then((job) => {
-        if (!alive) return;
-        if (job.status === 'done' && job.report) {
-          setPhase({ kind: 'done', repoUrl, report: job.report });
-        } else {
-          void start(repoUrl);
-        }
-      })
-      .catch(() => {
-        if (alive) void start(repoUrl);
-      });
+    void connectedRepoUrl().then((repoUrl) => {
+      if (!alive) return;
+      setConnectedUrl(repoUrl);
+      getLatestHealthReport(repoUrl)
+        .then((job) => {
+          if (!alive) return;
+          if (job.status === 'done' && job.report) {
+            setPhase({ kind: 'done', repoUrl, report: job.report });
+          } else {
+            void start(repoUrl);
+          }
+        })
+        .catch(() => {
+          if (alive) void start(repoUrl);
+        });
+    });
     return () => {
       alive = false;
     };
@@ -142,7 +151,7 @@ export function ProjectHealthPage() {
             >
               <HeartPulse className="h-3.5 w-3.5 text-[#FF8233]" />
               {repoDisplayName(phase.repoUrl)}
-              {phase.repoUrl === connectedRepoUrl() && (
+              {phase.repoUrl === connectedUrl && (
                 <span className="text-white/35">· connected repo</span>
               )}
             </span>
@@ -178,7 +187,7 @@ export function ProjectHealthPage() {
           onReset={reset}
         />
       ) : phase.kind === 'boot' ? (
-        <RunningState repoUrl={connectedRepoUrl()} startedAt={Date.now()} bootProbe />
+        <RunningState repoUrl={connectedUrl ?? 'connected repo'} startedAt={Date.now()} bootProbe />
       ) : (
         <IdleState
           busy={phase.kind === 'starting'}
@@ -270,7 +279,7 @@ function IdleState({
           className="mt-5 text-[11px] uppercase tracking-[0.16em] text-white/40 transition-colors hover:text-[#FF8233]"
           style={{ fontFamily: MONO }}
         >
-          ← back to {repoDisplayName(connectedRepoUrl())}
+          ← back to connected repo
         </button>
       )}
     </div>

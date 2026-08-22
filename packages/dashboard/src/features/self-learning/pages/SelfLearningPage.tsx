@@ -1,3 +1,4 @@
+import { getSelectedRepo } from '../../../api';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, FormEvent, ReactNode } from 'react';
 import {
@@ -40,6 +41,8 @@ import { absoluteTime, relativeTime } from '../../../lib/format';
 
 const REPO_STORAGE_KEY = 'oncall.selfLearning.repo';
 const DEFAULT_REPO = 'DIVIJ08070/oncall-ai-victim';
+// The onboarding-selected repo (GET /repos/selected) overrides this default
+// whenever the user hasn't explicitly picked a repo on this page.
 const POLL_MS = 15_000;
 const NEWBORN_MESSAGE =
   'The AI has not learned this repo yet — feedback from PRs will grow it.';
@@ -166,6 +169,28 @@ function growthByDay(items: Learning[]): Array<{ label: string; total: number }>
 
 export function SelfLearningPage() {
   const [repo, setRepo] = useState<string>(() => loadStoredRepo());
+
+  // No explicit per-page override? Follow the repo connected in onboarding —
+  // selecting a repo in the Setup Wizard repoints the whole app.
+  useEffect(() => {
+    let stored: string | null = null;
+    try {
+      stored = window.localStorage.getItem(REPO_STORAGE_KEY);
+    } catch {
+      stored = null;
+    }
+    if (stored?.trim()) return;
+    const ctrl = new AbortController();
+    void getSelectedRepo(ctrl.signal).then((sel) => {
+      if (sel) {
+        const slug = `${sel.owner}/${sel.repo}`;
+        setRepo(slug);
+        setDraft(slug);
+      }
+    });
+    return () => ctrl.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [draft, setDraft] = useState(repo);
 
   const commitRepo = (): void => {

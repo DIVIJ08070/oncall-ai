@@ -65,6 +65,21 @@ export function registerRepoRoutes(
     }
   });
 
+  // GET /repos/selected — the repo the customer connected in onboarding.
+  // This is the single source of truth the dashboard pages (Self-Learning,
+  // Project Health) follow, so a wizard selection changes the whole app.
+  app.get('/api/v1/repos/selected', async (req, reply) => {
+    const customer = await currentCustomer(req, db, config);
+    if (!customer || !customer.github_owner || !customer.github_repo) {
+      return sendError(reply, 404, 'not_found', 'No repo selected yet');
+    }
+    return reply.code(200).send({
+      owner: customer.github_owner,
+      repo: customer.github_repo,
+      default_branch: customer.default_branch,
+    });
+  });
+
   app.post('/api/v1/repos/select', async (req, reply) => {
     const parsed = RepoSelectRequestSchema.safeParse(req.body);
     if (!parsed.success) {

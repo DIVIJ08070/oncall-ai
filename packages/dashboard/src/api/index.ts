@@ -73,3 +73,14 @@ export async function getAuthMe(signal?: AbortSignal): Promise<User | null> {
     throw err;
   }
 }
+
+/** `GET /api/v1/repos/selected` — the repo connected in onboarding, or null. */
+export async function getSelectedRepo(
+  signal?: AbortSignal,
+): Promise<{ owner: string; repo: string } | null> {
+  try {
+    return await apiFetch<{ owner: string; repo: string }>('/repos/selected', { signal });
+  } catch {
+    return null;
+  }
+}
