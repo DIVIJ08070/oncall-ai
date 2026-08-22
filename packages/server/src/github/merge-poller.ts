@@ -3,7 +3,7 @@ import type { Config } from '../config.js';
 import type { OncallDb } from '../db/index.js';
 import type { Broker } from '../sse/broker.js';
 import { type Clock, systemClock } from '../detection/clock.js';
-import { emailIncidentResolved, emailIncidentMerged } from '../notify/index.js';
+import { emailIncidentResolved } from '../notify/index.js';
 import {
   beginVerifying,
   escalateIncident,
@@ -296,8 +296,6 @@ export class MergePoller {
     // picked up by Phase 2 of this same poll, which starts its sustained-health clock.
     const verifying = await beginVerifying(this.db.dao.incidents, inc.id);
     this.verifier.begin(verifying ?? inc, now);
-    // Confirm the merge to the user immediately (recovery email follows later).
-    void emailIncidentMerged(this.db, this.config, verifying ?? inc, pr.github_pr_number, this.log);
     if (verifying) {
       result.merged.push(verifying);
       this.publish(customerId, verifying, 'incident_verifying');
