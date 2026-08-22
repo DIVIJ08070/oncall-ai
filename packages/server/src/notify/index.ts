@@ -133,3 +133,40 @@ export function createSlackNotifier(deps: SlackNotifierDeps): Notifier {
     incidentEscalated: (incident) => fire(incident, 'incident_escalated'),
   };
 }
+
+/**
+ * Send a "✅ resolved" email + record it. Called at every resolve site
+ * (merge-poller recovery, detection self-heal). Best-effort; never throws.
+ */
+export async function emailIncidentResolved(
+  db: OncallDb,
+  config: Config,
+  incident: Incident,
+  log: NotifyLogger = () => {},
+): Promise<void> {
+  if (!emailConfigured(config)) return;
+  const subject = `✅ Resolved · ${incident.title}`;
+  const body = [
+    `Good news — an incident on OnCall AI has recovered.`,
+    '',
+    `Service:  ${incident.service}`,
+    `Title:    ${incident.title}`,
+    `Status:   resolved`,
+    `Incident: ${incident.id}`,
+    '',
+    'The service metrics are back within their healthy range.',
+    'Dashboard: http://localhost:5173/incidents',
+  ].join('\n');
+  try {
+    const res = await sendAlertEmail(config, subject, body);
+    await db.dao.notifications.insert({
+      incident_id: incident.id,
+      channel: 'email',
+      status: res.ok ? 'sent' : res.simulated ? 'stubbed' : 'failed',
+      payload: { subject, to: res.to, simulated: res.simulated, error: res.error },
+    });
+    if (res.ok) log(`[notify] resolved email sent → ${res.to}`, { incident_id: incident.id });
+  } catch (err) {
+    log('[notify] resolved email threw', err);
+  }
+}

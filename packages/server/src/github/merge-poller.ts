@@ -3,6 +3,7 @@ import type { Config } from '../config.js';
 import type { OncallDb } from '../db/index.js';
 import type { Broker } from '../sse/broker.js';
 import { type Clock, systemClock } from '../detection/clock.js';
+import { emailIncidentResolved } from '../notify/index.js';
 import {
   beginVerifying,
   escalateIncident,
@@ -214,10 +215,13 @@ export class MergePoller {
     const result: MergePollResult = { now, merged: [], resolved: [], escalated: [] };
 
     for (const customer of await this.db.dao.customers.list()) {
-      // Phase 1 — detect merges of PRs whose incident is awaiting_merge.
+      // Phase 1 — detect merges of PRs whose incident has an open fix PR.
+      // create_fix_pr leaves the incident at `fix_proposed` (PR open, awaiting
+      // a human merge) — that is the state we watch. (`awaiting_merge` is a
+      // documented-but-unused legacy status; watching it caught nothing.)
       for (const inc of await this.db.dao.incidents.list({
         customer_id: customer.id,
-        status: 'awaiting_merge',
+        status: 'fix_proposed',
       })) {
         await this.checkForMerge(customer.id, inc, now, result);
       }
@@ -398,6 +402,7 @@ export class MergePoller {
 
     if (outcome === 'recovered') {
       const resolved = await resolveIncident(this.db.dao.incidents, inc.id, now);
+      if (resolved) void emailIncidentResolved(this.db, this.config, resolved, this.log);
       if (pr) {
         void this.commentAndFinalize(pr, 'recovered', inc, rollup, now);
       }

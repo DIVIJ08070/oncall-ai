@@ -1,3 +1,4 @@
+import { emailIncidentResolved } from '../notify/index.js';
 import type { Incident } from '@oncall/shared';
 import type { Config } from '../config.js';
 import type { OncallDb } from '../db/index.js';
@@ -221,6 +222,8 @@ export class DetectionEngine {
       if (AUTO_HEAL_STATUSES.includes(inc.status) && !breaching.has(inc.detector)) {
         // Transient auto-heal (SPEC §10.4): metrics recovered before any PR.
         const resolved = await resolveIncident(this.db.dao.incidents, inc.id, now);
+      if (resolved) void emailIncidentResolved(this.db, this.config, resolved);
+        if (resolved) void emailIncidentResolved(this.db, this.config, resolved);
         if (resolved) {
           this.recoveryVerifier?.forget(inc.id);
           result.resolved.push(resolved);
@@ -246,6 +249,7 @@ export class DetectionEngine {
     const outcome = verifier.evaluate(inc, now, rollup);
     if (outcome === 'recovered') {
       const resolved = await resolveIncident(this.db.dao.incidents, inc.id, now);
+      if (resolved) void emailIncidentResolved(this.db, this.config, resolved);
       verifier.forget(inc.id);
       if (resolved) {
         result.resolved.push(resolved);
