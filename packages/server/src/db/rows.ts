@@ -59,7 +59,7 @@ export interface ChatMessageRow {
 }
 
 /* ── notifications ──────────────────────────────────────────────────────── */
-export type NotificationChannel = 'slack';
+export type NotificationChannel = 'slack' | 'email';
 export type NotificationStatus = 'sent' | 'stubbed' | 'failed';
 export interface NotificationRow {
   id: string;

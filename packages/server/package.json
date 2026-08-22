@@ -2,7 +2,7 @@
   "name": "@oncall/server",
   "version": "0.1.0",
   "private": true,
-  "description": "@oncall/server \u2014 Fastify platform (config loader scaffolded in C1; routes/db land in later chunks).",
+  "description": "@oncall/server — Fastify platform (config loader scaffolded in C1; routes/db land in later chunks).",
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
@@ -23,12 +23,14 @@
     "@oncall/shared": "*",
     "dotenv": "^16.4.5",
     "fastify": "^4.28.1",
+    "nodemailer": "^9.0.5",
     "pg": "^8.23.0",
     "ulid": "^2.3.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
+    "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.23.1"
   }
 }

@@ -3,6 +3,7 @@ import type { Config } from '../config.js';
 import type { OncallDb } from '../db/index.js';
 import type { NotificationStatus } from '../db/rows.js';
 import type { Notifier } from '../detection/seams.js';
+import { sendAlertEmail, emailConfigured } from './email.js';
 
 /**
  * Slack notification stub (SPEC §7 side-effect, FR-17). Implements the detection
@@ -68,7 +69,41 @@ export function createSlackNotifier(deps: SlackNotifierDeps): Notifier {
     }
   };
 
+  const emailFor = async (incident: Incident, kind: string): Promise<void> => {
+    if (!emailConfigured(config)) return;
+    const opened = kind !== 'incident_escalated';
+    const subject = `${opened ? '🔴 Incident' : '⚠️ Escalation'} · ${incident.title}`;
+    const body = [
+      `${opened ? 'A new incident has been detected' : 'An incident has escalated'} on OnCall AI.`,
+      '',
+      `Service:   ${incident.service}`,
+      `Title:     ${incident.title}`,
+      `Severity:  ${incident.severity}`,
+      `Detector:  ${incident.detector}`,
+      `Observed:  ${incident.observed_value} (threshold ${incident.threshold_value})`,
+      `Status:    ${incident.status}`,
+      `Incident:  ${incident.id}`,
+      '',
+      'The AI is investigating and will open a fix PR if it finds a confident root cause.',
+      'Dashboard: http://localhost:5173/incidents',
+    ].join('\n');
+    try {
+      const res = await sendAlertEmail(config, subject, body);
+      await db.dao.notifications.insert({
+        incident_id: incident.id,
+        channel: 'email',
+        status: res.ok ? 'sent' : res.simulated ? 'stubbed' : 'failed',
+        payload: { subject, to: res.to, simulated: res.simulated, error: res.error },
+      });
+      if (res.ok) log(`[notify] email sent → ${res.to}`, { incident_id: incident.id });
+      else if (res.error) log('[notify] email send failed', res.error);
+    } catch (err) {
+      log('[notify] email path threw', err);
+    }
+  };
+
   const fire = async (incident: Incident, kind: string): Promise<void> => {
+    void emailFor(incident, kind);
     const payload = slackPayload(incident, kind);
     if (!webhook) {
       // Log-only stub (SPEC §14: empty webhook → log-only).

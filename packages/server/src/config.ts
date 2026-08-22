@@ -72,6 +72,13 @@ const EnvSchema = z.object({
   // ingest / notify
   INGEST_API_KEY: strEnv('dev-local-ingest-key'),
   SLACK_WEBHOOK_URL: optStr(),
+  // Real email (nodemailer) — set these in .env to deliver alerts to an inbox.
+  SMTP_HOST: optStr(),
+  SMTP_PORT: numEnv(587),
+  SMTP_USER: optStr(),
+  SMTP_PASS: optStr(),
+  ALERT_EMAIL_FROM: optStr(),
+  ALERT_EMAIL_TO: optStr(),
 
   // server / auth
   PORT: numEnv(3001),
@@ -161,6 +168,15 @@ export interface Config {
   };
   notify: {
     slackWebhookUrl?: string;
+    /** SMTP for real email alerts (nodemailer). Absent ⇒ email is simulated. */
+    smtp?: {
+      host: string;
+      port: number;
+      user: string;
+      pass: string;
+      from: string;
+      to: string;
+    };
   };
   server: {
     port: number;
@@ -272,6 +288,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     },
     notify: {
       slackWebhookUrl: e.SLACK_WEBHOOK_URL,
+      smtp:
+        e.SMTP_HOST && e.SMTP_USER && e.SMTP_PASS && e.ALERT_EMAIL_TO
+          ? {
+              host: e.SMTP_HOST,
+              port: e.SMTP_PORT,
+              user: e.SMTP_USER,
+              pass: e.SMTP_PASS,
+              from: e.ALERT_EMAIL_FROM ?? e.SMTP_USER,
+              to: e.ALERT_EMAIL_TO,
+            }
+          : undefined,
     },
     server: {
       port: e.PORT,
