@@ -10,6 +10,7 @@ import {
 import { GlassCard, MONO } from '../../../components/shell/UnifiedChrome';
 import type { HealthIssue, HealthReport, IssueSeverity } from '../../../api/healthReport';
 import { ScoreRing, scoreColor } from './ScoreRing';
+import { HealthHelix } from './HealthHelix';
 
 /**
  * ReportView — the "done" state: hero (score ring + summary + engine badge)
@@ -51,7 +52,7 @@ export function ReportView({
     <div className="flex flex-col gap-5">
       <HeroCard report={report} repoUrl={repoUrl} onReset={onReset} />
 
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <div className="hr-grid grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         <LanguagesCard report={report} />
         <FrameworksCard frameworks={report.frameworks} />
         <DatabasesCard databases={report.databases} />
@@ -60,6 +61,27 @@ export function ReportView({
         <SecurityCard security={report.security} />
         <TestsDocsCard tests={report.tests} docs={report.docs} />
       </div>
+      <style>{`
+        @keyframes hr-rise {
+          from { opacity: 0; transform: translateY(14px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .hr-grid > * {
+          animation: hr-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+          transition: transform 0.25s ease, border-color 0.25s ease;
+        }
+        .hr-grid > *:hover { transform: translateY(-4px); }
+        .hr-grid > *:nth-child(1) { animation-delay: 0.05s; }
+        .hr-grid > *:nth-child(2) { animation-delay: 0.12s; }
+        .hr-grid > *:nth-child(3) { animation-delay: 0.19s; }
+        .hr-grid > *:nth-child(4) { animation-delay: 0.26s; }
+        .hr-grid > *:nth-child(5) { animation-delay: 0.33s; }
+        .hr-grid > *:nth-child(6) { animation-delay: 0.40s; }
+        .hr-grid > *:nth-child(7) { animation-delay: 0.47s; }
+        @media (prefers-reduced-motion: reduce) {
+          .hr-grid > * { animation: none; }
+        }
+      `}</style>
     </div>
   );
 }
@@ -77,8 +99,20 @@ function HeroCard({
 }) {
   const engine = report.engine === 'claude' ? 'Claude' : 'Gemini';
   return (
-    <GlassCard className="p-6 sm:p-8">
-      <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:gap-8">
+    <GlassCard className="overflow-hidden p-0">
+      <div className="flex flex-col lg:flex-row">
+        {/* the patient: DNA helix of the repo's languages, issues as mutations,
+            scanner beam + score-driven ECG */}
+        <div className="relative h-[300px] w-full shrink-0 border-b border-white/10 bg-black/30 lg:h-[360px] lg:w-[46%] lg:border-b-0 lg:border-r">
+          <HealthHelix report={report} />
+          <span
+            className="pointer-events-none absolute left-4 top-3 text-[10px] uppercase tracking-[0.2em] text-white/35"
+            style={{ fontFamily: MONO }}
+          >
+            Repo genome · issues glow as mutations
+          </span>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col items-center gap-6 p-6 sm:flex-row sm:items-start sm:gap-8 sm:p-8">
         <ScoreRing score={report.score} grade={report.grade} />
         <div className="min-w-0 flex-1 text-center sm:text-left">
           <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
@@ -134,6 +168,7 @@ function HeroCard({
             <RotateCcw className="h-3.5 w-3.5" />
             Analyze another
           </button>
+        </div>
         </div>
       </div>
     </GlassCard>
