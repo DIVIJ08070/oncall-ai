@@ -85,7 +85,7 @@ export function createSlackNotifier(deps: SlackNotifierDeps): Notifier {
       `Incident:  ${incident.id}`,
       '',
       'The AI is investigating and will open a fix PR if it finds a confident root cause.',
-      'Dashboard: http://localhost:5173/incidents',
+      `View incident: ${config.server.dashboardUrl.replace(/\/+$/, '')}/incidents/${incident.id}`,
     ].join('\n');
     try {
       const res = await sendAlertEmail(config, subject, body);
@@ -155,7 +155,7 @@ export async function emailIncidentResolved(
     `Incident: ${incident.id}`,
     '',
     'The service metrics are back within their healthy range.',
-    'Dashboard: http://localhost:5173/incidents',
+    `View incident: ${config.server.dashboardUrl.replace(/\/+$/, '')}/incidents/${incident.id}`,
   ].join('\n');
   try {
     const res = await sendAlertEmail(config, subject, body);
