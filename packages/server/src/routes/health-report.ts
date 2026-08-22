@@ -7,6 +7,7 @@ import {
   createJob,
   failJob,
   getJob,
+  latestDoneJobFor,
 } from '../services/health-report/jobs.js';
 import { runHealthReport } from '../services/health-report/report.js';
 
@@ -38,6 +39,20 @@ export function registerHealthReportRoutes(
   ctx: AppContext,
 ): void {
   const { config } = ctx;
+
+  // GET /api/v1/health-report/latest?repoUrl=… — newest finished report for a
+  // repo, so the page can show the connected repo's health without re-running.
+  app.get('/api/v1/health-report/latest', async (req, reply) => {
+    const repoUrl = (req.query as Record<string, string | undefined>).repoUrl;
+    if (!repoUrl) {
+      return sendError(reply, 400, 'validation_error', 'repoUrl query param required');
+    }
+    const job = latestDoneJobFor(repoUrl);
+    if (!job) {
+      return sendError(reply, 404, 'not_found', 'No completed report for this repo yet');
+    }
+    return reply.send(job);
+  });
 
   // POST /api/v1/health-report — start an async health-report job.
   app.post('/api/v1/health-report', async (req, reply) => {

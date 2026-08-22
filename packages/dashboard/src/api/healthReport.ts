@@ -79,3 +79,10 @@ export function getHealthReport(
     signal,
   });
 }
+
+/** Newest finished report for a repo, or a 404 error if none exists yet. */
+export function getLatestHealthReport(repoUrl: string): Promise<HealthReportJob> {
+  return apiFetch<HealthReportJob>(
+    `/health-report/latest?repoUrl=${encodeURIComponent(repoUrl)}`,
+  );
+}

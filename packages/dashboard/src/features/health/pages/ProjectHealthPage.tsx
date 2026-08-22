@@ -3,8 +3,22 @@ import type { FormEvent } from 'react';
 import { AlertTriangle, HeartPulse, RotateCcw } from 'lucide-react';
 import { GlassCard, MONO } from '../../../components/shell/UnifiedChrome';
 import { Entrance } from '../../../components/motion/primitives';
-import { getHealthReport, startHealthReport } from '../../../api/healthReport';
+import {
+  getHealthReport,
+  getLatestHealthReport,
+  startHealthReport,
+} from '../../../api/healthReport';
 import type { HealthReport } from '../../../api/healthReport';
+
+/** The repo the user connected for incident catching (same source as the
+ * Self-Learning page); health opens on THIS repo automatically. */
+function connectedRepoUrl(): string {
+  const stored = localStorage.getItem('oncall.selfLearning.repo');
+  const slug =
+    (stored && /^[\w.-]+\/[\w.-]+$/.test(stored) ? stored : null) ??
+    'DIVIJ08070/oncall-ai-victim';
+  return `https://github.com/${slug}`;
+}
 import { StageChecklist } from '../components/StageChecklist';
 import { ReportView, repoDisplayName } from '../components/ReportView';
 
@@ -22,6 +36,7 @@ const MAX_POLL_FAILURES = 5;
 const REPO_URL_RE = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+?(?:\.git)?\/?$/;
 
 type Phase =
+  | { kind: 'boot' }
   | { kind: 'idle' }
   | { kind: 'starting'; repoUrl: string }
   | { kind: 'running'; id: string; repoUrl: string; startedAt: number }
@@ -29,7 +44,30 @@ type Phase =
   | { kind: 'error'; repoUrl: string; message: string };
 
 export function ProjectHealthPage() {
-  const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
+  const [phase, setPhase] = useState<Phase>({ kind: 'boot' });
+
+  /* boot: show the connected repo's latest report, or analyze it now */
+  useEffect(() => {
+    if (phase.kind !== 'boot') return;
+    let alive = true;
+    const repoUrl = connectedRepoUrl();
+    getLatestHealthReport(repoUrl)
+      .then((job) => {
+        if (!alive) return;
+        if (job.status === 'done' && job.report) {
+          setPhase({ kind: 'done', repoUrl, report: job.report });
+        } else {
+          void start(repoUrl);
+        }
+      })
+      .catch(() => {
+        if (alive) void start(repoUrl);
+      });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase.kind]);
 
   const start = async (repoUrl: string): Promise<void> => {
     setPhase({ kind: 'starting', repoUrl });
@@ -96,7 +134,40 @@ export function ProjectHealthPage() {
   return (
     <Entrance className="flex flex-col gap-5">
       {phase.kind === 'done' ? (
-        <ReportView report={phase.report} repoUrl={phase.repoUrl} onReset={reset} />
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] text-white/70"
+              style={{ fontFamily: MONO }}
+            >
+              <HeartPulse className="h-3.5 w-3.5 text-[#FF8233]" />
+              {repoDisplayName(phase.repoUrl)}
+              {phase.repoUrl === connectedRepoUrl() && (
+                <span className="text-white/35">· connected repo</span>
+              )}
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void start(phase.repoUrl)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] text-white/70 transition-colors hover:border-[#F16524]/40 hover:text-[#FF8233]"
+                style={{ fontFamily: MONO }}
+              >
+                <RotateCcw className="h-3 w-3" />
+                Re-analyze
+              </button>
+              <button
+                type="button"
+                onClick={reset}
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] text-white/70 transition-colors hover:border-[#F16524]/40 hover:text-[#FF8233]"
+                style={{ fontFamily: MONO }}
+              >
+                Different repo →
+              </button>
+            </div>
+          </div>
+          <ReportView report={phase.report} repoUrl={phase.repoUrl} onReset={reset} />
+        </>
       ) : phase.kind === 'running' ? (
         <RunningState repoUrl={phase.repoUrl} startedAt={phase.startedAt} />
       ) : phase.kind === 'error' ? (
@@ -106,8 +177,14 @@ export function ProjectHealthPage() {
           onRetry={() => void start(phase.repoUrl)}
           onReset={reset}
         />
+      ) : phase.kind === 'boot' ? (
+        <RunningState repoUrl={connectedRepoUrl()} startedAt={Date.now()} bootProbe />
       ) : (
-        <IdleState busy={phase.kind === 'starting'} onSubmit={(url) => void start(url)} />
+        <IdleState
+          busy={phase.kind === 'starting'}
+          onSubmit={(url) => void start(url)}
+          onBack={() => setPhase({ kind: 'boot' })}
+        />
       )}
     </Entrance>
   );
@@ -118,9 +195,11 @@ export function ProjectHealthPage() {
 function IdleState({
   busy,
   onSubmit,
+  onBack,
 }: {
   busy: boolean;
   onSubmit: (repoUrl: string) => void;
+  onBack?: () => void;
 }) {
   const [url, setUrl] = useState('');
   const [invalid, setInvalid] = useState(false);
@@ -184,13 +263,34 @@ function IdleState({
             : 'public repos only · analysis takes 1–3 minutes'}
         </p>
       </form>
+      {onBack && (
+        <button
+          type="button"
+          onClick={onBack}
+          className="mt-5 text-[11px] uppercase tracking-[0.16em] text-white/40 transition-colors hover:text-[#FF8233]"
+          style={{ fontFamily: MONO }}
+        >
+          ← back to {repoDisplayName(connectedRepoUrl())}
+        </button>
+      )}
     </div>
   );
 }
 
 /* ── running — animated stage checklist ──────────────────────────────────── */
 
-function RunningState({ repoUrl, startedAt }: { repoUrl: string; startedAt: number }) {
+function RunningState({
+  repoUrl,
+  startedAt,
+  bootProbe,
+}: {
+  repoUrl: string;
+  startedAt: number;
+  bootProbe?: boolean;
+}) {
+  if (bootProbe) {
+    // brief flash while we check for an existing report of the connected repo
+  }
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center px-4">
       <p

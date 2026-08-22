@@ -58,3 +58,15 @@ export function failJob(id: string, message: string): void {
   job.status = 'error';
   job.error = message;
 }
+
+/** Latest completed job for a repo (normalized URL match), if any. */
+export function latestDoneJobFor(repoUrl: string): HealthJob | undefined {
+  const norm = (u: string): string =>
+    u.toLowerCase().replace(/\.git$/, '').replace(/\/+$/, '');
+  let best: HealthJob | undefined;
+  for (const job of jobs.values()) {
+    if (job.status !== 'done' || norm(job.repoUrl) !== norm(repoUrl)) continue;
+    if (!best || job.startedAt > best.startedAt) best = job;
+  }
+  return best;
+}
