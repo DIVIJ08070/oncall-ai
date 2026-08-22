@@ -260,11 +260,17 @@ export class MergePoller {
     }
 
     if (data.state === 'closed' && !data.merged) {
-      // PR closed without merging → record closed; leave incident for humans.
+      // PR closed without merging → record the correction ONCE, then move the
+      // incident OUT of `fix_proposed` (→ escalated, needs a human) so this
+      // poll loop never re-processes the same closed PR. Without this the
+      // incident stays watched and the "closed" learning is re-recorded every
+      // poll, inflating its confirmations forever.
       await this.db.dao.pullRequests.update(pr.id, { state: 'closed' });
       // Self-learning auto-signal: humans rejected this AI fix (source
       // "closed", rating −1). Guarded — never breaks the poller.
       await this.recordOutcomeLearning(customerId, inc, pr, 'closed');
+      const escalated = await escalateIncident(this.db.dao.incidents, inc.id);
+      if (escalated) result.escalated.push(escalated);
       return;
     }
     if (!data.merged) return; // still open — nothing to do yet.
