@@ -1,5 +1,3 @@
-import { FlaskConical } from 'lucide-react';
-import { Icon } from '../components/primitives/Icon';
 import { Entrance } from '../components/motion/primitives';
 import { DemoControlPanel } from '../components/demo/DemoControlPanel';
 
@@ -14,10 +12,6 @@ export function DemoControlPage() {
   return (
     <div className="mx-auto flex w-full max-w-[760px] flex-col gap-8">
       <Entrance className="flex flex-col gap-2">
-        <div className="flex items-center gap-2 text-accent">
-          <Icon icon={FlaskConical} size={16} />
-          <span className="text-label uppercase tracking-wide">Live demo</span>
-        </div>
         <h1 className="font-playfair text-h1 italic text-ink">Demo controls</h1>
         <p className="max-w-[60ch] text-body text-ink-2">
           Flip the victim app's failure mode and drive traffic to trigger the live

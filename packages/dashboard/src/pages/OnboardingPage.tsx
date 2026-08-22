@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PlugZap, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import type { RepoRef } from '@oncall/shared';
 import { useSession } from '../state/SessionContext';
 import { Card } from '../components/primitives/Card';
@@ -37,10 +37,6 @@ export function OnboardingPage() {
     <Entrance className="mx-auto flex w-full max-w-[600px] flex-col gap-6 py-6 md:py-10">
       {/* Header band — brand frame that spans all four steps */}
       <header className="flex flex-col gap-2">
-        <span className="inline-flex items-center gap-1.5 text-label uppercase tracking-wide text-accent-text">
-          <Icon icon={PlugZap} size={13} />
-          Guided setup
-        </span>
         <h1 className="font-playfair text-h1 italic text-ink">Get connected</h1>
         <p className="max-w-[46ch] text-body text-ink-2">
           Four quick steps take you from GitHub sign-in to your first AI-detected
