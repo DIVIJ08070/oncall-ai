@@ -189,8 +189,8 @@ export function EscalationTimeline() {
         </div>
       )}
 
-      {/* Timeline */}
-      <ol className="mt-4 flex flex-col">
+      {/* Timeline — scrolls when the escalation history grows long */}
+      <ol className="mt-4 flex max-h-[360px] flex-col overflow-y-auto pr-1">
         {steps.map((s, i) => (
           <TimelineStep key={s.id} step={s} isLast={i === steps.length - 1 && !waiting} />
         ))}
